@@ -1,1 +1,15 @@
+streamlit
 ollama
+edge-tts==6.1.14
+pypdf
+python-docx
+openpyxl
+python-pptx
+fpdf
+pillow
+ddgs
+google-genai
+pandas
+plotly
+youtube-transcript-api
+beautifulsoup4
