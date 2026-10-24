@@ -259,11 +259,13 @@ with st.sidebar:
 
     st.markdown("<h3 style='text-align:center;'>🪐 PANEL DE CONTROL</h3>", unsafe_allow_html=True)
     modelo_seleccionado = st.selectbox("Motor de IA", ["llama3.2:latest", "llama3.2-vision:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-       try:
+    
+    try:
         api_key_gemini = st.secrets["GEMINI_API_KEY"]
         st.sidebar.success("🔑 API Key cargada automáticamente")
     except:
-        api_key_gemini = st.text_input("Gemini API Key", type="password") 
+        api_key_gemini = st.text_input("Gemini API Key", type="password")
+        
     st.markdown("---")
     st.markdown("<p style='font-size:12px; color:#00f0ff; text-align:center;'>SYSTEM STATUS: OPTIMAL</p>", unsafe_allow_html=True)
 
@@ -292,7 +294,7 @@ with tabs[0]:
             st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{prompt_usuario}\n\nContexto:\n{contexto}", api_key_gemini)
             st.markdown(st.session_state.analisis_ia)
 
-# --- TAB 2: ARCHIVOS (CON BOTÓN PDF AÑADIDO) ---
+# --- TAB 2: ARCHIVOS ---
 with tabs[1]:
     st.markdown("### 📁 Análisis Forense de Archivos")
     archivo = st.file_uploader("Sube cualquier archivo (PDF, Word, Excel, PPT, TXT, Imágenes)", type=["pdf", "txt", "docx", "xlsx", "pptx", "png", "jpg", "jpeg"])
@@ -351,7 +353,6 @@ with tabs[1]:
 
                 st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
                 
-                # --- NUEVOS BOTONES DE DESCARGA (TXT Y PDF) ---
                 col_txt, col_pdf = st.columns(2)
                 with col_txt:
                     st.download_button("📥 Descargar Análisis (TXT)", st.session_state.analisis_ia.encode('utf-8'), "analisis_documento.txt", "text/plain")
