@@ -18,6 +18,8 @@ import pandas as pd
 import plotly.express as px
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
+import requests
+import tempfile
 
 try:
     from ddgs import DDGS
@@ -42,7 +44,8 @@ _defaults = {
     "analisis_ia": "", "audio_podcast": None, "contexto_podcast": "", "tema_podcast": "",
     "chat_history": [], "img_url": "", "app_code": "", "video_script": "",
     "office_file_bytes": None, "office_file_ext": "", "office_file_mime": "",
-    "pdf_bytes": None, "mermaid_code": "", "yt_resumen": "", "traduccion_audio": None
+    "pdf_bytes": None, "mermaid_code": "", "yt_resumen": "", "traduccion_audio": None,
+    "video_bytes": None
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state:
@@ -417,7 +420,6 @@ with tabs[3]:
     for msg in st.session_state.chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
         
-    # Botones de descarga del chat
     if st.session_state.chat_history:
         texto_chat = "\n\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.chat_history])
         botones_descarga(texto_chat, "Historial_Chat")
@@ -515,15 +517,33 @@ with tabs[7]:
             </script>
             """
         )
-        st.download_button("📥 Descargar Código del Mapa", st.session_state.mermaid_code.encode('utf-8'), "mapa.mmd", "text/plain")
+        
+        st.markdown("---")
+        col_mmd, col_png = st.columns(2)
+        
+        with col_mmd:
+            st.download_button("📥 Descargar Código (.mmd)", st.session_state.mermaid_code.encode('utf-8'), "mapa.mmd", "text/plain")
+            
+        with col_png:
+            b64_code = base64.urlsafe_b64encode(st.session_state.mermaid_code.encode('utf-8')).decode('utf-8')
+            img_url = f"https://mermaid.ink/img/{b64_code}?bgColor=white"
+            try:
+                req = urllib.request.Request(img_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response:
+                    img_bytes = response.read()
+                st.download_button("🖼️ Descargar Imagen (.png)", img_bytes, "mapa_visual.png", "image/png")
+            except Exception as e:
+                st.error(f"No se pudo generar la imagen. Prueba con el .mmd. Detalle: {e}")
 
-# --- TAB 9: VÍDEO ---
+# --- TAB 9: VÍDEO (CON GENERADOR DE MP4) ---
 with tabs[8]:
-    st.markdown("### 🎬 Simulador de Escenas")
+    st.markdown("### 🎬 Simulador de Escenas y Vídeo")
     tema_video = st.text_input("Concepto de la escena:")
     if st.button("Generar Storyboard") and tema_video:
         with st.spinner("Escribiendo..."):
             st.session_state.video_script = llamar_ia(modelo_seleccionado, f"Divide '{tema_video}' en 3 escenas: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'.", api_key_gemini)
+            st.session_state.video_bytes = None # Reseteamos el vídeo anterior
+            
     if st.session_state.video_script:
         st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
         botones_descarga(st.session_state.video_script, "Storyboard_Video")
@@ -533,6 +553,74 @@ with tabs[8]:
             for i, escena in enumerate(escenas, 1):
                 url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escena.strip())}?width=800&height=450&nologo=true"
                 st.image(url_img, caption=f"Fotograma {i}")
+
+        # --- NUEVA SECCIÓN: GENERAR VÍDEO ---
+        st.markdown("---")
+        st.markdown("#### 🎥 Montar Vídeo Final")
+        voz_video = st.selectbox("Voz del Narrador para el vídeo:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_vid")
+        
+        if st.button("🎬 Generar Vídeo (MP4)"):
+            with st.spinner("Creando vídeo... Esto puede tardar 1-2 minutos dependiendo de tu conexión."):
+                try:
+                    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+                    
+                    escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
+                    narraciones = re.findall(r'Narrador:\s*(.*)', st.session_state.video_script)
+                    
+                    if not escenas or not narraciones or len(escenas) != len(narraciones):
+                        st.error("El formato del guion no es correcto. Debe tener el mismo número de 'ESCENA X: ...' y 'Narrador: ...'.")
+                    else:
+                        clips = []
+                        for i in range(len(escenas)):
+                            # 1. Descargar Imagen de la escena
+                            url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escenas[i].strip())}?width=800&height=450&nologo=true"
+                            img_data = requests.get(url_img).content
+                            
+                            # 2. Generar Audio de la narración
+                            audio_bytes = generar_audio_sincrono(narraciones[i].strip(), voz_video)
+                            
+                            if not audio_bytes:
+                                continue
+                                
+                            # Guardar temporalmente para que moviepy los lea
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
+                                f_img.write(img_data)
+                                img_path = f_img.name
+                                
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
+                                f_aud.write(audio_bytes)
+                                aud_path = f_aud.name
+                            
+                            # 3. Crear el clip de vídeo (Imagen con duración del audio)
+                            audio_clip = AudioFileClip(aud_path)
+                            img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
+                            img_clip = img_clip.with_audio(audio_clip)
+                            clips.append(img_clip)
+                            
+                            # Limpiamos los archivos temporales
+                            os.remove(img_path)
+                            os.remove(aud_path)
+                            
+                        if clips:
+                            final_video = concatenate_videoclips(clips, method="compose")
+                            out_path = tempfile.mktemp(suffix=".mp4")
+                            
+                            # Exportar el vídeo
+                            final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+                            
+                            with open(out_path, "rb") as f_vid:
+                                st.session_state.video_bytes = f_vid.read()
+                                
+                            # Limpiamos el vídeo temporal
+                            os.remove(out_path)
+                            st.success("¡Vídeo generado con éxito! 🎉")
+                except Exception as e:
+                    st.error(f"Error al generar el vídeo: {e}")
+
+        # Mostrar el vídeo si ya se ha generado
+        if st.session_state.video_bytes:
+            st.video(st.session_state.video_bytes)
+            st.download_button("📥 Descargar Vídeo (MP4)", st.session_state.video_bytes, "video_generado.mp4", "video/mp4")
 
 # --- TAB 10: APP BUILDER ---
 with tabs[9]:
