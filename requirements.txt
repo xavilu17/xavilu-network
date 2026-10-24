@@ -13,3 +13,5 @@ pandas
 plotly
 youtube-transcript-api
 beautifulsoup4
+moviepy
+imageio-ffmpeg
