@@ -178,6 +178,29 @@ def generar_pdf_pro(titulo, contenido):
     pdf.multi_cell(0, 8, txt=contenido.encode('latin-1', 'replace').decode('latin-1'))
     return bytes(pdf.output())
 
+# --- NUEVA FUNCIÓN: BOTONES UNIVERSALES ---
+def botones_descarga(texto, nombre_archivo="documento"):
+    if texto:
+        st.markdown("---")
+        col_txt, col_pdf = st.columns(2)
+        with col_txt:
+            st.download_button(
+                label="📥 Descargar (TXT)", 
+                data=texto.encode('utf-8'), 
+                file_name=f"{nombre_archivo}.txt", 
+                mime="text/plain", 
+                key=f"btn_txt_{nombre_archivo}"
+            )
+        with col_pdf:
+            pdf_data = generar_pdf_pro(f"Reporte - {nombre_archivo.replace('_', ' ')}", texto)
+            st.download_button(
+                label="📄 Descargar (PDF)", 
+                data=pdf_data, 
+                file_name=f"{nombre_archivo}.pdf", 
+                mime="application/pdf", 
+                key=f"btn_pdf_{nombre_archivo}"
+            )
+
 def generar_word(texto):
     doc = Document()
     doc.add_heading("Documento Generado por Xavilu", 0)
@@ -287,12 +310,16 @@ with tabs[0]:
             with st.expander(f"🌐 {res['titulo']}"):
                 st.write(res['resumen'])
     st.markdown("---")
+    
     prompt_usuario = st.text_area("Instrucción para el núcleo neuronal:", height=80)
     if st.button("⚡ Ejecutar Análisis") and prompt_usuario:
         with st.spinner("Redactando..."):
             contexto = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in st.session_state.resultados_busqueda])
             st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{prompt_usuario}\n\nContexto:\n{contexto}", api_key_gemini)
-            st.markdown(st.session_state.analisis_ia)
+            
+    if st.session_state.analisis_ia:
+        st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=300, key="ta_resultado_web")
+        botones_descarga(st.session_state.analisis_ia, "Analisis_Web")
 
 # --- TAB 2: ARCHIVOS ---
 with tabs[1]:
@@ -352,14 +379,7 @@ with tabs[1]:
                         st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_local, "")
 
                 st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
-                
-                col_txt, col_pdf = st.columns(2)
-                with col_txt:
-                    st.download_button("📥 Descargar Análisis (TXT)", st.session_state.analisis_ia.encode('utf-8'), "analisis_documento.txt", "text/plain")
-                with col_pdf:
-                    titulo_pdf = f"Análisis Forense - {archivo.name}" if archivo else "Análisis Forense de Documento"
-                    pdf_data = generar_pdf_pro(titulo_pdf, st.session_state.analisis_ia)
-                    st.download_button("📄 Descargar Análisis (PDF)", pdf_data, "analisis_documento.pdf", "application/pdf")
+                botones_descarga(st.session_state.analisis_ia, "Analisis_Documento")
 
 # --- TAB 3: PODCAST ---
 with tabs[2]:
@@ -383,6 +403,8 @@ with tabs[2]:
             st.session_state.guion_podcast = llamar_ia(modelo_seleccionado, f"Guion en ESPAÑOL entre 'Moderador:' y 'Experto:'. Contexto: {st.session_state.contexto_podcast[:3000]}", api_key_gemini)
         if st.session_state.guion_podcast:
             st.text_area("Guion:", value=st.session_state.guion_podcast, height=200, key="ta_guion")
+            botones_descarga(st.session_state.guion_podcast, "Guion_Podcast")
+            
             if st.button("🔊 Sintetizar Audio"):
                 st.session_state.audio_podcast = generar_audio_sincrono(st.session_state.ta_guion, v_mod, v_exp)
         if st.session_state.audio_podcast:
@@ -394,6 +416,12 @@ with tabs[3]:
     st.markdown("### 💬 Interfaz de Comunicación Directa")
     for msg in st.session_state.chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
+        
+    # Botones de descarga del chat
+    if st.session_state.chat_history:
+        texto_chat = "\n\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.chat_history])
+        botones_descarga(texto_chat, "Historial_Chat")
+
     if prompt := st.chat_input("Escribe tu mensaje al núcleo neuronal..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
@@ -487,7 +515,7 @@ with tabs[7]:
             </script>
             """
         )
-        st.download_button("📥 Descargar Código", st.session_state.mermaid_code.encode('utf-8'), "mapa.mmd", "text/plain")
+        st.download_button("📥 Descargar Código del Mapa", st.session_state.mermaid_code.encode('utf-8'), "mapa.mmd", "text/plain")
 
 # --- TAB 9: VÍDEO ---
 with tabs[8]:
@@ -498,6 +526,8 @@ with tabs[8]:
             st.session_state.video_script = llamar_ia(modelo_seleccionado, f"Divide '{tema_video}' en 3 escenas: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'.", api_key_gemini)
     if st.session_state.video_script:
         st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
+        botones_descarga(st.session_state.video_script, "Storyboard_Video")
+        
         if st.button("🖼️ Renderizar Fotogramas"):
             escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
             for i, escena in enumerate(escenas, 1):
@@ -540,7 +570,7 @@ with tabs[10]:
 
     if st.session_state.yt_resumen:
         st.text_area("Resumen Ejecutivo:", value=st.session_state.yt_resumen, height=300)
-        st.download_button("📥 Descargar Resumen (TXT)", st.session_state.yt_resumen.encode('utf-8'), "resumen_youtube.txt", "text/plain")
+        botones_descarga(st.session_state.yt_resumen, "Resumen_YouTube")
 
 # --- TAB 12: GRÁFICOS ---
 with tabs[11]:
@@ -594,6 +624,8 @@ with tabs[12]:
             traduccion = llamar_ia(modelo_seleccionado, prompt_trad, api_key_gemini)
             st.success("Traducción completada:")
             st.info(traduccion)
+            
+            botones_descarga(traduccion, f"Traduccion_{idioma_dest}")
             
             with st.spinner("Sintetizando voz nativa..."):
                 voz_sel = IDIOMAS[idioma_dest]
