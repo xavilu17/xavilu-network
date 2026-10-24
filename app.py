@@ -31,7 +31,7 @@ try:
 except ImportError:
     HAS_GEMINI = False
 
-st.set_page_config(page_title="Xavilu Network", page_icon="⚙️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Xavilu Network", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 
 MAX_FILE_MB = 25
 MAX_TEXTO_IA = 60_000
@@ -127,7 +127,21 @@ def leer_archivo_universal(upload, modelo_ia):
         return "\n".join([" | ".join([str(c) for c in f if c is not None]) for h in wb.sheetnames for f in wb[h].iter_rows(values_only=True) if any(c is not None for c in f)])
     if nombre.endswith(".pptx"):
         return "\n".join([sh.text for s in Presentation(upload).slides for sh in s.shapes if hasattr(sh, "text") and sh.text])
-    return "Formato detectado."
+    
+    if nombre.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        try:
+            imagen = Image.open(upload)
+            out_img = BytesIO()
+            imagen.save(out_img, format="PNG")
+            bytes_img = out_img.getvalue()
+            client = ollama.Client(host="http://127.0.0.1:11434")
+            mod_vision = modelo_ia if "vision" in modelo_ia or "bakllava" in modelo_ia else "llama3.2-vision:latest"
+            res = client.chat(model=mod_vision, messages=[{'role': 'user', 'content': 'Extrae absolutamente todo el texto y describe los elementos visuales de esta imagen para un análisis forense.', 'images': [bytes_img]}])
+            return f"[Texto extraído de la imagen]: {res['message']['content']}"
+        except Exception as e: 
+            return f"Error procesando imagen: {e}. (Asegúrate de tener un modelo de visión como llama3.2-vision en Ollama o usa Gemini)."
+            
+    return "Formato no reconocido."
 
 def llamar_ia(modelo, prompt, api_key_gemini=""):
     prompt = prompt[:MAX_TEXTO_IA]
@@ -189,14 +203,13 @@ def generar_pptx(titulo, texto):
 
 # --- SÍNTESIS DE VOZ ---
 async def _ejecutar_sintesis_edge(texto_guion, voz_mod, voz_exp=None):
-    # Función adaptada para traducir o hacer guiones
     audio_completo = BytesIO()
-    if not voz_exp: # Es traducción
+    if not voz_exp: 
         try:
             async for chunk in edge_tts.Communicate(texto_guion, voz_mod).stream():
                 if chunk["type"] == "audio": audio_completo.write(chunk["data"])
         except: pass
-    else: # Es guion de podcast
+    else: 
         for linea in texto_guion.split("\n"):
             if not linea.strip() or ":" not in linea: continue
             rol, _, texto = linea.partition(":")
@@ -265,16 +278,59 @@ with tabs[0]:
             st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{prompt_usuario}\n\nContexto:\n{contexto}", api_key_gemini)
             st.markdown(st.session_state.analisis_ia)
 
-# --- TAB 2: ARCHIVOS ---
+# --- TAB 2: ARCHIVOS (EL DESTRIPADOR CON INDICACIONES) ---
 with tabs[1]:
-    st.markdown("### 📁 Análisis de Datos Locales")
-    archivo = st.file_uploader("Ingesta de Archivo", type=["pdf", "txt", "docx", "xlsx", "pptx"])
+    st.markdown("### 📁 Análisis Forense de Archivos")
+    archivo = st.file_uploader("Sube cualquier archivo (PDF, Word, Excel, PPT, TXT, Imágenes)", type=["pdf", "txt", "docx", "xlsx", "pptx", "png", "jpg", "jpeg"])
+    
     if archivo:
-        st.session_state.texto_archivo = leer_archivo_universal(archivo, modelo_seleccionado)[:MAX_TEXTO_IA]
-        st.success("Archivo asimilado correctamente.")
-        if st.button("🔎 Analizar Documento"):
-            with st.spinner("Analizando..."): st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, st.session_state.texto_archivo, api_key_gemini)
-            st.write(st.session_state.analisis_ia)
+        if archivo.size > MAX_FILE_MB * 1024 * 1024:
+            st.error(f"El archivo supera el límite de {MAX_FILE_MB} MB.")
+        else:
+            with st.spinner("Extrayendo información del archivo..."):
+                st.session_state.texto_archivo = leer_archivo_universal(archivo, modelo_seleccionado)[:MAX_TEXTO_IA]
+            
+            st.success("Archivo asimilado. ¿Cómo quieres destriparlo?")
+            
+            # MENÚ DE ANÁLISIS
+            tipo_analisis = st.radio("Selecciona el protocolo de análisis:", [
+                "Análisis Forense (Destripar a fondo)", 
+                "Resumen Ejecutivo Rápido", 
+                "Extraer Datos, Cifras y Nombres", 
+                "Generar Examen (Preguntas y Respuestas)"
+            ])
+
+            # NUEVA CAJA DE INDICACIONES CONCRETAS
+            indicacion_extra = st.text_input("🎯 Indícale a la IA algo concreto (Opcional):", 
+                                             placeholder="Ej: Sácame solo las fechas de vencimiento, o céntrate en la parte financiera...")
+            
+            if st.button("🔎 Ejecutar Análisis Neuronal"):
+                with st.spinner("Procesando documento..."):
+                    # 1. Generamos el prompt según el radio button
+                    if "Forense" in tipo_analisis:
+                        prompt_base = (
+                            f"Actúa como un analista de inteligencia experto. Tu objetivo es destripar este documento por completo.\n"
+                            f"Extrae y analiza: ideas principales, nombres propios, fechas, datos numéricos, contradicciones, y conclusiones no explícitas.\n\n"
+                            f"CONTENIDO DEL DOCUMENTO:\n{st.session_state.texto_archivo}"
+                        )
+                    elif "Rápido" in tipo_analisis:
+                        prompt_base = f"Haz un resumen ejecutivo conciso de qué trata este documento, cuál es su propósito y sus conclusiones principales:\n\n{st.session_state.texto_archivo}"
+                    elif "Datos" in tipo_analisis:
+                        prompt_base = f"Extrae de forma estructurada todos los datos clave, nombres propios, fechas, tablas, estadísticas y cifras numéricas que aparezcan en este texto:\n\n{st.session_state.texto_archivo}"
+                    else:
+                        prompt_base = f"Basándote en este texto, genera un cuestionario de 10 preguntas con 4 opciones cada una (tipo test) y sus respuestas correctas al final:\n\n{st.session_state.texto_archivo}"
+
+                    # 2. Si el usuario ha escrito una indicación extra, se la inyectamos al prompt
+                    if indicacion_extra.strip():
+                        prompt_final = f"{prompt_base}\n\nINSTRUCCIÓN ESPECÍFICA ADICIONAL DEL USUARIO (Prioriza esto):\n{indicacion_extra}"
+                    else:
+                        prompt_final = prompt_base
+
+                    # 3. Llamamos a la IA
+                    st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_final, api_key_gemini)
+                
+                st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
+                st.download_button("📥 Descargar Análisis (TXT)", st.session_state.analisis_ia.encode('utf-8'), "analisis_documento.txt", "text/plain")
 
 # --- TAB 3: PODCAST ---
 with tabs[2]:
@@ -435,7 +491,7 @@ with tabs[9]:
         st.code(st.session_state.app_code, language="python")
         st.download_button("📥 Descargar Código (.py)", st.session_state.app_code.encode('utf-8'), "mi_nueva_app.py", "text/plain")
 
-# --- TAB 11: YOUTUBE (NUEVO) ---
+# --- TAB 11: YOUTUBE ---
 with tabs[10]:
     st.markdown("### 🎥 Analizador de Vídeos de YouTube")
     url_yt = st.text_input("Pega la URL del vídeo (Ej: https://www.youtube.com/watch?v=...):")
@@ -443,7 +499,6 @@ with tabs[10]:
     if st.button("Extraer y Resumir") and url_yt:
         with st.spinner("Buscando transcripción y resumiendo..."):
             try:
-                # Extraer ID del vídeo
                 video_id = url_yt.split("v=")[-1].split("&")[0] if "v=" in url_yt else url_yt.split("/")[-1]
                 transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['es', 'en'])
                 texto_completo = " ".join([t['text'] for t in transcript])
@@ -458,7 +513,7 @@ with tabs[10]:
         st.text_area("Resumen Ejecutivo:", value=st.session_state.yt_resumen, height=300)
         st.download_button("📥 Descargar Resumen (TXT)", st.session_state.yt_resumen.encode('utf-8'), "resumen_youtube.txt", "text/plain")
 
-# --- TAB 12: GRÁFICOS (NUEVO) ---
+# --- TAB 12: GRÁFICOS ---
 with tabs[11]:
     st.markdown("### 📈 Generador de Gráficos Inteligente")
     archivo_datos = st.file_uploader("Sube un archivo CSV o Excel:", type=["csv", "xlsx"])
@@ -475,7 +530,6 @@ with tabs[11]:
                 respuesta_ia = llamar_ia(modelo_seleccionado, prompt_graf, api_key_gemini)
                 
                 try:
-                    # Parsear la respuesta de la IA
                     partes = respuesta_ia.strip().split('|')
                     tipo = partes[0].strip().lower()
                     x_col = partes[1].strip()
@@ -491,12 +545,11 @@ with tabs[11]:
                 except:
                     st.warning("La IA no pudo determinar las columnas. Prueba a ser más específico.")
 
-# --- TAB 13: TRADUCTOR DE VOZ (NUEVO) ---
+# --- TAB 13: TRADUCTOR ---
 with tabs[12]:
     st.markdown("### 🌍 Traductor y Locutor Multilingüe")
     texto_trad = st.text_area("Texto a traducir:", height=100)
     
-    # Diccionario de idiomas y sus voces
     IDIOMAS = {
         "Inglés": "en-US-JennyNeural",
         "Francés": "fr-FR-DeniseNeural",
