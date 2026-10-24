@@ -12,7 +12,6 @@ from PIL import Image
 from fpdf import FPDF
 import urllib.parse
 import csv
-import streamlit.components.v1 as components
 import os
 import base64
 import pandas as pd
@@ -27,6 +26,7 @@ except ImportError:
 
 try:
     from google import genai
+    from google.genai import types
     HAS_GEMINI = True
 except ImportError:
     HAS_GEMINI = False
@@ -79,7 +79,7 @@ st.markdown(
 )
 
 # --- EFECTO DE SONIDO SCI-FI ---
-components.html(
+st.html(
     """
     <script>
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -100,9 +100,7 @@ components.html(
         }
     });
     </script>
-    """,
-    height=0,
-    width=0
+    """
 )
 
 # --- FUNCIONES BASE ---
@@ -127,7 +125,6 @@ def leer_archivo_universal(upload, modelo_ia):
         return "\n".join([" | ".join([str(c) for c in f if c is not None]) for h in wb.sheetnames for f in wb[h].iter_rows(values_only=True) if any(c is not None for c in f)])
     if nombre.endswith(".pptx"):
         return "\n".join([sh.text for s in Presentation(upload).slides for sh in s.shapes if hasattr(sh, "text") and sh.text])
-    
     if nombre.endswith((".png", ".jpg", ".jpeg", ".webp")):
         try:
             imagen = Image.open(upload)
@@ -138,21 +135,34 @@ def leer_archivo_universal(upload, modelo_ia):
             mod_vision = modelo_ia if "vision" in modelo_ia or "bakllava" in modelo_ia else "llama3.2-vision:latest"
             res = client.chat(model=mod_vision, messages=[{'role': 'user', 'content': 'Extrae absolutamente todo el texto y describe los elementos visuales de esta imagen para un análisis forense.', 'images': [bytes_img]}])
             return f"[Texto extraído de la imagen]: {res['message']['content']}"
-        except Exception as e: 
-            return f"Error procesando imagen: {e}. (Asegúrate de tener un modelo de visión como llama3.2-vision en Ollama o usa Gemini)."
-            
+        except Exception as e: return f"Error procesando imagen: {e}."
     return "Formato no reconocido."
 
 def llamar_ia(modelo, prompt, api_key_gemini=""):
     prompt = prompt[:MAX_TEXTO_IA]
     if api_key_gemini.strip() and HAS_GEMINI:
-        try: return genai.Client(api_key=api_key_gemini).models.generate_content(model='gemini-2.5-flash', contents=prompt).text
+        try: return genai.Client(api_key=api_key_gemini).models.generate_content(model='gemini-3.8-flash', contents=prompt).text
         except: pass
     try: 
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         response = client.chat(model=modelo, messages=[{"role": "user", "content": prompt}], options={"temperature": 0.2, "num_ctx": 8192, "repeat_penalty": 1.2})
         return response["message"]["content"].split("</think>")[-1].strip()
     except Exception as e: return f"[ERROR LOCAL] {e}"
+
+# --- FUNCIÓN PARA GEMINI DIRECTO ---
+def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
+    if not HAS_GEMINI:
+        return "[ERROR] La librería google-genai no está instalada."
+    try:
+        client = genai.Client(api_key=api_key_gemini)
+        parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
+        response = client.models.generate_content(
+            model='gemini-3.8-flash',
+            contents=[prompt, parte_archivo]
+        )
+        return response.text
+    except Exception as e:
+        return f"[ERROR GEMINI] {e}"
 
 # --- GENERADORES DE ARCHIVOS ---
 def generar_pdf_pro(titulo, contenido):
@@ -278,7 +288,7 @@ with tabs[0]:
             st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{prompt_usuario}\n\nContexto:\n{contexto}", api_key_gemini)
             st.markdown(st.session_state.analisis_ia)
 
-# --- TAB 2: ARCHIVOS (EL DESTRIPADOR CON INDICACIONES) ---
+# --- TAB 2: ARCHIVOS (CON BOTÓN PDF AÑADIDO) ---
 with tabs[1]:
     st.markdown("### 📁 Análisis Forense de Archivos")
     archivo = st.file_uploader("Sube cualquier archivo (PDF, Word, Excel, PPT, TXT, Imágenes)", type=["pdf", "txt", "docx", "xlsx", "pptx", "png", "jpg", "jpeg"])
@@ -287,12 +297,8 @@ with tabs[1]:
         if archivo.size > MAX_FILE_MB * 1024 * 1024:
             st.error(f"El archivo supera el límite de {MAX_FILE_MB} MB.")
         else:
-            with st.spinner("Extrayendo información del archivo..."):
-                st.session_state.texto_archivo = leer_archivo_universal(archivo, modelo_seleccionado)[:MAX_TEXTO_IA]
+            st.success("Archivo cargado. Configura el análisis:")
             
-            st.success("Archivo asimilado. ¿Cómo quieres destriparlo?")
-            
-            # MENÚ DE ANÁLISIS
             tipo_analisis = st.radio("Selecciona el protocolo de análisis:", [
                 "Análisis Forense (Destripar a fondo)", 
                 "Resumen Ejecutivo Rápido", 
@@ -300,37 +306,55 @@ with tabs[1]:
                 "Generar Examen (Preguntas y Respuestas)"
             ])
 
-            # NUEVA CAJA DE INDICACIONES CONCRETAS
             indicacion_extra = st.text_input("🎯 Indícale a la IA algo concreto (Opcional):", 
                                              placeholder="Ej: Sácame solo las fechas de vencimiento, o céntrate en la parte financiera...")
             
             if st.button("🔎 Ejecutar Análisis Neuronal"):
-                with st.spinner("Procesando documento..."):
-                    # 1. Generamos el prompt según el radio button
-                    if "Forense" in tipo_analisis:
-                        prompt_base = (
-                            f"Actúa como un analista de inteligencia experto. Tu objetivo es destripar este documento por completo.\n"
-                            f"Extrae y analiza: ideas principales, nombres propios, fechas, datos numéricos, contradicciones, y conclusiones no explícitas.\n\n"
-                            f"CONTENIDO DEL DOCUMENTO:\n{st.session_state.texto_archivo}"
-                        )
-                    elif "Rápido" in tipo_analisis:
-                        prompt_base = f"Haz un resumen ejecutivo conciso de qué trata este documento, cuál es su propósito y sus conclusiones principales:\n\n{st.session_state.texto_archivo}"
-                    elif "Datos" in tipo_analisis:
-                        prompt_base = f"Extrae de forma estructurada todos los datos clave, nombres propios, fechas, tablas, estadísticas y cifras numéricas que aparezcan en este texto:\n\n{st.session_state.texto_archivo}"
-                    else:
-                        prompt_base = f"Basándote en este texto, genera un cuestionario de 10 preguntas con 4 opciones cada una (tipo test) y sus respuestas correctas al final:\n\n{st.session_state.texto_archivo}"
+                if "Forense" in tipo_analisis:
+                    prompt_base = "Actúa como un analista de inteligencia experto. Destripa este documento por completo. Extrae: ideas principales, nombres propios, fechas, datos numéricos, contradicciones, y conclusiones no explícitas."
+                elif "Rápido" in tipo_analisis:
+                    prompt_base = "Haz un resumen ejecutivo conciso de qué trata este documento, cuál es su propósito y sus conclusiones principales."
+                elif "Datos" in tipo_analisis:
+                    prompt_base = "Extrae de forma estructurada todos los datos clave, nombres propios, fechas, tablas, estadísticas y cifras numéricas que aparezcan en este documento."
+                else:
+                    prompt_base = "Basándote en este documento, genera un cuestionario de 10 preguntas con 4 opciones cada una (tipo test) y sus respuestas correctas al final."
 
-                    # 2. Si el usuario ha escrito una indicación extra, se la inyectamos al prompt
-                    if indicacion_extra.strip():
-                        prompt_final = f"{prompt_base}\n\nINSTRUCCIÓN ESPECÍFICA ADICIONAL DEL USUARIO (Prioriza esto):\n{indicacion_extra}"
-                    else:
-                        prompt_final = prompt_base
+                if indicacion_extra.strip():
+                    prompt_final = f"{prompt_base}\n\nINSTRUCCIÓN ESPECÍFICA ADICIONAL DEL USUARIO (Prioriza esto):\n{indicacion_extra}"
+                else:
+                    prompt_final = prompt_base
 
-                    # 3. Llamamos a la IA
-                    st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_final, api_key_gemini)
-                
+                if api_key_gemini.strip():
+                    with st.spinner("Enviando archivo directamente a Gemini (Nube)..."):
+                        nombre = archivo.name.lower()
+                        if nombre.endswith(".pdf"): mime = "application/pdf"
+                        elif nombre.endswith(".png"): mime = "image/png"
+                        elif nombre.endswith((".jpg", ".jpeg")): mime = "image/jpeg"
+                        else: mime = "text/plain"
+                        
+                        if nombre.endswith((".docx", ".xlsx", ".pptx", ".txt")):
+                            texto_extraido = leer_archivo_universal(archivo, modelo_seleccionado)
+                            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{prompt_final}\n\nCONTENIDO:\n{texto_extraido}", api_key_gemini)
+                        else:
+                            st.session_state.analisis_ia = analizar_archivo_con_gemini(
+                                archivo.getvalue(), mime, prompt_final, api_key_gemini
+                            )
+                else:
+                    with st.spinner("Extrayendo texto y procesando con Ollama (Local)..."):
+                        st.session_state.texto_archivo = leer_archivo_universal(archivo, modelo_seleccionado)[:MAX_TEXTO_IA]
+                        prompt_local = f"{prompt_final}\n\nCONTENIDO DEL DOCUMENTO:\n{st.session_state.texto_archivo}"
+                        st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_local, "")
+
                 st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
-                st.download_button("📥 Descargar Análisis (TXT)", st.session_state.analisis_ia.encode('utf-8'), "analisis_documento.txt", "text/plain")
+                
+                # --- NUEVOS BOTONES DE DESCARGA (TXT Y PDF) ---
+                col_txt, col_pdf = st.columns(2)
+                with col_txt:
+                    st.download_button("📥 Descargar Análisis (TXT)", st.session_state.analisis_ia.encode('utf-8'), "analisis_documento.txt", "text/plain")
+                with col_pdf:
+                    titulo_pdf = f"Análisis Forense - {archivo.name}" if archivo else "Análisis Forense de Documento"
+                    pdf_data = generar_pdf_pro(titulo_pdf, st.session_state.analisis_ia)
+                    st.download_button("📄 Descargar Análisis (PDF)", pdf_data, "analisis_documento.pdf", "application/pdf")
 
 # --- TAB 3: PODCAST ---
 with tabs[2]:
@@ -447,7 +471,7 @@ with tabs[7]:
             st.session_state.mermaid_code = llamar_ia(modelo_seleccionado, prompt_mapa, api_key_gemini).replace("```mermaid", "").replace("```", "").strip()
 
     if st.session_state.mermaid_code:
-        components.html(
+        st.html(
             f"""
             <div class="mermaid" style="background-color: white; padding: 20px; border-radius: 10px;">
             {st.session_state.mermaid_code}
@@ -456,7 +480,7 @@ with tabs[7]:
               import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
               mermaid.initialize({{ startOnLoad: true, theme: 'default' }});
             </script>
-            """, height=600,
+            """
         )
         st.download_button("📥 Descargar Código", st.session_state.mermaid_code.encode('utf-8'), "mapa.mmd", "text/plain")
 
