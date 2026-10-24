@@ -583,101 +583,178 @@ with tabs[8]:
             except Exception as e:
                 st.error(f"No se pudo generar la imagen. Prueba con el .mmd. Detalle: {e}")
 
-# --- TAB 10: VÍDEO ---
+# --- TAB 10: VÍDEO (NUEVO CON MODO MANUAL) ---
 with tabs[9]:
-    with st.expander("❓ ¿Cómo funciona esta sección? (Generador de Vídeo)"):
-        st.write("Escribe un tema. La IA creará un guion de 3 escenas, generará las imágenes y la voz, y unirá todo en un archivo MP4. También puedes subir música de fondo.")
-    st.markdown("### 🎬 Simulador de Escenas y Vídeo")
-    tema_video = st.text_input("Concepto de la escena:")
-    if st.button("Generar Storyboard") and tema_video:
-        with st.spinner("Escribiendo..."):
-            st.session_state.video_script = llamar_ia(modelo_seleccionado, f"Divide '{tema_video}' en 3 escenas: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'.", api_key_gemini)
-            st.session_state.video_bytes = None
-            
-    if st.session_state.video_script:
-        st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
-        botones_descarga(st.session_state.video_script, "Storyboard_Video")
-        
-        if st.button("🖼️ Renderizar Fotogramas"):
-            escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
-            for i, escena in enumerate(escenas, 1):
-                url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escena.strip())}?width=800&height=450&nologo=true"
-                st.image(url_img, caption=f"Fotograma {i}")
+    with st.expander("❓ ¿Cómo funciona esta sección? (Estudio de Vídeo)"):
+        st.write("**Modo IA:** La IA escribe un guion, genera las imágenes, la voz y el vídeo final.\n\n**Modo Manual:** Sube tus propias fotos o vídeo, tu voz y tu música, y la app los unirá en un solo archivo MP4.")
+    
+    st.markdown("### 🎬 Estudio de Vídeo")
+    
+    # Selector de modo
+    modo_video = st.radio("Selecciona el modo de creación:", [
+        "🤖 Generar con IA (Automático)",
+        "📁 Crear con mis archivos (Fotos/Vídeo)"
+    ])
+    
+    st.markdown("---")
 
-        st.markdown("---")
-        st.markdown("#### 🎥 Montar Vídeo Final")
-        voz_video = st.selectbox("Voz del Narrador para el vídeo:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_vid")
-        
-        # NUEVO: Subir música de fondo opcional
-        musica_fondo = st.file_uploader("🎵 Añadir música de fondo (Opcional - MP3 o WAV):", type=["mp3", "wav"])
-        
-        if st.button("🎬 Generar Vídeo (MP4)"):
-            with st.spinner("Creando vídeo... Esto puede tardar 1-2 minutos."):
-                try:
-                    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, afx
-                    
-                    escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
-                    narraciones = re.findall(r'Narrador:\s*(.*)', st.session_state.video_script)
-                    
-                    if not escenas or not narraciones or len(escenas) != len(narraciones):
-                        st.error("El formato del guion no es correcto.")
-                    else:
-                        clips = []
-                        for i in range(len(escenas)):
-                            url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escenas[i].strip())}?width=800&height=450&nologo=true"
-                            img_data = requests.get(url_img).content
-                            audio_bytes = generar_audio_sincrono(narraciones[i].strip(), voz_video)
-                            
-                            if not audio_bytes: continue
+    if modo_video == "🤖 Generar con IA (Automático)":
+        tema_video = st.text_input("Concepto del vídeo:")
+        if st.button("Generar Storyboard") and tema_video:
+            with st.spinner("Escribiendo..."):
+                st.session_state.video_script = llamar_ia(modelo_seleccionado, f"Divide '{tema_video}' en 3 escenas: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'.", api_key_gemini)
+                st.session_state.video_bytes = None
+                
+        if st.session_state.video_script:
+            st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
+            botones_descarga(st.session_state.video_script, "Storyboard_Video")
+            
+            if st.button("🖼️ Renderizar Fotogramas"):
+                escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
+                for i, escena in enumerate(escenas, 1):
+                    url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escena.strip())}?width=800&height=450&nologo=true"
+                    st.image(url_img, caption=f"Fotograma {i}")
+
+            st.markdown("#### 🎥 Montar Vídeo Final")
+            voz_video = st.selectbox("Voz del Narrador:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_vid")
+            musica_fondo = st.file_uploader("🎵 Música de fondo (Opcional):", type=["mp3", "wav"])
+            
+            if st.button("🎬 Generar Vídeo Automático"):
+                with st.spinner("Creando vídeo..."):
+                    try:
+                        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, afx
+                        escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
+                        narraciones = re.findall(r'Narrador:\s*(.*)', st.session_state.video_script)
+                        
+                        if not escenas or not narraciones or len(escenas) != len(narraciones):
+                            st.error("El formato del guion no es correcto.")
+                        else:
+                            clips = []
+                            for i in range(len(escenas)):
+                                url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escenas[i].strip())}?width=800&height=450&nologo=true"
+                                img_data = requests.get(url_img).content
+                                audio_bytes = generar_audio_sincrono(narraciones[i].strip(), voz_video)
+                                if not audio_bytes: continue
+                                    
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
+                                    f_img.write(img_data); img_path = f_img.name
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
+                                    f_aud.write(audio_bytes); aud_path = f_aud.name
                                 
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
-                                f_img.write(img_data)
-                                img_path = f_img.name
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
-                                f_aud.write(audio_bytes)
-                                aud_path = f_aud.name
-                            
-                            audio_clip = AudioFileClip(aud_path)
-                            img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
-                            img_clip = img_clip.with_audio(audio_clip)
-                            clips.append(img_clip)
-                            
-                            os.remove(img_path)
-                            os.remove(aud_path)
-                            
-                        if clips:
-                            final_video = concatenate_videoclips(clips, method="compose")
-                            
-                            # MEZCLAR MÚSICA DE FONDO SI SE HA SUBIDO
-                            if musica_fondo:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_mus:
-                                    f_mus.write(musica_fondo.getvalue())
-                                    mus_path = f_mus.name
+                                audio_clip = AudioFileClip(aud_path)
+                                img_clip = ImageClip(img_path).with_duration(audio_clip.duration).with_audio(audio_clip)
+                                clips.append(img_clip)
+                                os.remove(img_path); os.remove(aud_path)
                                 
-                                music_clip = AudioFileClip(mus_path)
-                                # Hacemos bucle con la música hasta que dure el vídeo
-                                music_loop = music_clip.with_effects([afx.AudioLoop(duration=final_video.duration)])
-                                # Bajamos el volumen al 20% para que no tape la voz
-                                music_loop = music_loop.with_volume_scaled(0.2)
+                            if clips:
+                                final_video = concatenate_videoclips(clips, method="compose")
                                 
-                                # Mezclamos el audio del vídeo (voz) con la música
-                                new_audio = CompositeAudioClip([final_video.audio, music_loop])
-                                final_video = final_video.with_audio(new_audio)
-                                os.remove(mus_path)
-                            
-                            out_path = tempfile.mktemp(suffix=".mp4")
-                            final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
-                            
-                            with open(out_path, "rb") as f_vid:
-                                st.session_state.video_bytes = f_vid.read()
-                            os.remove(out_path)
-                            st.success("¡Vídeo generado con éxito! 🎉")
-                except Exception as e:
-                    st.error(f"Error al generar el vídeo: {e}")
+                                if musica_fondo:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_mus:
+                                        f_mus.write(musica_fondo.getvalue()); mus_path = f_mus.name
+                                    music_clip = AudioFileClip(mus_path)
+                                    music_loop = music_clip.with_effects([afx.AudioLoop(duration=final_video.duration)]).with_volume_scaled(0.2)
+                                    final_video = final_video.with_audio(CompositeAudioClip([final_video.audio, music_loop]))
+                                    os.remove(mus_path)
+                                
+                                out_path = tempfile.mktemp(suffix=".mp4")
+                                final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+                                
+                                with open(out_path, "rb") as f_vid: st.session_state.video_bytes = f_vid.read()
+                                os.remove(out_path)
+                                st.success("¡Vídeo generado con éxito! 🎉")
+                    except Exception as e:
+                        st.error(f"Error al generar el vídeo: {e}")
 
         if st.session_state.video_bytes:
             st.video(st.session_state.video_bytes)
             st.download_button("📥 Descargar Vídeo (MP4)", st.session_state.video_bytes, "video_generado.mp4", "video/mp4")
+
+    else:
+        # MODO MANUAL
+        st.markdown("#### 📁 Sube tus archivos")
+        st.info("💡 Consejo: Al procesar el vídeo, puede tardar un poco. Si usas la versión en la nube (Streamlit), evita subir vídeos de más de 20-30 segundos para no saturar la memoria.")
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            imgs_subidas = st.file_uploader("🖼️ Sube fotos (se unirán en diapositivas de 3s)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+            vid_subido = st.file_uploader("🎥 O sube un vídeo base (MP4/MOV)", type=["mp4", "mov"])
+        with col_b:
+            audio_voz = st.file_uploader("🗣️ Sube audio de voz (Opcional)", type=["mp3", "wav"])
+            audio_musica = st.file_uploader("🎵 Sube música de fondo (Opcional)", type=["mp3", "wav"])
+
+        if st.button("🎬 Montar Vídeo Personalizado"):
+            if not imgs_subidas and not vid_subido:
+                st.warning("Debes subir al menos un vídeo o fotos para crear el vídeo.")
+            else:
+                with st.spinner("Montando tu vídeo personalizado..."):
+                    try:
+                        from moviepy import VideoFileClip, ImageClip, AudioFileClip, CompositeAudioClip, afx, concatenate_videoclips
+                        clips = []
+                        temp_files = []
+
+                        # Procesar imágenes o vídeo base
+                        if vid_subido:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+                                f.write(vid_subido.getvalue())
+                                vid_path = f.name
+                                temp_files.append(vid_path)
+                            base_clip = VideoFileClip(vid_path)
+                            clips.append(base_clip)
+                        elif imgs_subidas:
+                            for img in imgs_subidas:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+                                    f.write(img.getvalue())
+                                    img_path = f.name
+                                    temp_files.append(img_path)
+                                clip = ImageClip(img_path).with_duration(3)
+                                clips.append(clip)
+
+                        if clips:
+                            final_video = concatenate_videoclips(clips, method="compose")
+                            audio_final = None
+                            
+                            # Procesar Voz
+                            if audio_voz:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                                    f.write(audio_voz.getvalue())
+                                    voz_path = f.name
+                                    temp_files.append(voz_path)
+                                audio_final = AudioFileClip(voz_path)
+
+                            # Procesar Música
+                            if audio_musica:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                                    f.write(audio_musica.getvalue())
+                                    mus_path = f.name
+                                    temp_files.append(mus_path)
+                                mus_clip = AudioFileClip(mus_path)
+                                mus_loop = mus_clip.with_effects([afx.AudioLoop(duration=final_video.duration)]).with_volume_scaled(0.3)
+
+                                if audio_final:
+                                    audio_final = CompositeAudioClip([audio_final, mus_loop])
+                                else:
+                                    audio_final = mus_loop
+
+                            if audio_final:
+                                final_video = final_video.with_audio(audio_final)
+
+                            out_path = tempfile.mktemp(suffix=".mp4")
+                            final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+
+                            with open(out_path, "rb") as f_vid:
+                                video_bytes = f_vid.read()
+
+                            for tf in temp_files:
+                                try: os.remove(tf)
+                                except: pass
+                            os.remove(out_path)
+
+                            st.success("¡Vídeo montado con éxito! 🎉")
+                            st.video(video_bytes)
+                            st.download_button("📥 Descargar Vídeo (MP4)", video_bytes, "video_personalizado.mp4", "video/mp4")
+                    except Exception as e:
+                        st.error(f"Error al montar el vídeo: {e}")
 
 # --- TAB 11: APP BUILDER ---
 with tabs[10]:
