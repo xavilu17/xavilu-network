@@ -20,6 +20,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import re
 import requests
 import tempfile
+import time
+import qrcode
 
 try:
     from ddgs import DDGS
@@ -45,7 +47,7 @@ _defaults = {
     "chat_history": [], "img_url": "", "app_code": "", "video_script": "",
     "office_file_bytes": None, "office_file_ext": "", "office_file_mime": "",
     "pdf_bytes": None, "mermaid_code": "", "yt_resumen": "", "traduccion_audio": None,
-    "video_bytes": None
+    "video_bytes": None, "pdf_chat_text": "", "pdf_chat_history": []
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state:
@@ -128,17 +130,6 @@ def leer_archivo_universal(upload, modelo_ia):
         return "\n".join([" | ".join([str(c) for c in f if c is not None]) for h in wb.sheetnames for f in wb[h].iter_rows(values_only=True) if any(c is not None for c in f)])
     if nombre.endswith(".pptx"):
         return "\n".join([sh.text for s in Presentation(upload).slides for sh in s.shapes if hasattr(sh, "text") and sh.text])
-    if nombre.endswith((".png", ".jpg", ".jpeg", ".webp")):
-        try:
-            imagen = Image.open(upload)
-            out_img = BytesIO()
-            imagen.save(out_img, format="PNG")
-            bytes_img = out_img.getvalue()
-            client = ollama.Client(host="http://127.0.0.1:11434")
-            mod_vision = modelo_ia if "vision" in modelo_ia or "bakllava" in modelo_ia else "llama3.2-vision:latest"
-            res = client.chat(model=mod_vision, messages=[{'role': 'user', 'content': 'Extrae absolutamente todo el texto y describe los elementos visuales de esta imagen para un análisis forense.', 'images': [bytes_img]}])
-            return f"[Texto extraído de la imagen]: {res['message']['content']}"
-        except Exception as e: return f"Error procesando imagen: {e}."
     return "Formato no reconocido."
 
 def llamar_ia(modelo, prompt, api_key_gemini=""):
@@ -152,22 +143,26 @@ def llamar_ia(modelo, prompt, api_key_gemini=""):
         return response["message"]["content"].split("</think>")[-1].strip()
     except Exception as e: return f"[ERROR LOCAL] {e}"
 
-# --- FUNCIÓN PARA GEMINI DIRECTO ---
 def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
     if not HAS_GEMINI:
         return "[ERROR] La librería google-genai no está instalada."
-    try:
-        client = genai.Client(api_key=api_key_gemini)
-        parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
-        response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=[prompt, parte_archivo]
-        )
-        return response.text
-    except Exception as e:
-        return f"[ERROR GEMINI] {e}"
+    intentos = 3
+    for i in range(intentos):
+        try:
+            client = genai.Client(api_key=api_key_gemini)
+            parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
+            response = client.models.generate_content(
+                model='gemini-3.8-flash',
+                contents=[prompt, parte_archivo]
+            )
+            return response.text
+        except Exception as e:
+            if "503" in str(e) and i < intentos - 1:
+                time.sleep(3)
+                continue
+            else:
+                return f"[ERROR GEMINI] {e}"
 
-# --- GENERADORES DE ARCHIVOS ---
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF()
     pdf.add_page()
@@ -181,7 +176,6 @@ def generar_pdf_pro(titulo, contenido):
     pdf.multi_cell(0, 8, txt=contenido.encode('latin-1', 'replace').decode('latin-1'))
     return bytes(pdf.output())
 
-# --- NUEVA FUNCIÓN: BOTONES UNIVERSALES ---
 def botones_descarga(texto, nombre_archivo="documento"):
     if texto:
         st.markdown("---")
@@ -237,7 +231,6 @@ def generar_pptx(titulo, texto):
     out = BytesIO(); prs.save(out); out.seek(0)
     return out.getvalue()
 
-# --- SÍNTESIS DE VOZ ---
 async def _ejecutar_sintesis_edge(texto_guion, voz_mod, voz_exp=None):
     audio_completo = BytesIO()
     if not voz_exp: 
@@ -295,15 +288,18 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("<p style='font-size:12px; color:#00f0ff; text-align:center;'>SYSTEM STATUS: OPTIMAL</p>", unsafe_allow_html=True)
 
-# --- 13 PESTAÑAS ---
+# --- 18 PESTAÑAS ---
 tabs = st.tabs([
-    "🌐 GLOBAL", "📁 DATOS", "🎙️ VOZ", "💬 CHAT", "🎨 VISUAL", 
+    "🌐 GLOBAL", "📁 DATOS", "🖼️ MULTIMEDIA", "🎙️ VOZ", "💬 CHAT", "🎨 VISUAL", 
     "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "🎬 VIDEO", "💻 CÓDIGO",
-    "🎥 YOUTUBE", "📈 GRÁFICOS", "🌍 TRADUCTOR"
+    "🎥 YOUTUBE", "📈 GRÁFICOS", "🌍 TRADUCTOR", 
+    "📱 REDES SOCIALES", "💬 CHAT CON PDF", "📇 CV & QR", "🎯 PROMPTS"
 ])
 
 # --- TAB 1: INTERNET ---
 with tabs[0]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Buscador Web)"):
+        st.write("Busca información actualizada en internet. La IA leerá los resultados y te hará un informe descargable en TXT o PDF.")
     st.markdown("### 🌐 Información Global")
     query_busqueda = st.text_input("Comando de búsqueda en la red:", key="q_internet")
     if st.button("🔍 Rastrear Web", key="b_internet") and query_busqueda:
@@ -326,8 +322,10 @@ with tabs[0]:
 
 # --- TAB 2: ARCHIVOS ---
 with tabs[1]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Destripador de Documentos)"):
+        st.write("Sube un PDF, Word o Excel. Puedes pedirle un resumen o usar el 'Análisis Forense' para que la IA busque datos ocultos, contradicciones o conclusiones. También puedes escribirle una orden concreta en la caja de abajo.")
     st.markdown("### 📁 Análisis Forense de Archivos")
-    archivo = st.file_uploader("Sube cualquier archivo (PDF, Word, Excel, PPT, TXT, Imágenes)", type=["pdf", "txt", "docx", "xlsx", "pptx", "png", "jpg", "jpeg"])
+    archivo = st.file_uploader("Sube cualquier archivo (PDF, Word, Excel, PPT, TXT)", type=["pdf", "txt", "docx", "xlsx", "pptx"])
     
     if archivo:
         if archivo.size > MAX_FILE_MB * 1024 * 1024:
@@ -343,7 +341,7 @@ with tabs[1]:
             ])
 
             indicacion_extra = st.text_input("🎯 Indícale a la IA algo concreto (Opcional):", 
-                                             placeholder="Ej: Sácame solo las fechas de vencimiento, o céntrate en la parte financiera...")
+                                             placeholder="Ej: Sácame solo las fechas de vencimiento...")
             
             if st.button("🔎 Ejecutar Análisis Neuronal"):
                 if "Forense" in tipo_analisis:
@@ -356,7 +354,7 @@ with tabs[1]:
                     prompt_base = "Basándote en este documento, genera un cuestionario de 10 preguntas con 4 opciones cada una (tipo test) y sus respuestas correctas al final."
 
                 if indicacion_extra.strip():
-                    prompt_final = f"{prompt_base}\n\nINSTRUCCIÓN ESPECÍFICA ADICIONAL DEL USUARIO (Prioriza esto):\n{indicacion_extra}"
+                    prompt_final = f"{prompt_base}\n\nINSTRUCCIÓN ESPECÍFICA ADICIONAL DEL USUARIO:\n{indicacion_extra}"
                 else:
                     prompt_final = prompt_base
 
@@ -364,8 +362,6 @@ with tabs[1]:
                     with st.spinner("Enviando archivo directamente a Gemini (Nube)..."):
                         nombre = archivo.name.lower()
                         if nombre.endswith(".pdf"): mime = "application/pdf"
-                        elif nombre.endswith(".png"): mime = "image/png"
-                        elif nombre.endswith((".jpg", ".jpeg")): mime = "image/jpeg"
                         else: mime = "text/plain"
                         
                         if nombre.endswith((".docx", ".xlsx", ".pptx", ".txt")):
@@ -384,8 +380,50 @@ with tabs[1]:
                 st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Documento")
 
-# --- TAB 3: PODCAST ---
+# --- TAB 3: MULTIMEDIA ---
 with tabs[2]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Multimedia)"):
+        st.write("Sube una imagen, un audio o un vídeo. Escríbele qué quieres (ej: 'Transcribe este audio' o 'Escribe una historia con esta foto'). Esta función usa la nube de Gemini, ya que Ollama local no procesa audios ni vídeos.")
+    st.markdown("### 🖼️ Análisis Multimodal (Imagen, Vídeo y Audio)")
+    
+    archivo_multi = st.file_uploader("Sube tu archivo multimedia", type=["png", "jpg", "jpeg", "webp", "mp4", "mov", "avi", "mp3", "wav", "m4a", "ogg"])
+    orden_multi = st.text_area("¿Qué quieres que haga la IA con este archivo?", placeholder="Ej: 'Describe esta imagen', 'Transcribe este audio'...", height=120)
+    
+    if archivo_multi:
+        if archivo_multi.size > MAX_FILE_MB * 1024 * 1024:
+            st.error(f"El archivo supera el límite de {MAX_FILE_MB} MB.")
+        else:
+            if st.button("🚀 Analizar Multimedia"):
+                if not api_key_gemini.strip():
+                    st.error("⚠️ Para analizar audios o vídeos, necesitas la API Key de Gemini.")
+                else:
+                    with st.spinner("Analizando archivo multimedia..."):
+                        nombre = archivo_multi.name.lower()
+                        if nombre.endswith(".png"): mime = "image/png"
+                        elif nombre.endswith((".jpg", ".jpeg")): mime = "image/jpeg"
+                        elif nombre.endswith(".webp"): mime = "image/webp"
+                        elif nombre.endswith(".mp4"): mime = "video/mp4"
+                        elif nombre.endswith(".mov"): mime = "video/quicktime"
+                        elif nombre.endswith(".avi"): mime = "video/x-msvideo"
+                        elif nombre.endswith(".mp3"): mime = "audio/mp3"
+                        elif nombre.endswith(".wav"): mime = "audio/wav"
+                        elif nombre.endswith(".m4a"): mime = "audio/mp4"
+                        elif nombre.endswith(".ogg"): mime = "audio/ogg"
+                        else: mime = "application/octet-stream"
+                        
+                        prompt_final = orden_multi if orden_multi.strip() else "Describe y analiza este archivo detalladamente."
+                        st.session_state.analisis_ia = analizar_archivo_con_gemini(
+                            archivo_multi.getvalue(), mime, prompt_final, api_key_gemini
+                        )
+                        
+                if st.session_state.analisis_ia:
+                    st.text_area("Resultado del Análisis:", value=st.session_state.analisis_ia, height=400)
+                    botones_descarga(st.session_state.analisis_ia, "Analisis_Multimedia")
+
+# --- TAB 4: PODCAST ---
+with tabs[3]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Podcast)"):
+        st.write("Genera un guion de radio entre dos personas (Moderador y Experto) sobre cualquier tema, ya sea buscando en internet o subiendo un archivo. Luego puedes generar el audio en MP3 con voces realistas en español.")
     st.markdown("### 🎙️ Sintetizador de Voz")
     VOCES = {"es-ES-ElviraNeural": "Elvira (F)", "es-MX-JorgeNeural": "Jorge (M)"}
     v_mod = st.selectbox("Modulador (Moderador)", list(VOCES.keys()), format_func=lambda x: VOCES[x], index=0)
@@ -414,8 +452,10 @@ with tabs[2]:
             st.audio(st.session_state.audio_podcast, format="audio/mp3")
             st.download_button("📥 Descargar MP3", st.session_state.audio_podcast, "podcast.mp3", "audio/mpeg")
 
-# --- TAB 4: CHAT ---
-with tabs[3]:
+# --- TAB 5: CHAT ---
+with tabs[4]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Chat)"):
+        st.write("Habla directamente con la IA. Tiene memoria de la conversación para que puedas preguntarle cosas complejas. Al final puedes descargar todo el historial.")
     st.markdown("### 💬 Interfaz de Comunicación Directa")
     for msg in st.session_state.chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
@@ -433,8 +473,10 @@ with tabs[3]:
             st.session_state.chat_history.append({"role": "assistant", "content": res})
             st.chat_message("assistant").write(res)
 
-# --- TAB 5: IMÁGENES ---
-with tabs[4]:
+# --- TAB 6: IMÁGENES ---
+with tabs[5]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Generador Visual)"):
+        st.write("Escribe lo que imaginas (en español o inglés) y la IA lo dibujará usando Pollinations.ai. Te dará un enlace para descargar la foto en alta calidad.")
     st.markdown("### 🎨 Generador de Recreaciones Visuales")
     prompt_img = st.text_input("Describe el escenario a generar:")
     if st.button("Generar Visualización") and prompt_img:
@@ -444,8 +486,10 @@ with tabs[4]:
         st.image(st.session_state.img_url, use_column_width=True)
         st.markdown(f"[Descargar Visualización Original]({st.session_state.img_url})")
 
-# --- TAB 6: OFFICE ---
-with tabs[5]:
+# --- TAB 7: OFFICE ---
+with tabs[6]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Generador Office)"):
+        st.write("Pídele a la IA que te cree un documento (ej: 'Un presupuesto de obra', 'Una tabla de gastos', 'Una presentación sobre el espacio') y selecciona el formato Word, Excel o PowerPoint.")
     st.markdown("### 📊 Creación de Documentos Office")
     prompt_office = st.text_area("Define la estructura del documento:", height=80)
     formato = st.selectbox("Formato de exportación:", ["Word (.docx)", "Excel (.xlsx)", "PowerPoint (.pptx)"])
@@ -474,8 +518,10 @@ with tabs[5]:
     if st.session_state.office_file_bytes:
         st.download_button(f"📥 Descargar {st.session_state.office_file_ext.upper()}", st.session_state.office_file_bytes, f"doc.{st.session_state.office_file_ext}", st.session_state.office_file_mime)
 
-# --- TAB 7: PDF PRO ---
-with tabs[6]:
+# --- TAB 8: PDF PRO ---
+with tabs[7]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (PDF Pro)"):
+        st.write("Genera un documento en PDF perfectamente maquetado con portada, título y texto estructurado sobre el tema que le pidas.")
     st.markdown("### 📄 Protocolo de Creación de PDF")
     titulo_pdf = st.text_input("Título del documento:")
     contenido_pdf = st.text_area("Datos a incluir:", height=100)
@@ -491,8 +537,10 @@ with tabs[6]:
     if st.session_state.pdf_bytes:
         st.download_button("📥 Descargar PDF", st.session_state.pdf_bytes, f"{titulo_pdf}.pdf", "application/pdf")
 
-# --- TAB 8: MAPAS ---
-with tabs[7]:
+# --- TAB 9: MAPAS ---
+with tabs[8]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Mapas Mentales)"):
+        st.write("Escribe un tema y la IA creará un mapa mental o conceptual visual. Puedes descargarlo como código o como imagen PNG en alta calidad.")
     st.markdown("### 🕸️ Cartografía de Datos")
     tema_mapa = st.text_input("Nodo Central:", placeholder="Ej: Inteligencia Artificial...")
     tipo_mapa = st.radio("Protocolo de mapa:", ["Mapa Mental (Jerárquico)", "Mapa Conceptual (Flujo)"], horizontal=True)
@@ -535,14 +583,16 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"No se pudo generar la imagen. Prueba con el .mmd. Detalle: {e}")
 
-# --- TAB 9: VÍDEO (CON GENERADOR DE MP4) ---
-with tabs[8]:
+# --- TAB 10: VÍDEO ---
+with tabs[9]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Generador de Vídeo)"):
+        st.write("Escribe un tema. La IA creará un guion de 3 escenas, generará las imágenes y la voz, y unirá todo en un archivo MP4. También puedes subir música de fondo.")
     st.markdown("### 🎬 Simulador de Escenas y Vídeo")
     tema_video = st.text_input("Concepto de la escena:")
     if st.button("Generar Storyboard") and tema_video:
         with st.spinner("Escribiendo..."):
             st.session_state.video_script = llamar_ia(modelo_seleccionado, f"Divide '{tema_video}' en 3 escenas: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'.", api_key_gemini)
-            st.session_state.video_bytes = None # Reseteamos el vídeo anterior
+            st.session_state.video_bytes = None
             
     if st.session_state.video_script:
         st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
@@ -554,78 +604,87 @@ with tabs[8]:
                 url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escena.strip())}?width=800&height=450&nologo=true"
                 st.image(url_img, caption=f"Fotograma {i}")
 
-        # --- NUEVA SECCIÓN: GENERAR VÍDEO ---
         st.markdown("---")
         st.markdown("#### 🎥 Montar Vídeo Final")
         voz_video = st.selectbox("Voz del Narrador para el vídeo:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_vid")
         
+        # NUEVO: Subir música de fondo opcional
+        musica_fondo = st.file_uploader("🎵 Añadir música de fondo (Opcional - MP3 o WAV):", type=["mp3", "wav"])
+        
         if st.button("🎬 Generar Vídeo (MP4)"):
-            with st.spinner("Creando vídeo... Esto puede tardar 1-2 minutos dependiendo de tu conexión."):
+            with st.spinner("Creando vídeo... Esto puede tardar 1-2 minutos."):
                 try:
-                    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+                    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, afx
                     
                     escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
                     narraciones = re.findall(r'Narrador:\s*(.*)', st.session_state.video_script)
                     
                     if not escenas or not narraciones or len(escenas) != len(narraciones):
-                        st.error("El formato del guion no es correcto. Debe tener el mismo número de 'ESCENA X: ...' y 'Narrador: ...'.")
+                        st.error("El formato del guion no es correcto.")
                     else:
                         clips = []
                         for i in range(len(escenas)):
-                            # 1. Descargar Imagen de la escena
                             url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escenas[i].strip())}?width=800&height=450&nologo=true"
                             img_data = requests.get(url_img).content
-                            
-                            # 2. Generar Audio de la narración
                             audio_bytes = generar_audio_sincrono(narraciones[i].strip(), voz_video)
                             
-                            if not audio_bytes:
-                                continue
+                            if not audio_bytes: continue
                                 
-                            # Guardar temporalmente para que moviepy los lea
                             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
                                 f_img.write(img_data)
                                 img_path = f_img.name
-                                
                             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
                                 f_aud.write(audio_bytes)
                                 aud_path = f_aud.name
                             
-                            # 3. Crear el clip de vídeo (Imagen con duración del audio)
                             audio_clip = AudioFileClip(aud_path)
                             img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
                             img_clip = img_clip.with_audio(audio_clip)
                             clips.append(img_clip)
                             
-                            # Limpiamos los archivos temporales
                             os.remove(img_path)
                             os.remove(aud_path)
                             
                         if clips:
                             final_video = concatenate_videoclips(clips, method="compose")
-                            out_path = tempfile.mktemp(suffix=".mp4")
                             
-                            # Exportar el vídeo
+                            # MEZCLAR MÚSICA DE FONDO SI SE HA SUBIDO
+                            if musica_fondo:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_mus:
+                                    f_mus.write(musica_fondo.getvalue())
+                                    mus_path = f_mus.name
+                                
+                                music_clip = AudioFileClip(mus_path)
+                                # Hacemos bucle con la música hasta que dure el vídeo
+                                music_loop = music_clip.with_effects([afx.AudioLoop(duration=final_video.duration)])
+                                # Bajamos el volumen al 20% para que no tape la voz
+                                music_loop = music_loop.with_volume_scaled(0.2)
+                                
+                                # Mezclamos el audio del vídeo (voz) con la música
+                                new_audio = CompositeAudioClip([final_video.audio, music_loop])
+                                final_video = final_video.with_audio(new_audio)
+                                os.remove(mus_path)
+                            
+                            out_path = tempfile.mktemp(suffix=".mp4")
                             final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
                             
                             with open(out_path, "rb") as f_vid:
                                 st.session_state.video_bytes = f_vid.read()
-                                
-                            # Limpiamos el vídeo temporal
                             os.remove(out_path)
                             st.success("¡Vídeo generado con éxito! 🎉")
                 except Exception as e:
                     st.error(f"Error al generar el vídeo: {e}")
 
-        # Mostrar el vídeo si ya se ha generado
         if st.session_state.video_bytes:
             st.video(st.session_state.video_bytes)
             st.download_button("📥 Descargar Vídeo (MP4)", st.session_state.video_bytes, "video_generado.mp4", "video/mp4")
 
-# --- TAB 10: APP BUILDER ---
-with tabs[9]:
+# --- TAB 11: APP BUILDER ---
+with tabs[10]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Programación)"):
+        st.write("Pídele a la IA que programe una aplicación en Python (ej: 'Una calculadora' o 'Un juego de dados'). Te dará el código fuente para que lo guardes y lo ejecutes en tu ordenador.")
     st.markdown("### 💻 Asistente de Código (Fábrica de Apps)")
-    req_app = st.text_area("Especificaciones de la nueva aplicación:", placeholder="Ej: Una app para calcular propinas...", height=80)
+    req_app = st.text_area("Especificaciones de la nueva aplicación:", height=80)
     
     if st.button("Generar Código Base") and req_app:
         with st.spinner("Compilando..."):
@@ -638,8 +697,10 @@ with tabs[9]:
         st.code(st.session_state.app_code, language="python")
         st.download_button("📥 Descargar Código (.py)", st.session_state.app_code.encode('utf-8'), "mi_nueva_app.py", "text/plain")
 
-# --- TAB 11: YOUTUBE ---
-with tabs[10]:
+# --- TAB 12: YOUTUBE ---
+with tabs[11]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Resumidor YouTube)"):
+        st.write("Pega el enlace de un vídeo de YouTube. La IA extraerá automáticamente los subtítulos y te hará un resumen con lo más importante.")
     st.markdown("### 🎥 Analizador de Vídeos de YouTube")
     url_yt = st.text_input("Pega la URL del vídeo (Ej: https://www.youtube.com/watch?v=...):")
     
@@ -660,8 +721,10 @@ with tabs[10]:
         st.text_area("Resumen Ejecutivo:", value=st.session_state.yt_resumen, height=300)
         botones_descarga(st.session_state.yt_resumen, "Resumen_YouTube")
 
-# --- TAB 12: GRÁFICOS ---
-with tabs[11]:
+# --- TAB 13: GRÁFICOS ---
+with tabs[12]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Gráficos)"):
+        st.write("Sube un archivo Excel o CSV. Dile a la IA qué quieres ver (ej: 'Compara las ventas por meses'). Ella elegirá el mejor gráfico y lo dibujará.")
     st.markdown("### 📈 Generador de Gráficos Inteligente")
     archivo_datos = st.file_uploader("Sube un archivo CSV o Excel:", type=["csv", "xlsx"])
     
@@ -692,8 +755,10 @@ with tabs[11]:
                 except:
                     st.warning("La IA no pudo determinar las columnas. Prueba a ser más específico.")
 
-# --- TAB 13: TRADUCTOR ---
-with tabs[12]:
+# --- TAB 14: TRADUCTOR ---
+with tabs[13]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Traductor)"):
+        st.write("Escribe un texto, elige el idioma de destino y la IA te lo traducirá. Además, te generará un audio MP3 con la pronunciación nativa de ese idioma para que puedas escucharlo o practicar.")
     st.markdown("### 🌍 Traductor y Locutor Multilingüe")
     texto_trad = st.text_area("Texto a traducir:", height=100)
     
@@ -722,3 +787,125 @@ with tabs[12]:
     if st.session_state.traduccion_audio:
         st.audio(st.session_state.traduccion_audio, format="audio/mp3")
         st.download_button("📥 Descargar Audio", st.session_state.traduccion_audio, f"audio_{idioma_dest}.mp3", "audio/mpeg")
+
+# --- TAB 15: REDES SOCIALES ---
+with tabs[14]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Redes)"):
+        st.write("Dile de qué va tu mensaje o producto. La IA lo redactará de forma perfecta según la red social que elijas (un tono formal para Gmail, uno rápido para WhatsApp, con hashtags para Instagram, etc.).")
+    st.markdown("### 📱 Estudio de Redes Sociales y Comunicación")
+    
+    tema_post = st.text_area("¿De qué trata la publicación o el mensaje?", placeholder="Ej: Lanzamiento de nuestro nuevo producto...", height=100)
+    
+    red_social = st.selectbox("Selecciona la plataforma:", [
+        "📧 Gmail / Correo Formal", 
+        "💬 WhatsApp (Mensaje rápido)", 
+        "📸 Instagram (Post + Hashtags)", 
+        "🎵 TikTok (Guion de vídeo corto)", 
+        "💼 LinkedIn (Post profesional)", 
+        "🐦 Twitter / X (Hilo o Tweet)", 
+        "📘 Facebook (Publicación general)"
+    ])
+    
+    if st.button("✍️ Generar Texto para Redes"):
+        if tema_post:
+            with st.spinner(f"Redactando para {red_social}..."):
+                if "Gmail" in red_social:
+                    prompt_red = f"Escribe un correo electrónico formal y profesional sobre: '{tema_post}'. Incluye asunto, saludo, cuerpo y despedida."
+                elif "WhatsApp" in red_social:
+                    prompt_red = f"Escribe un mensaje corto, directo y amigable para enviar por WhatsApp sobre: '{tema_post}'."
+                elif "Instagram" in red_social:
+                    prompt_red = f"Escribe un post para Instagram sobre: '{tema_post}'. Usa emojis, sé visual y añade 10 hashtags relevantes al final."
+                elif "TikTok" in red_social:
+                    prompt_red = f"Escribe un guion de 30 segundos para un vídeo de TikTok sobre: '{tema_post}'. Divide en 'Gancho', 'Desarrollo' y 'Llamada a la acción'."
+                elif "LinkedIn" in red_social:
+                    prompt_red = f"Escribe un post profesional para LinkedIn sobre: '{tema_post}'. Tono inspirador o de liderazgo."
+                elif "Twitter" in red_social:
+                    prompt_red = f"Escribe un hilo de 3 tuits para Twitter sobre: '{tema_post}'."
+                else:
+                    prompt_red = f"Escribe una publicación para Facebook sobre: '{tema_post}'."
+                
+                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_red, api_key_gemini)
+                st.text_area("Texto Generado (Cópialo y pégalo en tu app):", value=st.session_state.analisis_ia, height=300)
+                botones_descarga(st.session_state.analisis_ia, "Post_Redes")
+
+# --- TAB 16: CHAT CON PDF ---
+with tabs[15]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Chat con PDF)"):
+        st.write("Sube un documento largo (un libro, un contrato, apuntes) y luego hazle preguntas concretas. La IA buscará la respuesta exacta dentro de ese archivo.")
+    st.markdown("### 💬 Chatea con tus Documentos")
+    
+    archivo_chat = st.file_uploader("Sube el documento para chatear:", type=["pdf", "txt", "docx"])
+    if archivo_chat:
+        with st.spinner("Leyendo documento..."):
+            st.session_state.pdf_chat_text = leer_archivo_universal(archivo_chat, modelo_seleccionado)[:MAX_TEXTO_IA]
+            st.success("Documento cargado en memoria. Ya puedes preguntar.")
+    
+    if st.session_state.pdf_chat_text:
+        for msg in st.session_state.pdf_chat_history:
+            st.chat_message(msg["role"]).write(msg["content"])
+            
+        if prompt := st.chat_input("Pregúntale algo a este documento..."):
+            st.session_state.pdf_chat_history.append({"role": "user", "content": prompt})
+            st.chat_message("user").write(prompt)
+            
+            with st.spinner("Buscando en el documento..."):
+                prompt_doc = f"Basándote EXCLUSIVAMENTE en el siguiente texto, responde a la pregunta del usuario. Si no está en el texto, di 'No lo sé'.\n\nTEXTO:\n{st.session_state.pdf_chat_text}\n\nPREGUNTA: {prompt}"
+                res = llamar_ia(modelo_seleccionado, prompt_doc, api_key_gemini)
+                st.session_state.pdf_chat_history.append({"role": "assistant", "content": res})
+                st.chat_message("assistant").write(res)
+
+# --- TAB 17: CV & QR ---
+with tabs[16]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (CV y QR)"):
+        st.write("En la izquierda puedes generar un Currículum profesional en PDF rellenando 4 datos. En la derecha, puedes crear un código QR con cualquier enlace web o texto para tu negocio.")
+    st.markdown("### 📇 Generador de CV y Códigos QR")
+    
+    col_cv, col_qr = st.columns(2)
+    
+    with col_cv:
+        st.markdown("#### 📄 Crear Currículum")
+        nombre_cv = st.text_input("Nombre y Apellidos:")
+        puesto_cv = st.text_input("Puesto al que aspiras:")
+        exp_cv = st.text_area("Experiencia y Educación (resumido):", height=100)
+        
+        if st.button("Generar CV en PDF"):
+            if nombre_cv and puesto_cv:
+                with st.spinner("Redactando CV..."):
+                    prompt_cv = f"Crea un currículum profesional para {nombre_cv} para el puesto de {puesto_cv}. Aquí tienes su experiencia: {exp_cv}. Redáctalo de forma atractiva y estructurada."
+                    texto_cv = llamar_ia(modelo_seleccionado, prompt_cv, api_key_gemini)
+                    st.text_area("Vista previa del CV:", value=texto_cv, height=200)
+                    st.download_button("📥 Descargar CV (PDF)", generar_pdf_pro(f"CV - {nombre_cv}", texto_cv), f"CV_{nombre_cv}.pdf", "application/pdf")
+            else:
+                st.warning("Rellena al menos el nombre y el puesto.")
+
+    with col_qr:
+        st.markdown("#### 📱 Generar Código QR")
+        texto_qr = st.text_input("Introduce el enlace (URL) o texto:")
+        
+        if st.button("Generar QR") and texto_qr:
+            qr = qrcode.QRCode(version=1, box_size=10, border=5)
+            qr.add_data(texto_qr)
+            qr.make(fit=True)
+            img_qr = qr.make_image(fill_color="black", back_color="white")
+            
+            buf_qr = BytesIO()
+            img_qr.save(buf_qr, format="PNG")
+            st.image(buf_qr.getvalue(), caption="Tu Código QR")
+            st.download_button("📥 Descargar QR (PNG)", buf_qr.getvalue(), "codigo_qr.png", "image/png")
+
+# --- TAB 18: GENERADOR DE PROMPTS ---
+with tabs[17]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Prompts para IAs)"):
+        st.write("Escribe tu idea en español y la IA la traducirá al 'idioma' que mejor entienden las inteligencias artificiales de dibujo (Midjourney, DALL-E). Añadirá detalles de luz, cámara y estilo.")
+    st.markdown("### 🎯 Generador de Prompts Pro")
+    
+    idea_basica = st.text_input("Tu idea en español:", placeholder="Ej: Un castillo flotando en el espacio")
+    estilo_arte = st.selectbox("Estilo deseado:", ["Fotorrealista", "Ilustración digital", "Anime", "Cyberpunk", "Pintura al óleo", "3D Render"])
+    
+    if st.button("Generar Prompt Maestro"):
+        if idea_basica:
+            with st.spinner("Escribiendo prompt en inglés..."):
+                prompt_maestro = f"Actúa como un experto en ingeniería de prompts para IA generativa. Convierte esta idea '{idea_basica}' en un prompt altamente detallado en INGLÉS para generar una imagen con estilo '{estilo_arte}'. Incluye detalles de iluminación, cámara, calidad y texturas. Devuelve SOLO el prompt en inglés, sin comillas."
+                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_maestro, api_key_gemini)
+                st.text_area("Prompt para copiar y pegar:", value=st.session_state.analisis_ia, height=150)
+                st.download_button("📥 Copiar Prompt (TXT)", st.session_state.analisis_ia.encode('utf-8'), "prompt.txt", "text/plain")
