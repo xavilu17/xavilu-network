@@ -259,11 +259,11 @@ with st.sidebar:
 
     st.markdown("<h3 style='text-align:center;'>🪐 PANEL DE CONTROL</h3>", unsafe_allow_html=True)
     modelo_seleccionado = st.selectbox("Motor de IA", ["llama3.2:latest", "llama3.2-vision:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-        try:
-        api_key_gemini = st.secrets["GEMINI_API_KEY"]
-        st.sidebar.success("🔑 API Key cargada automáticamente")
-    except:
-        api_key_gemini = st.text_input("Gemini API Key", type="password")
+    try:
+    api_key_gemini = st.secrets["GEMINI_API_KEY"]
+    st.sidebar.success("🔑 API Key cargada automáticamente")
+except:
+    api_key_gemini = st.text_input("Gemini API Key", type="password")
     st.markdown("---")
     st.markdown("<p style='font-size:12px; color:#00f0ff; text-align:center;'>SYSTEM STATUS: OPTIMAL</p>", unsafe_allow_html=True)
 
