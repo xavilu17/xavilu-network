@@ -83,148 +83,25 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK (Mantenemos el resto de la app igual) ---
+# --- CSS CYBERPUNK INTUITIVO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-    
-    .stApp { 
-        background-color: #000000 !important; 
-        background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
-        color: #f7dfa3 !important; 
-        font-family: 'Rajdhani', sans-serif !important; 
-    }
-    
-    h1, h2, h3 { 
-        font-family: 'Orbitron', sans-serif !important; 
-        color: #ffffff !important; 
-        text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; 
-        text-align: center; 
-        letter-spacing: 3px; 
-    }
-    
-    [data-testid="stWidgetLabel"] p { 
-        color: #00f0ff !important; 
-        font-family: 'Orbitron', sans-serif !important; 
-        font-size: 13px !important; 
-        font-weight: bold !important; 
-        text-transform: uppercase !important; 
-        background: rgba(0, 240, 255, 0.1) !important; 
-        padding: 5px 10px !important; 
-        border-left: 4px solid #FF007F !important; 
-        border-radius: 4px !important; 
-        display: inline-block !important; 
-        margin-bottom: 8px !important; 
-    }
-    
-    [data-testid="stSidebar"] { 
-        background-color: rgba(5, 5, 10, 0.98) !important; 
-        border-right: 2px solid #00f0ff !important; 
-        box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
-    }
-    
-    .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
-        background-color: rgba(10, 10, 10, 0.9) !important; 
-        border: 1px solid #00f0ff !important; 
-        border-radius: 8px !important; 
-        color: #ffffff !important; 
-        font-size: 16px !important; 
-        box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1) !important;
-    }
-    .stTextArea textarea:focus, .stTextInput input:focus { 
-        border: 1px solid #FF007F !important; 
-        box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
-    }
-    
-    div.stButton > button, div[data-testid="stDownloadButton"] > button { 
-        background: rgba(10, 10, 10, 0.8) !important; 
-        color: #00f0ff !important; 
-        border: 2px solid #00f0ff !important; 
-        border-radius: 25px !important; 
-        font-family: 'Orbitron', sans-serif !important; 
-        font-weight: bold !important; 
-        padding: 10px 20px !important; 
-        transition: all 0.3s !important;
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
-    }
-    div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover { 
-        background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important; 
-        color: #000 !important; 
-        border: 2px solid #fff !important; 
-        transform: translateY(-2px); 
-        box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
-    }
-    
-    [data-testid="stChatMessage"] { 
-        background: rgba(10, 10, 15, 0.8) !important; 
-        border: 1px solid #FF007F !important; 
-        border-radius: 15px !important; 
-        padding: 10px; 
-        box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important;
-    }
-    
-    .stAlert { 
-        border-radius: 10px; 
-        font-weight: bold; 
-        background-color: rgba(0, 240, 255, 0.1) !important;
-        border-left: 5px solid #00f0ff !important;
-    }
+    .stApp { background-color: #050505 !important; background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #050505 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #f7dfa3 !important; text-shadow: 0 0 10px #d4af37, 0 0 20px #d4af37 !important; text-align: center; letter-spacing: 2px; }
+    [data-testid="stWidgetLabel"] p { color: #00f0ff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: bold !important; text-transform: uppercase !important; background: rgba(0, 240, 255, 0.1) !important; padding: 5px 10px !important; border-left: 4px solid #00f0ff !important; border-radius: 4px !important; display: inline-block !important; margin-bottom: 8px !important; }
+    p, .stMarkdown p { color: #d4af37 !important; font-size: 16px; }
+    [data-testid="stSidebar"] { background-color: rgba(10, 10, 15, 0.9) !important; border-right: 1px solid #d4af37 !important; }
+    button[data-baseweb="tab"] { background: rgba(20, 20, 25, 0.8) !important; border: 1px solid #d4af37 !important; border-radius: 25px !important; color: #d4af37 !important; font-family: 'Orbitron', sans-serif !important; font-size: 12px !important; padding: 10px 15px !important; margin: 5px !important; transition: all 0.3s; }
+    button[data-baseweb="tab"]:hover { background: rgba(212, 175, 55, 0.2) !important; }
+    button[data-baseweb="tab"][aria-selected="true"] { background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%) !important; color: #000 !important; border: 1px solid #fff !important; box-shadow: 0 0 15px #d4af37 !important; }
+    .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { background-color: rgba(0, 0, 0, 0.8) !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; color: #f7dfa3 !important; font-size: 16px !important; }
+    div.stButton > button, div[data-testid="stDownloadButton"] > button { background: rgba(0, 0, 0, 0.8) !important; color: #d4af37 !important; border: 1px solid #d4af37 !important; border-radius: 25px !important; font-family: 'Orbitron', sans-serif !important; font-weight: bold !important; padding: 10px 20px !important; }
+    div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover { background: #d4af37 !important; color: #000 !important; transform: translateY(-2px); box-shadow: 0 0 15px #d4af37 !important; }
+    [data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.7) !important; border: 1px solid rgba(212, 175, 55, 0.4) !important; border-radius: 15px !important; padding: 10px; }
+    .stAlert { border-radius: 10px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
-
-# 🚀 MAGIA NEGRA: SCRIPT PARA FORZAR EL DISEÑO DE LAS PESTAÑAS
-st.html(
-    """
-    <script>
-    // Función que busca las pestañas y les inyecta los estilos
-    function styleTabs() {
-        const tabs = document.querySelectorAll('button[data-baseweb="tab"]');
-        tabs.forEach(tab => {
-            const isSelected = tab.getAttribute('aria-selected') === 'true';
-            
-            // Estilos base
-            tab.style.borderRadius = '25px';
-            tab.style.fontFamily = "'Orbitron', sans-serif";
-            tab.style.fontWeight = 'bold';
-            tab.style.padding = '10px 20px';
-            tab.style.margin = '5px';
-            tab.style.transition = 'all 0.3s ease';
-            tab.style.border = '2px solid #00f0ff';
-            
-            if (isSelected) {
-                // ESTILO ACTIVO (Degradado rosa a cian, texto negro)
-                tab.style.background = 'linear-gradient(135deg, #FF007F 0%, #00f0ff 100%)';
-                tab.style.border = '2px solid #ffffff';
-                tab.style.boxShadow = '0 0 25px rgba(255, 0, 127, 0.9)';
-                
-                // Forzar texto negro a la fuerza
-                tab.querySelectorAll('*').forEach(child => {
-                    child.style.setProperty('color', '#000000', 'important');
-                    child.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
-                });
-            } else {
-                // ESTILO INACTIVO (Fondo negro, borde y texto cian)
-                tab.style.background = 'rgba(10, 10, 10, 0.8)';
-                tab.style.boxShadow = '0 0 10px rgba(0, 240, 255, 0.3)';
-                
-                // Forzar texto cian a la fuerza
-                tab.querySelectorAll('*').forEach(child => {
-                    child.style.setProperty('color', '#00f0ff', 'important');
-                    child.style.setProperty('-webkit-text-fill-color', '#00f0ff', 'important');
-                });
-            }
-        });
-
-        // Ocultar la línea roja fea
-        const highlights = document.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]');
-        highlights.forEach(el => el.style.setProperty('display', 'none', 'important'));
-    }
-
-    // Ejecutar la función cada 500 milisegundos para asegurarnos de que pilla las pestañas cuando carguen
-    setInterval(styleTabs, 500);
-    </script>
-    """
-)
 
 # --- FUNCIONES BASE ---
 def buscar_en_internet(query):
@@ -382,7 +259,7 @@ def cajon_ideas_personalizado(contexto_pestana, modelo, api_key):
 # ==========================================
 # INTERFAZ PRINCIPAL
 # ==========================================
-st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff; font-weight:bold; letter-spacing:2px;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
+st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 🪐 PANEL DE CONTROL")
@@ -968,15 +845,20 @@ with macro_tabs[3]:
         
         if st.button("Generar Imagen", key="btn_gen_visual") and prompt_img:
             with st.spinner("Traduciendo y generando imagen..."):
+                # 1. Traducimos el prompt al inglés para que el generador lo entienda perfectamente
                 prompt_traducido = llamar_ia(modelo_seleccionado, f"Traduce el siguiente texto al inglés para un generador de imágenes. Devuelve SOLO la traducción, sin comillas ni explicaciones: '{prompt_img}'", api_key_gemini)
+                
+                # 2. Limpiamos la traducción por si la IA añade texto extra
                 prompt_en_ingles = prompt_traducido.replace('"', '').replace("'", "").strip()
                 st.session_state.img_prompt_en = prompt_en_ingles
                 
+                # 3. Añadimos el estilo
                 if "Colorear" in tipo_img:
                     prompt_final = prompt_en_ingles + ", coloring book page, thick black outlines, pure white background, no color"
                 else:
                     prompt_final = prompt_en_ingles
                 
+                # 4. Generamos la URL
                 st.session_state.img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_final)}?width=1024&height=1024&nologo=true&enhance=true"
         
         if st.session_state.img_url:
