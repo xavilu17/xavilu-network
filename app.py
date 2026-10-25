@@ -26,13 +26,16 @@ import qrcode
 import gc
 import html
 import numpy as np
+import hashlib
 
+# Intentar importar OpenCV para el lector de QR
 try:
     import cv2
     HAS_CV2 = True
 except ImportError:
     HAS_CV2 = False
 
+# --- LIBRERÍAS EXTERNAS ---
 try:
     import yt_dlp
     HAS_YTDLP = True
@@ -54,11 +57,13 @@ try:
 except ImportError:
     HAS_GEMINI = False
 
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Xavilu Network Pro", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 MAX_FILE_MB = 50
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-2.0-flash"
 
+# --- ESTADO DE SESIÓN ---
 _defaults = {
     "chat_history": [], "img_url": "", "app_code": "", "pdf_chat_history": [],
     "mermaid_code": "", "analisis_ia": "", "dl_bytes": None, "dl_filename": "", "dl_mime": "",
@@ -73,6 +78,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
+# --- CSS CYBERPUNK INTUITIVO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -92,6 +98,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- FUNCIONES BASE ---
 def buscar_en_internet(query):
     if DDGS is None: return []
     try:
@@ -182,11 +189,29 @@ def generar_pptx(titulo, texto):
         if len(slide.placeholders) > 1: slide.placeholders[1].text = "\n".join(lineas[1:]) if len(lineas) > 1 else ""
     out = BytesIO(); prs.save(out); out.seek(0); return out.getvalue()
 
-def botones_descarga(texto, nombre="documento"):
+def botones_descarga(texto, nombre_por_defecto="documento"):
     if texto:
-        st.markdown("---"); c1, c2 = st.columns(2)
-        with c1: st.download_button("📥 Descargar (TXT)", texto.encode('utf-8'), f"{nombre}.txt", "text/plain", key=f"dl_txt_{nombre}_{time.time()}", use_container_width=True)
-        with c2: st.download_button("📄 Descargar (PDF)", generar_pdf_pro(nombre, texto), f"{nombre}.pdf", "application/pdf", key=f"dl_pdf_{nombre}_{time.time()}", use_container_width=True)
+        st.markdown("---")
+        # Creamos un identificador único para evitar errores de Streamlit
+        key_unica = f"{nombre_por_defecto}".replace(" ", "_")
+        
+        # NUEVO: Caja de texto para personalizar el nombre
+        nombre_elegido = st.text_input(
+            "📝 Ponle nombre a tu archivo (sin extensión):", 
+            value=nombre_por_defecto, 
+            key=f"input_name_{key_unica}",
+            help="Escribe cómo quieres que se llame el archivo antes de descargarlo."
+        )
+        
+        # Limpiamos el nombre por si el usuario pone caracteres no permitidos en Windows
+        nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_')
+        if not nombre_limpio: nombre_limpio = nombre_por_defecto
+
+        c1, c2 = st.columns(2)
+        with c1: 
+            st.download_button("📥 Descargar (TXT)", texto.encode('utf-8'), f"{nombre_limpio}.txt", "text/plain", key=f"dl_txt_{key_unica}", use_container_width=True)
+        with c2: 
+            st.download_button("📄 Descargar (PDF)", generar_pdf_pro(nombre_limpio, texto), f"{nombre_limpio}.pdf", "application/pdf", key=f"dl_pdf_{key_unica}", use_container_width=True)
 
 def generar_audio_sincrono(texto, voz, exp=None):
     loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
@@ -199,6 +224,7 @@ def generar_audio_sincrono(texto, voz, exp=None):
     except: return None
     finally: loop.close()
 
+# --- FUNCIÓN MÁGICA: SUPERPODERES ---
 def boton_superpoder(texto_base, instruccion_poder, key_suffix, modelo, api_key):
     if st.button(f"🚀 Activar Superpoder: {instruccion_poder}", key=f"super_{key_suffix}", type="secondary"):
         if not texto_base or len(str(texto_base)) < 10:
@@ -211,6 +237,9 @@ def boton_superpoder(texto_base, instruccion_poder, key_suffix, modelo, api_key)
             st.info(resultado)
             botones_descarga(resultado, f"Superpoder_{key_suffix}")
 
+# ==========================================
+# INTERFAZ PRINCIPAL
+# ==========================================
 st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
 with st.sidebar:
@@ -228,6 +257,9 @@ macro_tabs = st.tabs([
     "🤖 ASISTENTES IA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR"
 ])
 
+# ==========================================
+# CATEGORÍA 1: DOCUMENTOS Y TEXTO
+# ==========================================
 with macro_tabs[0]:
     sub = st.tabs(["📁 ANÁLISIS", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
     with sub[0]:
@@ -268,7 +300,7 @@ with macro_tabs[0]:
         if st.button("Generar PDF", key="btn_pdf", type="primary") and titulo_pdf and contenido_pdf:
             texto = llamar_ia(modelo_seleccionado, contenido_pdf, api_key_gemini)
             st.session_state.pdf_text = texto
-            st.download_button("📥 Descargar PDF", generar_pdf_pro(titulo_pdf, texto), "doc.pdf")
+            st.download_button("📥 Descargar PDF", generar_pdf_pro(titulo_pdf, texto), f"{titulo_pdf}.pdf")
         if st.session_state.pdf_text:
             boton_superpoder(st.session_state.pdf_text, "Añade un resumen ejecutivo al principio y amplía las conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
     with sub[3]:
@@ -314,6 +346,9 @@ with macro_tabs[0]:
         if st.session_state.clip_text:
             boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog estructurado y atractivo", "clip", modelo_seleccionado, api_key_gemini)
 
+# ==========================================
+# CATEGORÍA 2: WEB Y ACTUALIDAD
+# ==========================================
 with macro_tabs[1]:
     sub = st.tabs(["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"])
     with sub[0]:
@@ -455,6 +490,9 @@ with macro_tabs[1]:
         if st.session_state.web_text:
             boton_superpoder(st.session_state.web_text, "Dame una opinión crítica sobre el sesgo o la veracidad de este artículo", "web", modelo_seleccionado, api_key_gemini)
 
+# ==========================================
+# CATEGORÍA 3: MULTIMEDIA
+# ==========================================
 with macro_tabs[2]:
     sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "📥 DESCARGADOR"])
     with sub[0]:
@@ -521,6 +559,9 @@ with macro_tabs[2]:
         if st.session_state.dl_bytes:
             st.download_button("💾 Guardar archivo", st.session_state.dl_bytes, st.session_state.dl_filename)
 
+# ==========================================
+# CATEGORÍA 4: ASISTENTES IA
+# ==========================================
 with macro_tabs[3]:
     sub = st.tabs(["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"])
     with sub[0]:
@@ -592,6 +633,9 @@ with macro_tabs[3]:
             res = llamar_ia(modelo_seleccionado, f"Traduce al {idioma}: {texto_trad}", api_key_gemini)
             st.info(res)
 
+# ==========================================
+# CATEGORÍA 5: ESTUDIO Y OFICIOS
+# ==========================================
 with macro_tabs[4]:
     sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO"])
     with sub[0]:
@@ -639,6 +683,9 @@ with macro_tabs[4]:
             st.success("Explicación:")
             st.info(res)
 
+# ==========================================
+# CATEGORÍA 6: VIAJES Y HOGAR
+# ==========================================
 with macro_tabs[5]:
     sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
     with sub[0]:
