@@ -86,7 +86,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V83 - FINAL DEFINITIVO) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V84 - TRADUCTOR UNIVERSAL) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -795,11 +795,25 @@ if macro_idx == 0:
         cajon_ideas_personalizado("Código", modelo_seleccionado, api_key_gemini)
 
     elif sub_idx == 8:
-        st.markdown("#### Traductor")
+        st.markdown("#### 🌍 Traductor Universal")
         texto_trad = st.text_area("Texto a traducir:", key="trad_text")
-        idioma = st.selectbox("Idioma destino:", ["Inglés", "Francés", "Alemán", "Italiano"], key="trad_lang")
-        if st.button("Traducir", key="btn_trad") and texto_trad:
-            st.info(llamar_ia(modelo_seleccionado, f"Traduce al {idioma}: {texto_trad}", api_key_gemini))
+        
+        col_origen, col_destino = st.columns(2)
+        with col_origen:
+            idioma_origen = st.selectbox("Idioma de origen:", ["Auto-detectar", "Español", "Inglés", "Francés", "Alemán", "Italiano", "Portugués", "Ruso", "Chino", "Japonés"], key="trad_lang_origen")
+        with col_destino:
+            idioma_destino = st.selectbox("Idioma destino:", ["Español", "Inglés", "Francés", "Alemán", "Italiano", "Portugués", "Ruso", "Chino", "Japonés"], key="trad_lang_destino")
+            
+        if st.button("Traducir", key="btn_trad", type="primary") and texto_trad:
+            with st.spinner("Traduciendo..."):
+                if idioma_origen == "Auto-detectar":
+                    prompt_trad = f"Detecta el idioma de este texto y tradúcelo al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
+                else:
+                    prompt_trad = f"Traduce este texto del {idioma_origen} al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
+                
+                resultado_trad = llamar_ia(modelo_seleccionado, prompt_trad, api_key_gemini)
+                st.info(resultado_trad)
+                botones_descarga(resultado_trad, "Traduccion")
         cajon_ideas_personalizado("Traductor", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
