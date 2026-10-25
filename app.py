@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS NUCLEAR PARA PESTAÑAS NEÓN ---
+# --- 🎨 CSS CYBERPUNK: MENÚ RADIO ESTILO BOTÓN NEÓN ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -126,56 +126,46 @@ st.markdown("""
         border-right: 2px solid #00f0ff !important; 
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
-    
-    /* 🌟 PESTAÑAS: ATAQUE NUCLEAR AL ESTILO 🌟 */
-    
-    /* 1. Ocultar la línea roja fea de Streamlit a la de ya */
-    [data-baseweb="tab-highlight"] { display: none !important; }
-    [data-baseweb="tab-border"] { display: none !important; }
 
-    /* 2. Pestañas Inactivas: Botón neón oscuro */
-    button[data-baseweb="tab"] {
-        background-color: #0a0a0a !important;
+    /* 🌟 MAGIA: CONVERTIR st.radio EN BOTONES NEÓN 🌟 */
+    div[role="radiogroup"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    /* Ocultar el circulito del radio button */
+    div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+    /* Estilo de los botones (Inactivos) */
+    div[role="radiogroup"] > label {
+        background: rgba(10, 10, 10, 0.8) !important;
         border: 2px solid #00f0ff !important;
         border-radius: 25px !important;
-        padding: 8px 18px !important;
-        margin: 0 5px !important;
-        opacity: 0.8 !important;
-        transition: all 0.3s ease !important;
-    }
-
-    /* 3. FORZAR EL COLOR DEL TEXTO INACTIVO (La parte difícil) */
-    button[data-baseweb="tab"] *,
-    button[data-baseweb="tab"] p,
-    button[data-baseweb="tab"] div {
+        padding: 8px 20px !important;
         color: #00f0ff !important;
-        -webkit-text-fill-color: #00f0ff !important; /* Martillo nuclear */
         font-family: 'Orbitron', sans-serif !important;
         font-weight: bold !important;
-        opacity: 1 !important;
+        font-size: 13px !important;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
     }
-
-    /* 4. Hover: Brillo al pasar el ratón */
-    button[data-baseweb="tab"]:hover {
-        opacity: 1 !important;
+    /* Cuando pasas el ratón */
+    div[role="radiogroup"] > label:hover {
         box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
         transform: translateY(-2px);
     }
-
-    /* 5. Pestaña Activa: Degradado rosa/cian con texto negro */
-    button[data-baseweb="tab"][aria-selected="true"] {
+    /* El botón SELECCIONADO (Activo) */
+    div[role="radiogroup"] > label:has(input:checked) {
         background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important;
         border: 2px solid #ffffff !important;
-        box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important;
-        opacity: 1 !important;
-    }
-
-    /* 6. FORZAR EL COLOR DEL TEXTO ACTIVO a negro */
-    button[data-baseweb="tab"][aria-selected="true"] *,
-    button[data-baseweb="tab"][aria-selected="true"] p,
-    button[data-baseweb="tab"][aria-selected="true"] div {
         color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important;
+        box-shadow: 0 0 25px rgba(255, 0, 127, 0.9) !important;
+        transform: translateY(-2px);
+    }
+    div[role="radiogroup"] > label:has(input:checked) p {
+        color: #000000 !important;
         font-weight: 900 !important;
     }
     
@@ -430,16 +420,19 @@ with st.sidebar:
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
     if not HAS_CV2: st.warning("⚠️ `opencv-python` no instalado")
 
-macro_tabs = st.tabs([
+# 🆕 EL NUEVO MENÚ PRINCIPAL ESTILO BOTÓN
+opciones_menu = [
     "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD",
     "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",
     "🎵 MÚSICA Y ARTE"
-])
+]
+seleccion = st.radio("Navegación principal", opciones_menu, horizontal=True, label_visibility="collapsed")
 
 # ==========================================
-# CATEGORÍA 1: CHAT Y ASISTENTES IA
+# CONTENIDO DINÁMICO
 # ==========================================
-with macro_tabs[0]:
+
+if seleccion == "💬 CHAT Y ASISTENTES":
     sub = st.tabs(["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES CUSTOM", "⚖️ EL DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"])
     
     with sub[0]:
@@ -611,7 +604,7 @@ with macro_tabs[0]:
 # ==========================================
 # CATEGORÍA 2: DOCUMENTOS Y TEXTO
 # ==========================================
-with macro_tabs[1]:
+elif seleccion == "📁 DOCUMENTOS Y TEXTO":
     sub = st.tabs(["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
     with sub[0]:
         st.markdown("#### Análisis Avanzado de Documentos")
@@ -729,7 +722,7 @@ with macro_tabs[1]:
 # ==========================================
 # CATEGORÍA 3: WEB Y ACTUALIDAD
 # ==========================================
-with macro_tabs[2]:
+elif seleccion == "🌐 WEB Y ACTUALIDAD":
     sub = st.tabs(["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"])
     with sub[0]:
         st.markdown("#### Buscador Global")
@@ -915,7 +908,7 @@ with macro_tabs[2]:
 # ==========================================
 # CATEGORÍA 4: MULTIMEDIA
 # ==========================================
-with macro_tabs[3]:
+elif seleccion == "🎬 MULTIMEDIA":
     sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"])
     with sub[0]:
         st.markdown("#### Análisis Inteligente de Archivos")
@@ -1038,7 +1031,7 @@ with macro_tabs[3]:
 # ==========================================
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
-with macro_tabs[4]:
+elif seleccion == "🎓 ESTUDIO Y OFICIOS":
     sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
     with sub[0]:
         st.markdown("#### 🌐 Herramientas de Redes")
@@ -1101,7 +1094,7 @@ with macro_tabs[4]:
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
 # ==========================================
-with macro_tabs[5]:
+elif seleccion == "🌍 VIAJES Y HOGAR":
     sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
     with sub[0]:
         st.markdown("#### 🌍 Planificador de Viajes")
@@ -1150,7 +1143,7 @@ with macro_tabs[5]:
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
-with macro_tabs[6]:
+elif seleccion == "🎵 MÚSICA Y ARTE":
     sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
     with sub[0]:
         st.markdown("#### 🎵 Estudio de Creación Musical")
