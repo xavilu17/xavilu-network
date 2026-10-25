@@ -86,20 +86,17 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V80 - PULIDO FINAL) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V81 - PARCHE DE SEGURIDAD) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
 
-/* Fondo Negro Espacial */
 .stApp { 
     background-color: #000000 !important; 
     background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
     color: #f7dfa3 !important; 
     font-family: 'Rajdhani', sans-serif !important; 
 }
-
-/* Título Principal DORADO */
 h1 { 
     font-family: 'Orbitron', sans-serif !important; 
     color: #FFD700 !important; 
@@ -107,8 +104,6 @@ h1 {
     text-align: center; 
     letter-spacing: 3px; 
 }
-
-/* Subtítulos (Neón Rosa/Cian) */
 h2, h3 { 
     font-family: 'Orbitron', sans-serif !important; 
     color: #ffffff !important; 
@@ -116,16 +111,12 @@ h2, h3 {
     text-align: center; 
     letter-spacing: 3px; 
 }
-
-/* Títulos de sección (h4) */
 h4 {
     font-family: 'Orbitron', sans-serif !important;
     color: #00f0ff !important;
     text-shadow: 0 0 8px #00f0ff, 0 0 15px #FF007F !important;
     letter-spacing: 1px;
 }
-
-/* Etiquetas de inputs */
 [data-testid="stWidgetLabel"] p { 
     color: #00f0ff !important; 
     font-family: 'Orbitron', sans-serif !important; 
@@ -139,18 +130,14 @@ h4 {
     display: inline-block !important; 
     margin-bottom: 8px !important; 
 }
-
-/* Barra lateral */
 [data-testid="stSidebar"] { 
     background-color: rgba(5, 5, 10, 0.98) !important; 
     border-right: 2px solid #00f0ff !important; 
     box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
 }
-
-/* 🌟 BOTONES COMO PESTAÑAS 🌟 */
 div.stButton > button[kind="secondary"] {
     background-color: #0a0a0a !important;
-    color: #ffffff !important; /* Texto BLANCO en inactivas */
+    color: #ffffff !important;
     font-family: 'Orbitron', sans-serif !important;
     font-size: 13px !important;
     font-weight: bold !important;
@@ -164,7 +151,7 @@ div.stButton > button[kind="secondary"] {
 }
 div.stButton > button[kind="secondary"]:hover {
     background-color: rgba(0, 240, 255, 0.15) !important;
-    color: #00f0ff !important; /* El hover sí es cian */
+    color: #00f0ff !important;
     box-shadow: 0 0 20px rgba(0, 240, 255, 0.7) !important;
     transform: translateY(-2px) !important;
 }
@@ -183,8 +170,6 @@ div.stButton > button[kind="primary"] {
     transform: translateY(-1px) !important;
     width: 100% !important;
 }
-
-/* Cajas de texto e inputs normales */
 .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
     background-color: #0a0a0a !important; 
     border: 1px solid #00f0ff !important; 
@@ -197,16 +182,12 @@ div.stButton > button[kind="primary"] {
     border: 1px solid #FF007F !important; 
     box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
 }
-
-/* Chat Input (Legacy) */
 [data-testid="stChatInput"] {
     background-color: #0a0a0a !important;
     border: 1px solid #00f0ff !important;
     border-radius: 10px !important;
     box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
 }
-
-/* 🔥 CHAT INPUT PRO (Opción 3) 🔥 */
 [data-testid="stTextInput"] div,
 [data-testid="stTextInput"] input {
     background-color: #0a0a0a !important;
@@ -235,8 +216,6 @@ div.stButton > button[kind="primary"] {
     color: #888888 !important;
     opacity: 1 !important;
 }
-
-/* Botones normales */
 div.stButton > button:not([kind="primary"]):not([kind="secondary"]), div[data-testid="stDownloadButton"] > button { 
     background: #0a0a0a !important; 
     color: #00f0ff !important; 
@@ -255,8 +234,6 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
     transform: translateY(-2px); 
     box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
 }
-
-/* Mensajes del Chat */
 [data-testid="stChatMessage"] { 
     background: rgba(10, 10, 15, 0.8) !important; 
     border: 1px solid #FF007F !important; 
@@ -264,16 +241,12 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
     padding: 10px; 
     box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important;
 }
-
-/* Alertas */
 .stAlert { 
     border-radius: 10px; 
     font-weight: bold; 
     background-color: rgba(0, 240, 255, 0.1) !important;
     border-left: 5px solid #00f0ff !important;
 }
-
-/* Reducir hueco entre menús */
 [data-testid="stVerticalBlock"] > div {
     padding-bottom: 0.5rem !important;
 }
@@ -325,7 +298,12 @@ def buscar_noticias_deportivas(deporte, liga):
         return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in res]
     except: return []
 
+# 🛠️ PARCHE 1: VALIDACIÓN DE TAMAÑO DE ARCHIVO
 def leer_archivo_universal(upload, modelo_ia):
+    if upload.size > MAX_FILE_MB * 1024 * 1024:
+        st.error(f"❌ El archivo **{upload.name}** pesa más de {MAX_FILE_MB} MB. Por seguridad, no se puede procesar.")
+        st.stop()
+        
     nombre = upload.name.lower()
     if nombre.endswith(".txt"): return upload.read().decode("utf-8", errors="ignore")
     if nombre.endswith(".pdf"): return "\n".join([p.extract_text() for p in pypdf.PdfReader(BytesIO(upload.getvalue())).pages if p.extract_text()])
@@ -384,18 +362,35 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     except Exception as e: 
         return f"[ERROR LOCAL] {e}"
 
+# 🛠️ PARCHE 2: BÚSQUEDA DE FUENTE MULTIPLATAFORMA
+def obtener_ruta_fuente():
+    rutas = [
+        "C:/Windows/Fonts/arial.ttf", # Windows
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", # Linux (Ubuntu/Debian)
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf", # Linux alternativo
+        "/Library/Fonts/Arial.ttf", # Mac
+        "/System/Library/Fonts/Supplemental/Arial.ttf" # Mac alternativo
+    ]
+    for ruta in rutas:
+        if os.path.exists(ruta):
+            return ruta
+    return None
+
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF(); pdf.add_page()
-    font_path = "C:/Windows/Fonts/arial.ttf"
-    if os.path.exists(font_path): 
+    font_path = obtener_ruta_fuente()
+    
+    if font_path: 
         pdf.add_font("Arial", "", font_path, uni=True)
         pdf.set_font("Arial", size=11)
     else: 
         pdf.set_font("Helvetica", size=11)
         contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
+        
     pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 20, txt="", ln=True); pdf.multi_cell(0, 10, txt=titulo, align='C')
     pdf.set_font("Helvetica", "I", 12); pdf.cell(0, 10, txt="Generado por Xavilu Network Pro", align='C', ln=True); pdf.add_page()
-    if os.path.exists(font_path): pdf.set_font("Arial", size=11)
+    
+    if font_path: pdf.set_font("Arial", size=11)
     else: pdf.set_font("Helvetica", size=11)
     pdf.multi_cell(0, 8, txt=contenido)
     return bytes(pdf.output())
@@ -477,7 +472,6 @@ def cajon_ideas_personalizado(contexto_pestana, modelo, api_key):
             st.warning("Escribe primero tu idea.")
 
 def chat_input_pro(key, placeholder="Escribe tu mensaje..."):
-    """Sustituto estilizado de st.chat_input (Opción 3: control total del CSS)."""
     text_key = f"{key}_text"
     msg_key  = f"{key}_msg"
     
@@ -510,7 +504,6 @@ def chat_input_pro(key, placeholder="Escribe tu mensaje..."):
     return st.session_state.pop(msg_key, None)
 
 def custom_tabs(tab_names, key_name, default_idx=0):
-    """Sistema de pestañas custom usando botones (SIEMPRE 5 columnas por fila)."""
     state_key = f"tab_state_{key_name}"
     if state_key not in st.session_state:
         st.session_state[state_key] = default_idx
@@ -518,7 +511,7 @@ def custom_tabs(tab_names, key_name, default_idx=0):
     max_cols = 5
     for i in range(0, len(tab_names), max_cols):
         chunk = tab_names[i:i + max_cols]
-        cols = st.columns(max_cols) # Siempre 5 columnas
+        cols = st.columns(max_cols) 
         for j, name in enumerate(chunk):
             real_idx = i + j
             with cols[j]:
@@ -549,6 +542,11 @@ with st.sidebar:
     archivo_global = st.file_uploader("📁 Contexto Global", type=["pdf", "txt", "docx", "png", "jpg", "jpeg", "mp3", "wav", "mp4"], key="up_global")
     
     if archivo_global:
+        # 🛠️ PARCHE 1.1: Validación de tamaño también en el cerebro global
+        if archivo_global.size > MAX_FILE_MB * 1024 * 1024:
+            st.error(f"❌ Archivo demasiado grande (Máx: {MAX_FILE_MB} MB).")
+            st.stop()
+
         if st.session_state.get("global_file_name") != archivo_global.name:
             with st.spinner("Procesando archivo para el cerebro global..."):
                 nombre = archivo_global.name.lower()
@@ -1178,7 +1176,12 @@ elif macro_idx == 3:
             else:
                 with st.spinner("Descargando..."):
                     temp_dir = tempfile.mkdtemp()
-                    ydl_opts = {'outtmpl': os.path.join(temp_dir, "%(title)s.%(ext)s"), 'quiet': True, 'format': 'best'}
+                    # 🛠️ PARCHE 3: Límite de 720p para evitar OOM
+                    ydl_opts = {
+                        'outtmpl': os.path.join(temp_dir, "%(title)s.%(ext)s"), 
+                        'quiet': True, 
+                        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+                    }
                     try:
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                             info = ydl.extract_info(url_dl, download=True)
