@@ -15,3 +15,4 @@ qrcode
 google-genai
 ddgs
 yt-dlp
+opencv-python
