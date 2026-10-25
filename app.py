@@ -83,15 +83,15 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS SÚPER NEÓN (OPCIÓN 1 - MEJORADO) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
     
-    /* Fondo general de la app */
+    /* Fondo Negro Espacial con brillo sutil en el centro */
     .stApp { 
-        background-color: #050505 !important; 
-        background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #050505 100%) !important; 
+        background-color: #000000 !important; 
+        background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
         color: #f7dfa3 !important; 
         font-family: 'Rajdhani', sans-serif !important; 
     }
@@ -122,7 +122,7 @@ st.markdown("""
     
     /* Barra lateral */
     [data-testid="stSidebar"] { 
-        background-color: rgba(10, 10, 25, 0.95) !important; 
+        background-color: rgba(5, 5, 10, 0.98) !important; 
         border-right: 2px solid #00f0ff !important; 
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
@@ -134,14 +134,14 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent !important;
-        color: #ffffff !important; /* Blanco puro para que se lean bien */
+        color: #ffffff !important;
         font-family: 'Orbitron', sans-serif !important;
         font-weight: bold !important;
         font-size: 14px !important;
         padding: 10px 15px !important;
         border: none !important;
         transition: all 0.3s ease !important;
-        opacity: 0.6 !important; /* Ligeramente transparente si no está seleccionada */
+        opacity: 0.6 !important; 
     }
     .stTabs [data-baseweb="tab"]:hover {
         color: #00f0ff !important;
@@ -149,12 +149,12 @@ st.markdown("""
         text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #00f0ff !important; /* Cian neón al seleccionar */
+        color: #00f0ff !important; 
         text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff !important;
-        border-bottom: 3px solid #FF007F !important; /* Línea rosa neón */
-        background: rgba(0, 240, 255, 0.1) !important; /* Fondo sutil azul */
+        border-bottom: 3px solid #FF007F !important; 
+        background: rgba(0, 240, 255, 0.1) !important; 
         border-radius: 10px 10px 0 0 !important;
-        opacity: 1 !important; /* Totalmente opaca */
+        opacity: 1 !important; 
     }
     
     /* Ocultar la línea de Streamlit por defecto */
@@ -168,7 +168,7 @@ st.markdown("""
     
     /* Cajas de texto e inputs */
     .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
-        background-color: rgba(0, 0, 0, 0.9) !important; 
+        background-color: rgba(10, 10, 10, 0.9) !important; 
         border: 1px solid #00f0ff !important; 
         border-radius: 8px !important; 
         color: #ffffff !important; 
@@ -182,7 +182,7 @@ st.markdown("""
     
     /* Botones */
     div.stButton > button, div[data-testid="stDownloadButton"] > button { 
-        background: rgba(0, 0, 0, 0.8) !important; 
+        background: rgba(10, 10, 10, 0.8) !important; 
         color: #00f0ff !important; 
         border: 2px solid #00f0ff !important; 
         border-radius: 25px !important; 
@@ -202,7 +202,7 @@ st.markdown("""
     
     /* Mensajes del Chat */
     [data-testid="stChatMessage"] { 
-        background: rgba(10, 10, 25, 0.8) !important; 
+        background: rgba(10, 10, 15, 0.8) !important; 
         border: 1px solid #FF007F !important; 
         border-radius: 15px !important; 
         padding: 10px; 
