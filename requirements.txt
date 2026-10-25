@@ -1,11 +1,11 @@
 streamlit
 ollama
-edge-tts==6.1.14
+edge-tts
 pypdf
 python-docx
 openpyxl
 python-pptx
-fpdf
+fpdf2
 pillow
 ddgs
 google-genai
@@ -13,6 +13,6 @@ pandas
 plotly
 youtube-transcript-api
 beautifulsoup4
-moviepy
+moviepy>=2.0.0
 imageio-ffmpeg
 qrcode[pil]
