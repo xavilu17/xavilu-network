@@ -86,7 +86,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V84 - TRADUCTOR UNIVERSAL) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V85 - FALLBACK GEMINI) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -370,6 +370,7 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
                 continue
             else: return f"[ERROR GEMINI] {e}"
 
+# 🛠️ FALLBACK INTELIGENTE: Si Gemini falla por cuota, usa Ollama
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     prompt_final = prompt[:MAX_TEXTO_IA]
     
@@ -381,25 +382,35 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial de la conversación hasta ahora:\n{contexto_chat}\n\nNuevo mensaje del usuario:\n{prompt_final}\n\nResponde al nuevo mensaje."
         
+    # Intento con Gemini
     if api_key_gemini.strip():
-        if not HAS_GEMINI: return "[ERROR] Falta google-genai."
-        for intento in range(3):
-            try:
-                client = get_gemini_client(api_key_gemini)
-                response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt_final)
-                return response.text
-            except Exception as e:
-                if "503" in str(e) and intento < 2: 
-                    time.sleep(3)
-                    continue
-                return f"[ERROR GEMINI] {e}"
+        if not HAS_GEMINI: 
+            st.warning("⚠️ Falta la librería google-genai. Usando Ollama local.")
+        else:
+            for intento in range(2):
+                try:
+                    client = get_gemini_client(api_key_gemini)
+                    response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt_final)
+                    return response.text
+                except Exception as e:
+                    error_str = str(e)
+                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                        st.warning("🔋 Cuota de Gemini agotada (límite diario). Cambiando a **Ollama local** automáticamente...")
+                        break 
+                    elif "503" in error_str and intento < 1: 
+                        time.sleep(2)
+                        continue
+                    else:
+                        st.warning(f"⚠️ Error con Gemini: {error_str[:100]}... Usando Ollama local.")
+                        break
                 
+    # Fallback a Ollama
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         response = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})
         return response["message"]["content"].split("</think>")[-1].strip()
     except Exception as e: 
-        return f"[ERROR LOCAL] {e}"
+        return f"[ERROR CRÍTICO] No se pudo conectar ni con Gemini ni con Ollama. Revisa que Ollama esté encendido. Detalle: {e}"
 
 # BÚSQUEDA DE FUENTE MULTIPLATAFORMA
 def obtener_ruta_fuente():
@@ -426,14 +437,12 @@ def generar_pdf_pro(titulo, contenido):
         pdf.set_font("Helvetica", size=11)
         contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
         
-    # Cabecera sin salto de página forzado
     pdf.set_font("Helvetica", "B", 24)
     pdf.cell(0, 20, txt="", ln=True)
     pdf.multi_cell(0, 10, txt=titulo, align='C')
     pdf.set_font("Helvetica", "I", 12)
     pdf.cell(0, 10, txt="Generado por Xavilu Network Pro", align='C', ln=True)
     
-    # Línea decorativa
     pdf.set_draw_color(0, 240, 255)
     pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5)
     pdf.ln(15)
