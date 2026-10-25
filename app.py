@@ -25,6 +25,7 @@ import qrcode
 import gc
 import html
 
+# Fallback para buscador
 try:
     from ddgs import DDGS
 except ImportError:
@@ -33,6 +34,7 @@ except ImportError:
     except ImportError:
         DDGS = None
 
+# SDK de Gemini
 try:
     from google import genai
     from google.genai import types
@@ -143,8 +145,9 @@ def llamar_ia(modelo, prompt, api_key_gemini=""):
     
     if api_key_gemini.strip() and HAS_GEMINI:
         try: 
+            # CORREGIDO: Modelo actualizado a gemini-2.5-flash
             response = genai.Client(api_key=api_key_gemini).models.generate_content(
-                model='gemini-1.5-flash', 
+                model='gemini-2.5-flash', 
                 contents=prompt
             )
             return response.text + "\n\n*(Procesado en la Nube con Gemini)*"
@@ -166,8 +169,9 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
         try:
             client = genai.Client(api_key=api_key_gemini)
             parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
+            # CORREGIDO: Modelo actualizado a gemini-2.5-flash
             response = client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=[prompt, parte_archivo]
             )
             return response.text + "\n\n*(Procesado en la Nube con Gemini)*"
@@ -285,14 +289,12 @@ def generar_audio_sincrono(texto_guion, voz_mod, voz_exp=None):
     except: return None
     finally: loop.close()
 
-# --- NUEVA FUNCIÓN MÁGICA PARA PEGAR ---
+# --- FUNCIÓN DE PEGADO MÁGICO ---
 def magic_paste_box(key):
-    # Esta función usa el chat_input de Streamlit que SÍ permite pegar imágenes
-    # Le añadimos la opción accept_file=True
     result = st.chat_input("📋 Pega aquí (Ctrl+V) tu imagen o archivo...", accept_file=True, key=key)
     if result:
         if result.files:
-            return result.files[0] # Devolvemos el primer archivo pegado
+            return result.files[0]
     return None
 
 # =========================================================
@@ -346,11 +348,9 @@ with tabs[0]:
     archivo_pegado_web = magic_paste_box("paste_web")
     
     contexto_archivo = ""
-    if archivo_pegado_web:
-        contexto_archivo = leer_archivo_universal(archivo_pegado_web, modelo_seleccionado)[:5000]
-        st.success("¡Archivo pegado con éxito! Se usará como contexto.")
-    elif archivo_web:
-        contexto_archivo = leer_archivo_universal(archivo_web, modelo_seleccionado)[:5000]
+    file_to_process = archivo_pegado_web if archivo_pegado_web else archivo_web
+    if file_to_process:
+        contexto_archivo = leer_archivo_universal(file_to_process, modelo_seleccionado)[:5000]
         st.success("Archivo cargado. Se usará como contexto extra.")
 
     query_busqueda = st.text_input("Comando de búsqueda en la red:", key="q_internet")
@@ -379,7 +379,6 @@ with tabs[1]:
         st.write("Sube un PDF, Word o Excel. Puedes pedirle un resumen o usar el 'Análisis Forense'.")
     st.markdown("### 📁 Análisis Forense de Archivos")
     
-    # CAJA NORMAL + CAJA MÁGICA
     archivo = st.file_uploader("📎 Arrastra y suelta aquí o haz clic para buscar (PDF, Word...)", type=["pdf", "txt", "docx", "xlsx", "pptx"])
     archivo_pegado = magic_paste_box("paste_datos")
     
@@ -568,10 +567,6 @@ with tabs[4]:
             st.session_state.chat_history.append({"role": "assistant", "content": res})
             st.chat_message("assistant").write(res)
 
-# (A partir de aquí, el resto de pestañas son idénticas a la versión V32.0, 
-# pero he añadido la función `magic_paste_box` en las pestañas que suben archivos, 
-# como en PDF, OFFICE, MAPAS, etc. Para no hacerlo infinito, te dejo la estructura clave).
-
 # --- TAB 6: IMÁGENES ---
 with tabs[5]:
     with st.expander("❓ ¿Cómo funciona esta sección? (Generador Visual)"):
@@ -668,10 +663,6 @@ with tabs[7]:
     if st.session_state.pdf_bytes:
         st.download_button("📥 Descargar PDF", st.session_state.pdf_bytes, f"{titulo_pdf}.pdf", "application/pdf")
 
-# (El resto de pestañas MAPAS, VIDEO, APP BUILDER, YOUTUBE, GRÁFICOS, etc. siguen exactamente igual, 
-# con la misma lógica de añadir el magic_paste_box si suben archivos. Para no hacer el mensaje 
-# interminable, he puesto el ejemplo en las más importantes. Solo tendrías que copiar la lógica).
-
 # --- TAB 9: MAPAS ---
 with tabs[8]:
     with st.expander("❓ ¿Cómo funciona esta sección? (Mapas Mentales)"):
@@ -735,10 +726,615 @@ with tabs[8]:
             except Exception as e:
                 st.error(f"No se pudo generar la imagen. Prueba con el .mmd. Detalle: {e}")
 
-# (Repetir la misma lógica de `magic_paste_box` en las pestañas de Video, Traductor, Redes, 
-# y Chat con PDF, para que puedas pegar archivos en absolutamente todas ellas).
+# --- TAB 10: VÍDEO ---
+with tabs[9]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Estudio de Vídeo)"):
+        st.write("**Modo IA:** La IA escribe un guion, genera las imágenes, la voz y el vídeo final.\n\n**Modo Manual:** Sube tus propias fotos o vídeo.\n\n**Efecto Cine:** Da vida a una sola foto.")
+    
+    st.markdown("### 🎬 Estudio de Vídeo")
+    
+    modo_video = st.radio("Selecciona el modo de creación:", [
+        "🤖 Generar con IA (Automático)",
+        "📁 Crear con mis archivos (Fotos/Vídeo)",
+        "📸 Dar vida a 1 Foto (Efecto Cine)"
+    ])
+    
+    st.markdown("---")
 
-# --- TAB 19: CLIPBOARD (SE MANTIENE INTACTO) ---
+    if modo_video == "🤖 Generar con IA (Automático)":
+        with st.container():
+            st.markdown("#### 💡 Cajón de Ideas")
+            st.caption("¿No sabes de qué hacer el vídeo? Pídele ideas a la IA.")
+            categoria_idea = st.selectbox("Temática general:", ["Curiosidades", "Misterio", "Ciencia", "Historia", "Tecnología", "Motivación", "Finanzas", "Salud", "Deportes", "Cocina", "Viajes", "Cine y Series", "Videojuegos"])
+            idea_personalizada = st.text_input("O escríbele lo que te gustaría (Opcional):", placeholder="Ej: Ideas sobre gatos...")
+            
+            if st.button("🎲 Generar Ideas"):
+                with st.spinner("Pensando..."):
+                    contexto_idea = f"sobre la categoría '{categoria_idea}'" if not idea_personalizada.strip() else f"sobre el tema específico: '{idea_personalizada}'"
+                    prompt_ideas = f"Genera 3 ideas creativas y breves para un vídeo corto {contexto_idea}. Usa un formato de lista numerada (1., 2., 3.). No pongas texto extra."
+                    st.session_state.ideas_video = llamar_ia(modelo_seleccionado, prompt_ideas, api_key_gemini)
+            
+            if st.session_state.ideas_video:
+                st.info(st.session_state.ideas_video)
+
+        st.markdown("---")
+
+        tema_video = st.text_input("Concepto del vídeo (o pega aquí una idea):", key="tema_video_input")
+        instrucciones_video = st.text_area("🎯 Instrucciones específicas (Opcional):", placeholder="Ej: Hazlo con tono humorístico...", height=80)
+        
+        if st.button("Generar Storyboard") and tema_video:
+            with st.spinner("Escribiendo..."):
+                prompt_storyboard = f"Divide el tema '{tema_video}' en 3 escenas. "
+                if instrucciones_video.strip():
+                    prompt_storyboard += f"Ten en cuenta estas instrucciones específicas: '{instrucciones_video}'. "
+                prompt_storyboard += "Formato exacto: 'ESCENA X: [Descripción visual en INGLÉS]' y 'Narrador: [Texto en ESPAÑOL]'."
+                
+                st.session_state.video_script = llamar_ia(modelo_seleccionado, prompt_storyboard, api_key_gemini)
+                st.session_state.video_bytes = None
+                
+        if st.session_state.video_script:
+            st.text_area("Guion de Escenas:", value=st.session_state.video_script, height=200)
+            botones_descarga(st.session_state.video_script, "Storyboard_Video")
+            
+            if st.button("🖼️ Renderizar Fotogramas"):
+                escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
+                for i, escena in enumerate(escenas, 1):
+                    url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escena.strip())}?width=800&height=450&nologo=true"
+                    st.image(url_img, caption=f"Fotograma {i}")
+
+            st.markdown("#### 🎥 Montar Vídeo Final")
+            voz_video = st.selectbox("Voz del Narrador:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_vid")
+            musica_fondo = st.file_uploader("🎵 Arrastra música de fondo (Opcional):", type=["mp3", "wav"])
+            
+            if st.button("🎬 Generar Vídeo Automático"):
+                with st.spinner("Creando vídeo..."):
+                    try:
+                        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip, afx
+                        escenas = re.findall(r'ESCENA \d+:\s*(.*)', st.session_state.video_script)
+                        narraciones = re.findall(r'Narrador:\s*(.*)', st.session_state.video_script)
+                        
+                        if not escenas or not narraciones or len(escenas) != len(narraciones):
+                            st.error("El formato del guion no es correcto.")
+                        else:
+                            clips = []
+                            for i in range(len(escenas)):
+                                url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(escenas[i].strip())}?width=800&height=450&nologo=true"
+                                img_data = requests.get(url_img).content
+                                audio_bytes = generar_audio_sincrono(narraciones[i].strip(), voz_video)
+                                if not audio_bytes: continue
+                                    
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
+                                    f_img.write(img_data); img_path = f_img.name
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
+                                    f_aud.write(audio_bytes); aud_path = f_aud.name
+                                
+                                audio_clip = AudioFileClip(aud_path)
+                                img_clip = ImageClip(img_path).with_duration(audio_clip.duration).with_audio(audio_clip)
+                                clips.append(img_clip)
+                                os.remove(img_path); os.remove(aud_path)
+                                
+                            if clips:
+                                final_video = concatenate_videoclips(clips, method="compose")
+                                
+                                if musica_fondo:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_mus:
+                                        f_mus.write(musica_fondo.getvalue()); mus_path = f_mus.name
+                                    music_clip = AudioFileClip(mus_path)
+                                    music_loop = music_clip.with_effects([afx.AudioLoop(duration=final_video.duration)]).with_volume_scaled(0.2)
+                                    final_video = final_video.with_audio(CompositeAudioClip([final_video.audio, music_loop]))
+                                    os.remove(mus_path)
+                                
+                                out_path = tempfile.mktemp(suffix=".mp4")
+                                final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+                                
+                                with open(out_path, "rb") as f_vid: st.session_state.video_bytes = f_vid.read()
+                                os.remove(out_path)
+                                st.success("¡Vídeo generado con éxito! 🎉")
+                    except Exception as e:
+                        st.error(f"Error al generar el vídeo: {e}")
+
+        if st.session_state.video_bytes:
+            st.video(st.session_state.video_bytes)
+            st.download_button("📥 Descargar Vídeo (MP4)", st.session_state.video_bytes, "video_generado.mp4", "video/mp4")
+
+    elif modo_video == "📁 Crear con mis archivos (Fotos/Vídeo)":
+        st.markdown("#### 📁 Sube tus archivos")
+        st.info("💡 Consejo: Al procesar el vídeo, puede tardar un poco. Evita subir vídeos de más de 20-30 segundos.")
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            imgs_subidas = st.file_uploader("🖼️ Arrastra fotos (se unirán en diapositivas de 3s)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+            vid_subido = st.file_uploader("🎥 Arrastra un vídeo base (MP4/MOV)", type=["mp4", "mov"])
+        with col_b:
+            audio_voz = st.file_uploader("🗣️ Arrastra audio de voz (Opcional)", type=["mp3", "wav"])
+            audio_musica = st.file_uploader("🎵 Arrastra música de fondo (Opcional)", type=["mp3", "wav"])
+            
+        st.markdown("---")
+        instrucciones_manual = st.text_area("🎯 ¿Quieres que la IA escriba y narre un texto para tus fotos? (Opcional)", placeholder="Ej: Escribe un poema triste para estas fotos...", height=80)
+        
+        texto_generado_manual = ""
+        if instrucciones_manual.strip() and not audio_voz:
+            if st.button("📝 Generar Texto y Voz con IA"):
+                with st.spinner("Escribiendo texto..."):
+                    prompt_manual = f"Basándote en estas instrucciones: '{instrucciones_manual}', escribe un texto para narrar un vídeo. Sé breve (máximo 3 párrafos)."
+                    texto_generado_manual = llamar_ia(modelo_seleccionado, prompt_manual, api_key_gemini)
+                    st.session_state.texto_manual_generado = texto_generado_manual
+                    st.info("Texto generado:")
+                    st.write(texto_generado_manual)
+
+        if st.button("🎬 Montar Vídeo Personalizado"):
+            if not imgs_subidas and not vid_subido:
+                st.warning("Debes subir al menos un vídeo o fotos para crear el vídeo.")
+            else:
+                with st.spinner("Montando tu vídeo personalizado..."):
+                    try:
+                        from moviepy import VideoFileClip, ImageClip, AudioFileClip, CompositeAudioClip, afx, concatenate_videoclips
+                        clips = []
+                        temp_files = []
+
+                        if vid_subido:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+                                f.write(vid_subido.getvalue())
+                                vid_path = f.name
+                                temp_files.append(vid_path)
+                            base_clip = VideoFileClip(vid_path)
+                            clips.append(base_clip)
+                        elif imgs_subidas:
+                            for img in imgs_subidas:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+                                    f.write(img.getvalue())
+                                    img_path = f.name
+                                    temp_files.append(img_path)
+                                clip = ImageClip(img_path).with_duration(3)
+                                clips.append(clip)
+
+                        if clips:
+                            final_video = concatenate_videoclips(clips, method="compose")
+                            audio_final = None
+                            
+                            if audio_voz:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                                    f.write(audio_voz.getvalue())
+                                    voz_path = f.name
+                                    temp_files.append(voz_path)
+                                audio_final = AudioFileClip(voz_path)
+                            elif st.session_state.texto_manual_generado:
+                                audio_bytes = generar_audio_sincrono(st.session_state.texto_manual_generado, "es-ES-ElviraNeural")
+                                if audio_bytes:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                                        f.write(audio_bytes)
+                                        voz_path = f.name
+                                        temp_files.append(voz_path)
+                                    audio_final = AudioFileClip(voz_path)
+
+                            if audio_musica:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                                    f.write(audio_musica.getvalue())
+                                    mus_path = f.name
+                                    temp_files.append(mus_path)
+                                mus_clip = AudioFileClip(mus_path)
+                                mus_loop = mus_clip.with_effects([afx.AudioLoop(duration=final_video.duration)]).with_volume_scaled(0.3)
+
+                                if audio_final:
+                                    audio_final = CompositeAudioClip([audio_final, mus_loop])
+                                else:
+                                    audio_final = mus_loop
+
+                            if audio_final:
+                                final_video = final_video.with_audio(audio_final)
+
+                            out_path = tempfile.mktemp(suffix=".mp4")
+                            final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+
+                            with open(out_path, "rb") as f_vid:
+                                video_bytes = f_vid.read()
+
+                            for tf in temp_files:
+                                try: os.remove(tf)
+                                except: pass
+                            os.remove(out_path)
+
+                            st.success("¡Vídeo montado con éxito! 🎉")
+                            st.video(video_bytes)
+                            st.download_button("📥 Descargar Vídeo (MP4)", video_bytes, "video_personalizado.mp4", "video/mp4")
+                    except Exception as e:
+                        st.error(f"Error al montar el vídeo: {e}")
+                        
+    else:
+        st.markdown("#### 📸 Dar vida a una foto (Efecto Cine)")
+        st.write("Sube una foto, escribe lo que quieres que diga la voz en off, y la IA creará un vídeo con un efecto de zoom lento.")
+        
+        foto_unica = st.file_uploader("Arrastra y suelta tu foto principal:", type=["png", "jpg", "jpeg"])
+        idea_voz = st.text_input("💡 ¿De qué quieres que trate la narración? (Opcional):", placeholder="Ej: Una historia misteriosa sobre esta foto...")
+        texto_narracion = st.text_area("Texto para la voz en off (Puedes editarlo):", height=100, placeholder="Ej: En un lugar de la Mancha...")
+        
+        voz_foto = st.selectbox("Voz del Narrador:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_foto")
+        musica_foto = st.file_uploader("🎵 Arrastra música de fondo (Opcional):", type=["mp3", "wav"], key="mus_foto")
+        
+        if st.button("🎬 Generar Vídeo con Movimiento"):
+            if not foto_unica:
+                st.warning("Sube una foto para darle vida.")
+            else:
+                with st.spinner("Creando vídeo cinematográfico..."):
+                    img_path, aud_path, mus_path, out_path = None, None, None, None
+                    base_clip, audio_voz_clip, mus_clip, audio_final, final_video = None, None, None, None, None
+                    
+                    try:
+                        from moviepy import ImageClip, AudioFileClip, CompositeAudioClip, afx
+                        
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_img:
+                            f_img.write(foto_unica.getvalue())
+                            img_path = f_img.name
+                            
+                        if idea_voz.strip() and not texto_narracion.strip():
+                            with st.spinner("Escribiendo narración con IA..."):
+                                texto_narracion = llamar_ia(modelo_seleccionado, f"Escribe una narración breve y cinematográfica (máximo 20 segundos) basada en esta idea: '{idea_voz}'. Devuelve SOLO el texto.", api_key_gemini)
+                                st.info(f"Narración generada: {texto_narracion}")
+                            
+                        audio_bytes = b""
+                        if texto_narracion.strip():
+                            audio_bytes = generar_audio_sincrono(texto_narracion, voz_foto)
+                            
+                        duracion = 5.0 
+                        
+                        if audio_bytes:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_aud:
+                                f_aud.write(audio_bytes)
+                                aud_path = f_aud.name
+                            audio_voz_clip = AudioFileClip(aud_path)
+                            duracion = audio_voz_clip.duration
+                        
+                        base_clip = ImageClip(img_path).with_duration(duracion)
+                        
+                        def zoom_effect(t):
+                            return 1.0 + 0.2 * (t / duracion)
+                            
+                        final_video = base_clip.resized(zoom_effect)
+                        
+                        audio_final = audio_voz_clip if audio_voz_clip else None
+                        
+                        if musica_foto:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f_mus:
+                                f_mus.write(musica_foto.getvalue())
+                                mus_path = f_mus.name
+                            mus_clip = AudioFileClip(mus_path)
+                            mus_loop = mus_clip.with_effects([afx.AudioLoop(duration=duracion)]).with_volume_scaled(0.3)
+                            
+                            if audio_final:
+                                audio_final = CompositeAudioClip([audio_final, mus_loop])
+                            else:
+                                audio_final = mus_loop
+                                
+                        if audio_final:
+                            final_video = final_video.with_audio(audio_final)
+
+                        out_path = tempfile.mktemp(suffix=".mp4")
+                        final_video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+                        
+                        with open(out_path, "rb") as f_vid:
+                            video_bytes = f_vid.read()
+                        
+                        st.success("¡Foto animada con éxito! 🎉")
+                        st.video(video_bytes)
+                        st.download_button("📥 Descargar Vídeo (MP4)", video_bytes, "foto_animada.mp4", "video/mp4")
+                        
+                    except Exception as e:
+                        st.error(f"Error al animar la foto: {e}")
+                    finally:
+                        for clip in [final_video, audio_final, mus_clip, audio_voz_clip, base_clip]:
+                            if clip:
+                                try: clip.close()
+                                except: pass
+                        
+                        gc.collect()
+                        time.sleep(1)
+                        
+                        def borrar_archivo_seguro(ruta):
+                            if ruta and os.path.exists(ruta):
+                                for _ in range(5):
+                                    try:
+                                        os.remove(ruta)
+                                        break
+                                    except:
+                                        time.sleep(0.5)
+                                        
+                        for path in [img_path, aud_path, mus_path, out_path]:
+                            borrar_archivo_seguro(path)
+
+# --- TAB 11: APP BUILDER ---
+with tabs[10]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Programación)"):
+        st.write("Pídele a la IA que programe una aplicación en Python.")
+    st.markdown("### 💻 Asistente de Código (Fábrica de Apps)")
+    req_app = st.text_area("🎯 Especificaciones de la nueva aplicación:", height=80)
+    instrucciones_code = st.text_area("🎯 Requisitos extra (Opcional):", placeholder="Ej: Usa pandas, añade gráficos con plotly...", height=60)
+    
+    if st.button("Generar Código Base") and req_app:
+        with st.spinner("Compilando..."):
+            prompt_code = f"Eres un desarrollador experto en Python y Streamlit. Crea el código completo para: '{req_app}'. "
+            if instrucciones_code.strip():
+                prompt_code += f"Ten en cuenta: {instrucciones_code}. "
+            prompt_code += "REGLAS: Usa 'import streamlit as st'. Devuelve ÚNICAMENTE el código Python sin bloques markdown."
+            
+            codigo = llamar_ia(modelo_seleccionado, prompt_code, api_key_gemini)
+            st.session_state.app_code = codigo.replace("```python", "").replace("```", "").strip()
+            
+    if st.session_state.app_code:
+        st.success("Código fuente compilado.")
+        st.code(st.session_state.app_code, language="python")
+        st.download_button("📥 Descargar Código (.py)", st.session_state.app_code.encode('utf-8'), "mi_nueva_app.py", "text/plain")
+
+# --- TAB 12: YOUTUBE ---
+with tabs[11]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Resumidor YouTube)"):
+        st.write("Pega el enlace de un vídeo de YouTube. La IA extraerá automáticamente los subtítulos y te hará un resumen.")
+    st.markdown("### 🎥 Analizador de Vídeos de YouTube")
+    url_yt = st.text_input("Pega la URL del vídeo (Ej: https://www.youtube.com/watch?v=...):")
+    instrucciones_yt = st.text_area("🎯 Instrucciones para el resumen (Opcional):", placeholder="Ej: Céntrate solo en los datos numéricos...", height=80)
+    
+    if st.button("Extraer y Resumir") and url_yt:
+        with st.spinner("Buscando transcripción y resumiendo..."):
+            try:
+                video_id = url_yt.split("v=")[-1].split("&")[0] if "v=" in url_yt else url_yt.split("/")[-1]
+                transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['es', 'en'])
+                texto_completo = " ".join([t['text'] for t in transcript])
+                
+                prompt_yt = f"Haz un resumen detallado, con los puntos clave y conclusiones, del siguiente texto extraído de un vídeo:\n\n{texto_completo[:5000]}"
+                if instrucciones_yt.strip():
+                    prompt_yt += f"\n\nINSTRUCCIONES EXTRA: {instrucciones_yt}"
+                    
+                st.session_state.yt_resumen = llamar_ia(modelo_seleccionado, prompt_yt, api_key_gemini)
+                st.success("¡Análisis completado!")
+            except Exception as e:
+                st.error(f"Error al extraer el vídeo: {e}")
+
+    if st.session_state.yt_resumen:
+        st.text_area("Resumen Ejecutivo:", value=st.session_state.yt_resumen, height=300)
+        botones_descarga(st.session_state.yt_resumen, "Resumen_YouTube")
+
+# --- TAB 13: GRÁFICOS ---
+with tabs[12]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Gráficos)"):
+        st.write("Sube un archivo Excel o CSV. Dile a la IA qué quieres ver y ella elegirá el mejor gráfico.")
+    st.markdown("### 📈 Generador de Gráficos Inteligente")
+    archivo_datos = st.file_uploader("Arrastra y suelta un archivo CSV o Excel:", type=["csv", "xlsx"])
+    
+    if archivo_datos:
+        df = pd.read_csv(archivo_datos) if archivo_datos.name.endswith('.csv') else pd.read_excel(archivo_datos)
+        st.dataframe(df.head(5))
+        
+        instruccion_grafico = st.text_input("🎯 ¿Qué gráfico quieres? (Ej: Compara las ventas por mes):")
+        if st.button("Generar Gráfico") and instruccion_grafico:
+            with st.spinner("La IA está analizando tus datos..."):
+                cols = df.columns.tolist()
+                prompt_graf = f"Tengo un DataFrame con estas columnas: {cols}. El usuario quiere: '{instruccion_grafico}'. Dime qué gráfico usar (bar, line, pie, scatter) y qué columna va en X y cuál en Y. Devuelve SOLO un formato estricto: tipo_grafico|x_col|y_col. Si no aplica Y, pon 'none'."
+                respuesta_ia = llamar_ia(modelo_seleccionado, prompt_graf, api_key_gemini)
+                
+                try:
+                    partes = respuesta_ia.strip().split('|')
+                    tipo = partes[0].strip().lower()
+                    x_col = partes[1].strip()
+                    y_col = partes[2].strip()
+                    
+                    if "bar" in tipo: fig = px.bar(df, x=x_col, y=y_col, title=instruccion_grafico)
+                    elif "line" in tipo: fig = px.line(df, x=x_col, y=y_col, title=instruccion_grafico)
+                    elif "pie" in tipo: fig = px.pie(df, names=x_col, values=y_col, title=instruccion_grafico)
+                    else: fig = px.scatter(df, x=x_col, y=y_col, title=instruccion_grafico)
+                    
+                    fig.update_layout(template="plotly_dark")
+                    st.plotly_chart(fig, use_container_width=True)
+                except:
+                    st.warning("La IA no pudo determinar las columnas. Prueba a ser más específico.")
+
+# --- TAB 14: TRADUCTOR ---
+with tabs[13]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Traductor)"):
+        st.write("Escribe un texto o sube un archivo, elige el idioma de destino y la IA te lo traducirá y generará un audio MP3.")
+    st.markdown("### 🌍 Traductor y Locutor Multilingüe")
+    
+    archivo_trad = st.file_uploader("📎 Arrastra un archivo para traducir (Opcional)", type=["pdf", "txt", "docx"], key="up_trad")
+    archivo_pegado_trad = magic_paste_box("paste_trad")
+    file_trad = archivo_pegado_trad if archivo_pegado_trad else archivo_trad
+    
+    texto_trad = st.text_area("Texto a traducir (o escribe aquí):", height=100)
+    
+    if file_trad:
+        texto_trad = leer_archivo_universal(file_trad, modelo_seleccionado)[:4000]
+        st.info("Archivo cargado. Se usará el texto extraído.")
+
+    IDIOMAS = {
+        "Inglés": "en-US-JennyNeural",
+        "Francés": "fr-FR-DeniseNeural",
+        "Alemán": "de-DE-KatjaNeural",
+        "Italiano": "it-IT-ElsaNeural",
+        "Portugués": "pt-BR-FranciscaNeural"
+    }
+    idioma_dest = st.selectbox("Idioma de destino:", list(IDIOMAS.keys()))
+    
+    instrucciones_trad = st.text_input("🎯 Tono del idioma (Opcional):", placeholder="Ej: Formal, coloquial, juvenil...")
+    
+    if st.button("Traducir y Generar Audio") and texto_trad:
+        with st.spinner(f"Traduciendo al {idioma_dest}..."):
+            prompt_trad = f"Traduce el siguiente texto al {idioma_dest}. Devuelve ÚNICAMENTE la traducción:\n\n{texto_trad}"
+            if instrucciones_trad.strip():
+                prompt_trad += f"\n\nUSA ESTE TONO: {instrucciones_trad}"
+                
+            traduccion = llamar_ia(modelo_seleccionado, prompt_trad, api_key_gemini)
+            st.success("Traducción completada:")
+            st.info(traduccion)
+            
+            botones_descarga(traduccion, f"Traduccion_{idioma_dest}")
+            
+            with st.spinner("Sintetizando voz nativa..."):
+                voz_sel = IDIOMAS[idioma_dest]
+                st.session_state.traduccion_audio = generar_audio_sincrono(traduccion, voz_sel)
+                
+    if st.session_state.traduccion_audio:
+        st.audio(st.session_state.traduccion_audio, format="audio/mp3")
+        st.download_button("📥 Descargar Audio", st.session_state.traduccion_audio, f"audio_{idioma_dest}.mp3", "audio/mpeg")
+
+# --- TAB 15: REDES SOCIALES ---
+with tabs[14]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Redes)"):
+        st.write("Dile de qué va tu mensaje o producto. La IA lo redactará de forma perfecta según la red social que elijas. Puedes adjuntar una imagen para que se base en ella.")
+    st.markdown("### 📱 Estudio de Redes Sociales y Comunicación")
+    
+    archivo_redes = st.file_uploader("📎 Arrastra una imagen o documento de tu producto (Opcional)", type=["png", "jpg", "jpeg", "pdf", "txt"], key="up_redes")
+    archivo_pegado_redes = magic_paste_box("paste_redes")
+    file_redes = archivo_pegado_redes if archivo_pegado_redes else archivo_redes
+    
+    contexto_redes = ""
+    if file_redes:
+        if file_redes.name.lower().endswith((".png", ".jpg", ".jpeg")):
+            if api_key_gemini.strip():
+                with st.spinner("Analizando imagen del producto..."):
+                    contexto_redes = analizar_archivo_con_gemini(file_redes.getvalue(), "image/jpeg", "Describe esta imagen de forma atractiva para un post de redes sociales.", api_key_gemini)
+                    st.success("Imagen analizada. La IA usará esta descripción para el post.")
+            else:
+                st.warning("Necesitas Gemini para analizar imágenes.")
+        else:
+            contexto_redes = leer_archivo_universal(file_redes, modelo_seleccionado)[:4000]
+            st.success("Documento cargado.")
+
+    tema_post = st.text_area("¿De qué trata la publicación o el mensaje?", placeholder="Ej: Lanzamiento de nuestro nuevo producto...", height=100)
+    
+    red_social = st.selectbox("Selecciona la plataforma:", [
+        "📧 Gmail / Correo Formal", 
+        "💬 WhatsApp (Mensaje rápido)", 
+        "📸 Instagram (Post + Hashtags)", 
+        "🎵 TikTok (Guion de vídeo corto)", 
+        "💼 LinkedIn (Post profesional)", 
+        "🐦 Twitter / X (Hilo o Tweet)", 
+        "📘 Facebook (Publicación general)"
+    ])
+    
+    instrucciones_redes = st.text_area("🎯 Instrucciones extra (Opcional):", placeholder="Ej: Usa muchos emojis, incluye una llamada a la acción...", height=80)
+    
+    if st.button("✍️ Generar Texto para Redes"):
+        if tema_post or contexto_redes:
+            with st.spinner(f"Redactando para {red_social}..."):
+                prompt_base_red = ""
+                if "Gmail" in red_social:
+                    prompt_base_red = f"Escribe un correo electrónico formal y profesional sobre: '{tema_post}'."
+                elif "WhatsApp" in red_social:
+                    prompt_base_red = f"Escribe un mensaje corto, directo y amigable para enviar por WhatsApp sobre: '{tema_post}'."
+                elif "Instagram" in red_social:
+                    prompt_base_red = f"Escribe un post para Instagram sobre: '{tema_post}'. Usa emojis, sé visual y añade 10 hashtags relevantes al final."
+                elif "TikTok" in red_social:
+                    prompt_base_red = f"Escribe un guion de 30 segundos para un vídeo de TikTok sobre: '{tema_post}'. Divide en 'Gancho', 'Desarrollo' y 'Llamada a la acción'."
+                elif "LinkedIn" in red_social:
+                    prompt_base_red = f"Escribe un post profesional para LinkedIn sobre: '{tema_post}'. Tono inspirador o de liderazgo."
+                elif "Twitter" in red_social:
+                    prompt_base_red = f"Escribe un hilo de 3 tuits para Twitter sobre: '{tema_post}'."
+                else:
+                    prompt_base_red = f"Escribe una publicación para Facebook sobre: '{tema_post}'."
+                
+                prompt_red = prompt_base_red
+                if contexto_redes: prompt_red += f"\n\nBasado en esta descripción/imagen:\n{contexto_redes}"
+                if instrucciones_redes.strip(): prompt_red += f"\n\nINSTRUCCIONES EXTRA: {instrucciones_redes}"
+                    
+                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_red, api_key_gemini)
+                st.text_area("Texto Generado (Cópialo y pégalo en tu app):", value=st.session_state.analisis_ia, height=300)
+                botones_descarga(st.session_state.analisis_ia, "Post_Redes")
+        else:
+            st.warning("Escribe un tema o sube un archivo para empezar.")
+
+# --- TAB 16: CHAT CON PDF ---
+with tabs[15]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Chat con PDF)"):
+        st.write("Sube un documento largo y luego hazle preguntas concretas. La IA buscará la respuesta exacta dentro de ese archivo.")
+    st.markdown("### 💬 Chatea con tus Documentos")
+    
+    archivo_chat = st.file_uploader("Arrastra y suelta el documento para chatear:", type=["pdf", "txt", "docx"])
+    archivo_pegado_chatpdf = magic_paste_box("paste_chatpdf")
+    file_chatpdf = archivo_pegado_chatpdf if archivo_pegado_chatpdf else archivo_chat
+    
+    if file_chatpdf:
+        with st.spinner("Leyendo documento..."):
+            st.session_state.pdf_chat_text = leer_archivo_universal(file_chatpdf, modelo_seleccionado)[:MAX_TEXTO_IA]
+            st.success("Documento cargado en memoria. Ya puedes preguntar.")
+    
+    if st.session_state.pdf_chat_text:
+        for msg in st.session_state.pdf_chat_history:
+            st.chat_message(msg["role"]).write(msg["content"])
+            
+        if prompt := st.chat_input("Pregúntale algo a este documento..."):
+            st.session_state.pdf_chat_history.append({"role": "user", "content": prompt})
+            st.chat_message("user").write(prompt)
+            
+            with st.spinner("Buscando en el documento..."):
+                prompt_doc = f"Basándote EXCLUSIVAMENTE en el siguiente texto, responde a la pregunta del usuario. Si no está en el texto, di 'No lo sé'.\n\nTEXTO:\n{st.session_state.pdf_chat_text}\n\nPREGUNTA: {prompt}"
+                res = llamar_ia(modelo_seleccionado, prompt_doc, api_key_gemini)
+                st.session_state.pdf_chat_history.append({"role": "assistant", "content": res})
+                st.chat_message("assistant").write(res)
+
+# --- TAB 17: CV & QR ---
+with tabs[16]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (CV y QR)"):
+        st.write("En la izquierda puedes generar un Currículum profesional en PDF rellenando 4 datos. En la derecha, puedes crear un código QR.")
+    st.markdown("### 📇 Generador de CV y Códigos QR")
+    
+    col_cv, col_qr = st.columns(2)
+    
+    with col_cv:
+        st.markdown("#### 📄 Crear Currículum")
+        nombre_cv = st.text_input("Nombre y Apellidos:")
+        puesto_cv = st.text_input("Puesto al que aspiras:")
+        exp_cv = st.text_area("Experiencia y Educación (resumido):", height=100)
+        instrucciones_cv = st.text_area("🎯 Destaca esto (Opcional):", placeholder="Ej: Mi experiencia en liderazgo...", height=60)
+        
+        if st.button("Generar CV en PDF"):
+            if nombre_cv and puesto_cv:
+                with st.spinner("Redactando CV..."):
+                    prompt_cv = f"Crea un currículum profesional para {nombre_cv} para el puesto de {puesto_cv}. Aquí tienes su experiencia: {exp_cv}."
+                    if instrucciones_cv.strip():
+                        prompt_cv += f" Asegúrate de destacar: {instrucciones_cv}."
+                    prompt_cv += " Redáctalo de forma atractiva y estructurada."
+                    
+                    texto_cv = llamar_ia(modelo_seleccionado, prompt_cv, api_key_gemini)
+                    st.text_area("Vista previa del CV:", value=texto_cv, height=200)
+                    st.download_button("📥 Descargar CV (PDF)", generar_pdf_pro(f"CV - {nombre_cv}", texto_cv), f"CV_{nombre_cv}.pdf", "application/pdf")
+            else:
+                st.warning("Rellena al menos el nombre y el puesto.")
+
+    with col_qr:
+        st.markdown("#### 📱 Generar Código QR")
+        texto_qr = st.text_input("Introduce el enlace (URL) o texto:")
+        
+        if st.button("Generar QR") and texto_qr:
+            qr = qrcode.QRCode(version=1, box_size=10, border=5)
+            qr.add_data(texto_qr)
+            qr.make(fit=True)
+            img_qr = qr.make_image(fill_color="black", back_color="white")
+            
+            buf_qr = BytesIO()
+            img_qr.save(buf_qr, format="PNG")
+            st.image(buf_qr.getvalue(), caption="Tu Código QR")
+            st.download_button("📥 Descargar QR (PNG)", buf_qr.getvalue(), "codigo_qr.png", "image/png")
+
+# --- TAB 18: GENERADOR DE PROMPTS ---
+with tabs[17]:
+    with st.expander("❓ ¿Cómo funciona esta sección? (Prompts para IAs)"):
+        st.write("Escribe tu idea en español y la IA la traducirá al 'idioma' de Midjourney o DALL-E.")
+    st.markdown("### 🎯 Generador de Prompts Pro")
+    
+    idea_basica = st.text_input("Tu idea en español:", placeholder="Ej: Un castillo flotando en el espacio")
+    estilo_arte = st.selectbox("Estilo deseado:", ["Fotorrealista", "Ilustración digital", "Anime", "Cyberpunk", "Pintura al óleo", "3D Render"])
+    instrucciones_prompt = st.text_input("🎯 Detalles extra para el prompt (Opcional):", placeholder="Ej: Iluminación cinematográfica, 8k...")
+    
+    if st.button("Generar Prompt Maestro"):
+        if idea_basica:
+            with st.spinner("Escribiendo prompt en inglés..."):
+                prompt_maestro = f"Actúa como un experto en ingeniería de prompts para IA generativa. Convierte esta idea '{idea_basica}' en un prompt altamente detallado en INGLÉS para generar una imagen con estilo '{estilo_arte}'. "
+                if instrucciones_prompt.strip():
+                    prompt_maestro += f"Incluye también: {instrucciones_prompt}. "
+                prompt_maestro += "Incluye detalles de iluminación, cámara, calidad y texturas. Devuelve SOLO el prompt en inglés, sin comillas."
+                
+                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_maestro, api_key_gemini)
+                st.text_area("Prompt para copiar y pegar:", value=st.session_state.analisis_ia, height=150)
+                st.download_button("📥 Copiar Prompt (TXT)", st.session_state.analisis_ia.encode('utf-8'), "prompt.txt", "text/plain")
+
+# --- TAB 19: CLIPBOARD ---
 with tabs[18]:
     with st.expander("❓ ¿Cómo funciona esta sección? (Portapapeles Universal)"):
         st.write("Pega cualquier texto (Ctrl+V) o arrastra cualquier archivo (canción, foto, documento...). Dile a la IA qué quieres que haga con ello y lo procesará.")
@@ -748,28 +1344,30 @@ with tabs[18]:
     
     with col_up:
         archivo_uni = st.file_uploader("📎 Arrastra y suelta tu archivo aquí (Audio, Imagen, Doc...)", type=["png", "jpg", "jpeg", "webp", "mp4", "mov", "mp3", "wav", "pdf", "txt", "docx"], key="up_uni")
+        archivo_pegado_uni = magic_paste_box("paste_uni")
+        file_uni = archivo_pegado_uni if archivo_pegado_uni else archivo_uni
     with col_tx:
         texto_uni = st.text_area("📝 O pega tu texto aquí (Ctrl+V):", height=150, key="tx_uni")
         
     instruccion_uni = st.text_input("🎯 ¿Qué quieres que haga la IA con esto?", placeholder="Ej: Resume este texto, describe la canción, analiza esta foto...")
     
-    if st.button("🚀 Procesar en Portapapeles") and (archivo_uni or texto_uni or instruccion_uni):
+    if st.button("🚀 Procesar en Portapapeles") and (file_uni or texto_uni or instruccion_uni):
         with st.spinner("Procesando..."):
             resultado_uni = ""
-            if archivo_uni:
-                nombre = archivo_uni.name.lower()
+            if file_uni:
+                nombre = file_uni.name.lower()
                 if nombre.endswith((".mp3", ".wav")):
                     if not api_key_gemini.strip():
                         st.error("Necesitas Gemini para analizar audio.")
                     else:
-                        resultado_uni = analizar_archivo_con_gemini(archivo_uni.getvalue(), "audio/mp3", instruccion_uni or "Describe este audio.", api_key_gemini)
+                        resultado_uni = analizar_archivo_con_gemini(file_uni.getvalue(), "audio/mp3", instruccion_uni or "Describe este audio.", api_key_gemini)
                 elif nombre.endswith((".png", ".jpg", ".jpeg", ".webp")):
                     if not api_key_gemini.strip():
                         st.error("Necesitas Gemini para analizar imágenes.")
                     else:
-                        resultado_uni = analizar_archivo_con_gemini(archivo_uni.getvalue(), "image/jpeg", instruccion_uni or "Describe esta imagen.", api_key_gemini)
+                        resultado_uni = analizar_archivo_con_gemini(file_uni.getvalue(), "image/jpeg", instruccion_uni or "Describe esta imagen.", api_key_gemini)
                 else:
-                    texto_extraido = leer_archivo_universal(archivo_uni, modelo_seleccionado)[:4000]
+                    texto_extraido = leer_archivo_universal(file_uni, modelo_seleccionado)[:4000]
                     prompt = f"{instruccion_uni}\n\nTexto del archivo:\n{texto_extraido}"
                     resultado_uni = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
             elif texto_uni:
