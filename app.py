@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS SÚPER NEÓN (OPCIÓN 1) ---
+# --- 🎨 CSS SÚPER NEÓN (OPCIÓN 1 - MEJORADO) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -127,34 +127,37 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: SÚPER NEÓN 🌟 */
+    /* 🌟 PESTAÑAS: LETRAS CLARAS Y BRILLO NEÓN 🌟 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 15px !important;
+        gap: 10px !important;
         border-bottom: 2px solid rgba(0, 240, 255, 0.2) !important;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent !important;
-        color: #a0a0a0 !important; /* Gris claro para inactivas */
+        color: #ffffff !important; /* Blanco puro para que se lean bien */
         font-family: 'Orbitron', sans-serif !important;
         font-weight: bold !important;
         font-size: 14px !important;
         padding: 10px 15px !important;
         border: none !important;
         transition: all 0.3s ease !important;
+        opacity: 0.6 !important; /* Ligeramente transparente si no está seleccionada */
     }
     .stTabs [data-baseweb="tab"]:hover {
         color: #00f0ff !important;
+        opacity: 1 !important;
         text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         color: #00f0ff !important; /* Cian neón al seleccionar */
         text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff !important;
         border-bottom: 3px solid #FF007F !important; /* Línea rosa neón */
-        background: rgba(0, 240, 255, 0.05) !important;
+        background: rgba(0, 240, 255, 0.1) !important; /* Fondo sutil azul */
         border-radius: 10px 10px 0 0 !important;
+        opacity: 1 !important; /* Totalmente opaca */
     }
     
-    /* Ocultar la línea roja fea por defecto */
+    /* Ocultar la línea de Streamlit por defecto */
     [data-baseweb="tab-highlight"] {
         background-color: transparent !important;
         display: none !important;
