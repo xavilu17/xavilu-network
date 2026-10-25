@@ -78,7 +78,7 @@ _defaults = {
     "doc_opcion": "Resumen Ejecutivo",
     "global_context": "", "global_file_name": "",
     "agente_activo": None, "agente_chat_history": [],
-    "debate_resultado": ""
+    "debate_resultado": "", "img_prompt_en": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -146,7 +146,6 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     prompt_final = prompt[:MAX_TEXTO_IA]
     
-    # 🧠 INYECCIÓN DEL CONTEXTO GLOBAL
     if st.session_state.get("global_context"):
         nombre_archivo = st.session_state.get("global_file_name", "Archivo_Adjunto")
         prompt_final = f"[EL USUARIO HA ADJUNTADO EL SIGUIENTE ARCHIVO: {nombre_archivo}]\nCONTENIDO EXTRAÍDO DEL ARCHIVO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN DEL USUARIO]:\n{prompt_final}\n\n(Responde teniendo en cuenta el archivo adjunto si es relevante)."
@@ -302,7 +301,6 @@ with st.sidebar:
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
     if not HAS_CV2: st.warning("⚠️ `opencv-python` no instalado")
 
-# 🆕 REORDENACIÓN: EL CHAT PRIMERO
 macro_tabs = st.tabs([
     "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD",
     "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",
@@ -310,7 +308,7 @@ macro_tabs = st.tabs([
 ])
 
 # ==========================================
-# CATEGORÍA 1: CHAT Y ASISTENTES IA (PRIMERA POSICIÓN)
+# CATEGORÍA 1: CHAT Y ASISTENTES IA
 # ==========================================
 with macro_tabs[0]:
     sub = st.tabs(["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES CUSTOM", "⚖️ EL DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"])
@@ -319,7 +317,6 @@ with macro_tabs[0]:
         st.markdown("#### 💬 Chat con IA")
         st.caption("Este chat tiene memoria. Recuerda lo que habéis hablado anteriormente.")
         
-        # Botones de acción rápida
         if st.session_state.chat_history:
             col_q1, col_q2, col_q3 = st.columns(3)
             quick_prompt = ""
@@ -335,11 +332,9 @@ with macro_tabs[0]:
         else:
             quick_prompt = ""
 
-        # Mostrar historial
         for msg in st.session_state.chat_history: 
             st.chat_message(msg["role"]).write(msg["content"])
             
-        # Botones de utilidad
         if st.session_state.chat_history:
             col_u1, col_u2, col_u3 = st.columns(3)
             with col_u1:
@@ -356,10 +351,8 @@ with macro_tabs[0]:
                         audio_chat = generar_audio_sincrono(ultimo_msg, "es-ES-ElviraNeural")
                         if audio_chat: st.audio(audio_chat, format="audio/mp3")
 
-        # Caja de entrada de chat
         prompt = st.chat_input("Escribe tu mensaje...", key="chat_main_input")
         
-        # Si se ha pulsado un botón rápido
         if quick_prompt:
             prompt = quick_prompt
             
@@ -371,14 +364,14 @@ with macro_tabs[0]:
                 res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, historial_chat=st.session_state.chat_history)
                 st.session_state.chat_history.append({"role": "assistant", "content": res})
                 st.chat_message("assistant").write(res)
-                st.rerun() # Refrescar para que aparezcan los botones rápidos
+                st.rerun()
                 
         cajon_ideas_personalizado("Chat IA", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### Sintetizador de Voz")
-        texto_pod = st.text_area("Escribe el texto que quieres escuchar:")
-        voz = st.selectbox("Selecciona la voz:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+        texto_pod = st.text_area("Escribe el texto que quieres escuchar:", key="voz_texto")
+        voz = st.selectbox("Selecciona la voz:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_select")
         if st.button("🔊 Generar Audio", key="btn_voz") and texto_pod:
             with st.spinner("Generando voz..."):
                 audio = generar_audio_sincrono(texto_pod, voz)
@@ -430,7 +423,7 @@ with macro_tabs[0]:
         st.markdown("#### ⚖️ La Balanza: El Debate")
         st.caption("Pon a prueba tus ideas. La IA defenderá una postura y luego la contraria.")
         
-        tema_debate = st.text_input("¿Sobre qué quieres debatir?", placeholder="Ej: ¿Debería comprarme un coche eléctrico?")
+        tema_debate = st.text_input("¿Sobre qué quieres debatir?", placeholder="Ej: ¿Debería comprarme un coche eléctrico?", key="debate_q")
         
         if st.button("Iniciar Debate", type="primary", key="btn_debate") and tema_debate:
             with st.spinner("Preparando argumentos..."):
@@ -493,11 +486,6 @@ with macro_tabs[1]:
     sub = st.tabs(["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
     with sub[0]:
         st.markdown("#### Análisis Avanzado de Documentos")
-        with st.expander("💡 Cajón de Ideas"):
-            st.write("- **Auditoría:** Busca contradicciones o letra pequeña.")
-            st.write("- **Estudio:** Convierte el texto en un test de preguntas.")
-            st.write("- **Datos:** Saca solo las fechas, nombres y cifras.")
-        
         archivo = st.file_uploader("Sube un PDF, Word, Excel o TXT", type=["pdf", "txt", "docx", "xlsx"], key="up_dat")
         st.session_state.doc_opcion = st.selectbox("🎯 Selección de análisis:", ["Resumen Ejecutivo", "Extraer Fechas y Cifras", "Buscar Errores", "Crear Test", "Traducir al Inglés"])
         
@@ -517,28 +505,22 @@ with macro_tabs[1]:
 
     with sub[1]:
         st.markdown("#### ⚖️ Comparador de Documentos")
-        st.caption("Sube dos versiones de un contrato, apuntes o documento y la IA te dirá qué ha cambiado.")
-        
         col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            doc_original = st.file_uploader("Documento Original (A):", type=["pdf", "txt", "docx"], key="doc_a")
-        with col_c2:
-            doc_nuevo = st.file_uploader("Documento Modificado (B):", type=["pdf", "txt", "docx"], key="doc_b")
+        with col_c1: doc_original = st.file_uploader("Documento Original (A):", type=["pdf", "txt", "docx"], key="doc_a")
+        with col_c2: doc_nuevo = st.file_uploader("Documento Modificado (B):", type=["pdf", "txt", "docx"], key="doc_b")
             
         if doc_original and doc_nuevo and st.button("Comparar Documentos", type="primary", key="btn_compare"):
             with st.spinner("Buscando diferencias..."):
                 texto_a = leer_archivo_universal(doc_original, modelo_seleccionado)
                 texto_b = leer_archivo_universal(doc_nuevo, modelo_seleccionado)
-                
-                prompt_comp = f"Actúa como un auditor legal. Te voy a dar dos versiones de un documento (A y B). Tu tarea es encontrar las diferencias, cambios, adiciones o eliminaciones importantes entre ambos. Sé muy específico.\n\nDOCUMENTO A:\n{texto_a[:10000]}\n\nDOCUMENTO B:\n{texto_b[:10000]}"
-                
+                prompt_comp = f"Auditor legal. Encuentra las diferencias entre estos dos documentos.\n\nDOC A:\n{texto_a[:10000]}\n\nDOC B:\n{texto_b[:10000]}"
                 st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_comp, api_key_gemini)
                 st.text_area("Diferencias Encontradas:", value=st.session_state.analisis_ia, height=400)
                 botones_descarga(st.session_state.analisis_ia, "Comparativa_Docs")
         cajon_ideas_personalizado("Comparador de Documentos", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
-        st.markdown("#### Creación de Documentos (Word/Excel/PPT)")
+        st.markdown("#### Creación de Documentos")
         col_form, col_prompt = st.columns([1, 2])
         with col_form: formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_format")
         with col_prompt: prompt_office = st.text_area("¿Qué documento quieres crear?", placeholder="Ej: Un presupuesto para un cliente...", key="office_prompt")
@@ -858,13 +840,30 @@ with macro_tabs[3]:
 
     with sub[1]:
         st.markdown("#### Generador Visual")
-        prompt_img = st.text_input("Describe la imagen:", key="img_prompt")
+        prompt_img = st.text_input("Describe la imagen (en español):", key="img_prompt")
         tipo_img = st.radio("Estilo:", ["Foto/Realista", "Dibujo para Colorear"], horizontal=True, key="img_style")
+        
         if st.button("Generar Imagen", key="btn_gen_visual") and prompt_img:
-            prompt_final = prompt_img + (", coloring book page, thick black outlines, pure white background, no color" if "Colorear" in tipo_img else "")
-            st.session_state.img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_final)}?width=1024&height=1024&nologo=true&enhance=false"
+            with st.spinner("Traduciendo y generando imagen..."):
+                # 1. Traducimos el prompt al inglés para que el generador lo entienda perfectamente
+                prompt_traducido = llamar_ia(modelo_seleccionado, f"Traduce el siguiente texto al inglés para un generador de imágenes. Devuelve SOLO la traducción, sin comillas ni explicaciones: '{prompt_img}'", api_key_gemini)
+                
+                # 2. Limpiamos la traducción por si la IA añade texto extra
+                prompt_en_ingles = prompt_traducido.replace('"', '').replace("'", "").strip()
+                st.session_state.img_prompt_en = prompt_en_ingles
+                
+                # 3. Añadimos el estilo
+                if "Colorear" in tipo_img:
+                    prompt_final = prompt_en_ingles + ", coloring book page, thick black outlines, pure white background, no color"
+                else:
+                    prompt_final = prompt_en_ingles
+                
+                # 4. Generamos la URL
+                st.session_state.img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_final)}?width=1024&height=1024&nologo=true&enhance=true"
+        
         if st.session_state.img_url:
             st.image(st.session_state.img_url, use_container_width=True)
+            st.caption(f"Prompt enviado a la IA: *{st.session_state.img_prompt_en}*")
             boton_superpoder(f"Genera un prompt cinematográfico para: {prompt_img}", "Crear Prompt Alternativo", "visual", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Generador Visual", modelo_seleccionado, api_key_gemini)
 
