@@ -83,12 +83,11 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK: MENÚ RADIO ESTILO BOTÓN NEÓN ---
+# --- 🎨 CSS CYBERPUNK (Mantenemos el resto de la app igual) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
     
-    /* Fondo Negro Espacial */
     .stApp { 
         background-color: #000000 !important; 
         background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
@@ -96,7 +95,6 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif !important; 
     }
     
-    /* Títulos con brillo neón */
     h1, h2, h3 { 
         font-family: 'Orbitron', sans-serif !important; 
         color: #ffffff !important; 
@@ -105,7 +103,6 @@ st.markdown("""
         letter-spacing: 3px; 
     }
     
-    /* Etiquetas de los inputs */
     [data-testid="stWidgetLabel"] p { 
         color: #00f0ff !important; 
         font-family: 'Orbitron', sans-serif !important; 
@@ -120,56 +117,12 @@ st.markdown("""
         margin-bottom: 8px !important; 
     }
     
-    /* Barra lateral */
     [data-testid="stSidebar"] { 
         background-color: rgba(5, 5, 10, 0.98) !important; 
         border-right: 2px solid #00f0ff !important; 
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
-
-    /* 🌟 MAGIA: CONVERTIR st.radio EN BOTONES NEÓN 🌟 */
-    div[role="radiogroup"] {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    /* Ocultar el circulito del radio button */
-    div[role="radiogroup"] > label > div:first-child {
-        display: none !important;
-    }
-    /* Estilo de los botones (Inactivos) */
-    div[role="radiogroup"] > label {
-        background: rgba(10, 10, 10, 0.8) !important;
-        border: 2px solid #00f0ff !important;
-        border-radius: 25px !important;
-        padding: 8px 20px !important;
-        color: #00f0ff !important;
-        font-family: 'Orbitron', sans-serif !important;
-        font-weight: bold !important;
-        font-size: 13px !important;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
-    }
-    /* Cuando pasas el ratón */
-    div[role="radiogroup"] > label:hover {
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
-        transform: translateY(-2px);
-    }
-    /* El botón SELECCIONADO (Activo) */
-    div[role="radiogroup"] > label:has(input:checked) {
-        background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important;
-        border: 2px solid #ffffff !important;
-        color: #000000 !important;
-        box-shadow: 0 0 25px rgba(255, 0, 127, 0.9) !important;
-        transform: translateY(-2px);
-    }
-    div[role="radiogroup"] > label:has(input:checked) p {
-        color: #000000 !important;
-        font-weight: 900 !important;
-    }
     
-    /* Cajas de texto e inputs */
     .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
         background-color: rgba(10, 10, 10, 0.9) !important; 
         border: 1px solid #00f0ff !important; 
@@ -183,7 +136,6 @@ st.markdown("""
         box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
     }
     
-    /* Botones normales */
     div.stButton > button, div[data-testid="stDownloadButton"] > button { 
         background: rgba(10, 10, 10, 0.8) !important; 
         color: #00f0ff !important; 
@@ -203,7 +155,6 @@ st.markdown("""
         box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
     }
     
-    /* Mensajes del Chat */
     [data-testid="stChatMessage"] { 
         background: rgba(10, 10, 15, 0.8) !important; 
         border: 1px solid #FF007F !important; 
@@ -212,7 +163,6 @@ st.markdown("""
         box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important;
     }
     
-    /* Alertas */
     .stAlert { 
         border-radius: 10px; 
         font-weight: bold; 
@@ -221,6 +171,60 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
+
+# 🚀 MAGIA NEGRA: SCRIPT PARA FORZAR EL DISEÑO DE LAS PESTAÑAS
+st.html(
+    """
+    <script>
+    // Función que busca las pestañas y les inyecta los estilos
+    function styleTabs() {
+        const tabs = document.querySelectorAll('button[data-baseweb="tab"]');
+        tabs.forEach(tab => {
+            const isSelected = tab.getAttribute('aria-selected') === 'true';
+            
+            // Estilos base
+            tab.style.borderRadius = '25px';
+            tab.style.fontFamily = "'Orbitron', sans-serif";
+            tab.style.fontWeight = 'bold';
+            tab.style.padding = '10px 20px';
+            tab.style.margin = '5px';
+            tab.style.transition = 'all 0.3s ease';
+            tab.style.border = '2px solid #00f0ff';
+            
+            if (isSelected) {
+                // ESTILO ACTIVO (Degradado rosa a cian, texto negro)
+                tab.style.background = 'linear-gradient(135deg, #FF007F 0%, #00f0ff 100%)';
+                tab.style.border = '2px solid #ffffff';
+                tab.style.boxShadow = '0 0 25px rgba(255, 0, 127, 0.9)';
+                
+                // Forzar texto negro a la fuerza
+                tab.querySelectorAll('*').forEach(child => {
+                    child.style.setProperty('color', '#000000', 'important');
+                    child.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
+                });
+            } else {
+                // ESTILO INACTIVO (Fondo negro, borde y texto cian)
+                tab.style.background = 'rgba(10, 10, 10, 0.8)';
+                tab.style.boxShadow = '0 0 10px rgba(0, 240, 255, 0.3)';
+                
+                // Forzar texto cian a la fuerza
+                tab.querySelectorAll('*').forEach(child => {
+                    child.style.setProperty('color', '#00f0ff', 'important');
+                    child.style.setProperty('-webkit-text-fill-color', '#00f0ff', 'important');
+                });
+            }
+        });
+
+        // Ocultar la línea roja fea
+        const highlights = document.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]');
+        highlights.forEach(el => el.style.setProperty('display', 'none', 'important'));
+    }
+
+    // Ejecutar la función cada 500 milisegundos para asegurarnos de que pilla las pestañas cuando carguen
+    setInterval(styleTabs, 500);
+    </script>
+    """
+)
 
 # --- FUNCIONES BASE ---
 def buscar_en_internet(query):
@@ -420,19 +424,16 @@ with st.sidebar:
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
     if not HAS_CV2: st.warning("⚠️ `opencv-python` no instalado")
 
-# 🆕 EL NUEVO MENÚ PRINCIPAL ESTILO BOTÓN
-opciones_menu = [
+macro_tabs = st.tabs([
     "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD",
     "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",
     "🎵 MÚSICA Y ARTE"
-]
-seleccion = st.radio("Navegación principal", opciones_menu, horizontal=True, label_visibility="collapsed")
+])
 
 # ==========================================
-# CONTENIDO DINÁMICO
+# CATEGORÍA 1: CHAT Y ASISTENTES IA
 # ==========================================
-
-if seleccion == "💬 CHAT Y ASISTENTES":
+with macro_tabs[0]:
     sub = st.tabs(["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES CUSTOM", "⚖️ EL DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"])
     
     with sub[0]:
@@ -604,7 +605,7 @@ if seleccion == "💬 CHAT Y ASISTENTES":
 # ==========================================
 # CATEGORÍA 2: DOCUMENTOS Y TEXTO
 # ==========================================
-elif seleccion == "📁 DOCUMENTOS Y TEXTO":
+with macro_tabs[1]:
     sub = st.tabs(["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
     with sub[0]:
         st.markdown("#### Análisis Avanzado de Documentos")
@@ -722,7 +723,7 @@ elif seleccion == "📁 DOCUMENTOS Y TEXTO":
 # ==========================================
 # CATEGORÍA 3: WEB Y ACTUALIDAD
 # ==========================================
-elif seleccion == "🌐 WEB Y ACTUALIDAD":
+with macro_tabs[2]:
     sub = st.tabs(["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"])
     with sub[0]:
         st.markdown("#### Buscador Global")
@@ -908,7 +909,7 @@ elif seleccion == "🌐 WEB Y ACTUALIDAD":
 # ==========================================
 # CATEGORÍA 4: MULTIMEDIA
 # ==========================================
-elif seleccion == "🎬 MULTIMEDIA":
+with macro_tabs[3]:
     sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"])
     with sub[0]:
         st.markdown("#### Análisis Inteligente de Archivos")
@@ -1031,7 +1032,7 @@ elif seleccion == "🎬 MULTIMEDIA":
 # ==========================================
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
-elif seleccion == "🎓 ESTUDIO Y OFICIOS":
+with macro_tabs[4]:
     sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
     with sub[0]:
         st.markdown("#### 🌐 Herramientas de Redes")
@@ -1094,7 +1095,7 @@ elif seleccion == "🎓 ESTUDIO Y OFICIOS":
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
 # ==========================================
-elif seleccion == "🌍 VIAJES Y HOGAR":
+with macro_tabs[5]:
     sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
     with sub[0]:
         st.markdown("#### 🌍 Planificador de Viajes")
@@ -1143,7 +1144,7 @@ elif seleccion == "🌍 VIAJES Y HOGAR":
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
-elif seleccion == "🎵 MÚSICA Y ARTE":
+with macro_tabs[6]:
     sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
     with sub[0]:
         st.markdown("#### 🎵 Estudio de Creación Musical")
