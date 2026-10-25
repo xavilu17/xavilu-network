@@ -25,7 +25,6 @@ import qrcode
 import gc
 import html
 
-# Fallback para buscador
 try:
     from ddgs import DDGS
 except ImportError:
@@ -34,7 +33,6 @@ except ImportError:
     except ImportError:
         DDGS = None
 
-# SDK de Gemini
 try:
     from google import genai
     from google.genai import types
@@ -145,9 +143,9 @@ def llamar_ia(modelo, prompt, api_key_gemini=""):
     
     if api_key_gemini.strip() and HAS_GEMINI:
         try: 
-            # CORREGIDO: Modelo actualizado a gemini-2.5-flash
+            # CORREGIDO: Modelo actualizado a gemini-3.8-flash
             response = genai.Client(api_key=api_key_gemini).models.generate_content(
-                model='gemini-2.5-flash', 
+                model='gemini-3.8-flash', 
                 contents=prompt
             )
             return response.text + "\n\n*(Procesado en la Nube con Gemini)*"
@@ -169,9 +167,9 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
         try:
             client = genai.Client(api_key=api_key_gemini)
             parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
-            # CORREGIDO: Modelo actualizado a gemini-2.5-flash
+            # CORREGIDO: Modelo actualizado a gemini-3.8-flash
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.8-flash',
                 contents=[prompt, parte_archivo]
             )
             return response.text + "\n\n*(Procesado en la Nube con Gemini)*"
