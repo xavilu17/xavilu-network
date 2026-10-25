@@ -67,7 +67,7 @@ _defaults = {
     "chat_history": [], "img_url": "", "app_code": "", "pdf_chat_history": [],
     "mermaid_code": "", "analisis_ia": "", "dl_bytes": None, "dl_filename": "", "dl_mime": "",
     "cuento_generado": "", "receta_generada": "", "menu_generado": "",
-    "redes_resultado": "", "pelo_resultado": "", "deberes_resultado": "",
+    "redes_resultado": "", "pelo_resultado": "", "deberes_resultado": "", "prl_resultado": "",
     "qr_resultado": "", "code_resultado": "", "entrevista_resultado": "",
     "presupuesto_resultado": "", "noticias_deportes": [], "resumen_deportivo": "",
     "evento_resultados": None, "office_text": "", "pdf_text": "", "clip_text": "",
@@ -654,7 +654,6 @@ with macro_tabs[2]:
             
         if st.button("🛡️ Generar Logo", type="primary", key="btn_gen_logo") and nombre_marca:
             with st.spinner("Diseñando logotipo..."):
-                # Creamos un prompt MUY específico para logos
                 prompt_logo = f"Professional brand logo design for '{nombre_marca}', {estilo_logo} style, primary color {color_logo}, "
                 if icono_logo: prompt_logo += f"with an icon of {icono_logo}, "
                 prompt_logo += "flat vector graphic, minimalist, clean white background, centered, high quality, no text, corporate identity"
@@ -730,7 +729,6 @@ with macro_tabs[3]:
         st.markdown("#### 🕵️‍♂️ Creador de Agentes IA")
         st.caption("Crea un personaje o experto con una personalidad única y chatea con él.")
         
-        # Configuración del Agente
         with st.container():
             nombre_agente = st.text_input("Nombre del Agente:", placeholder="Ej: Albert, el Profesor de Física")
             rol_agente = st.text_area("Personalidad y Reglas (System Prompt):", 
@@ -745,7 +743,6 @@ with macro_tabs[3]:
                 else:
                     st.warning("Ponle un nombre y una personalidad al agente para activarlo.")
                     
-        # Interfaz de Chat del Agente
         if st.session_state.get("agente_activo"):
             agente = st.session_state.agente_activo
             st.markdown(f"---")
@@ -759,9 +756,7 @@ with macro_tabs[3]:
                 st.chat_message("user").write(prompt)
                 
                 with st.spinner(f"{agente['nombre']} está pensando..."):
-                    # Inyectamos la personalidad en el prompt
                     prompt_con_rol = f"INSTRUCCIONES DEL SISTEMA (ERES ESTE AGENTE):\n{agente['rol']}\n\nEl usuario dice: {prompt}"
-                    
                     res = llamar_ia(modelo_seleccionado, prompt_con_rol, api_key_gemini)
                     st.session_state.agente_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
@@ -816,7 +811,7 @@ with macro_tabs[3]:
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
 with macro_tabs[4]:
-    sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO"])
+    sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
     with sub[0]:
         st.markdown("#### 🌐 Herramientas de Redes")
         
@@ -869,6 +864,40 @@ with macro_tabs[4]:
             res = llamar_ia(modelo_seleccionado, f"Eres un profesor. Nivel: {nivel}. Materia: {materia}. Explica esto paso a paso y con ejemplos: {duda}", api_key_gemini)
             st.success("Explicación:")
             st.info(res)
+            
+    # 🆕 NUEVA PESTAÑA: PRL
+    with sub[3]:
+        st.markdown("#### 🦺 Asistente de Prevención de Riesgos Laborales")
+        st.caption("Herramientas para técnicos de PRL: charlas, evaluaciones y dudas legales.")
+        
+        with st.expander("💡 Cajón de Ideas PRL"):
+            st.write("- Pide una **charla de 5 minutos** sobre el uso seguro de escaleras de mano.")
+            st.write("- Pide una **evaluación de riesgos** para un puesto de repartidor en moto.")
+            st.write("- Pregunta **qué EPIs** son obligatorios para soldadura.")
+            
+        tipo_prl = st.selectbox("¿Qué necesitas generar hoy?", [
+            "Charla de 5 Minutos (Seguridad)",
+            "Evaluación de Riesgos (Puesto/Tarea)",
+            "Recomendación de EPIs (Equipos de Protección)",
+            "Consulta Legal / Normativa (Ley 31/1995, RD...)"
+        ])
+        
+        contexto_prl = st.text_area("Describe el puesto, la tarea o la duda legal:", placeholder="Ej: Trabajo en altura para cambiar una bombilla en un almacén con una escalera de tijera.")
+        
+        if st.button("🦺 Generar Documento PRL", type="primary") and contexto_prl:
+            with st.spinner("Redactando informe técnico..."):
+                if "Charla" in tipo_prl:
+                    prompt_prl = f"Actúa como un Técnico Superior en PRL. Escribe una Charla de 5 minutos, directa y dinámica, para los trabajadores sobre: '{contexto_prl}'. Incluye: 1. Riesgos principales. 2. Medidas preventivas. 3. EPIs necesarios."
+                elif "Evaluación" in tipo_prl:
+                    prompt_prl = f"Actúa como un Técnico en PRL. Realiza una Evaluación de Riesgos simplificada para: '{contexto_prl}'. Enumera los riesgos (físicos, ergonómicos, etc.), la probabilidad, la gravedad y las medidas preventivas a adoptar."
+                elif "EPIs" in tipo_prl:
+                    prompt_prl = f"Actúa como experto en seguridad laboral. Dime detalladamente qué Equipos de Protección Individual (EPIs) son obligatorios y recomendados para: '{contexto_prl}'. Explica por qué y menciona la normativa aplicable."
+                else:
+                    prompt_prl = f"Actúa como asesor legal en PRL. Responde a la siguiente duda técnica o legal con base en la Ley de Prevención de Riesgos Laborales (España): '{contexto_prl}'. Sé riguroso y cita artículos si es posible."
+                
+                st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, prompt_prl, api_key_gemini)
+                st.text_area("Documento Generado:", value=st.session_state.prl_resultado, height=400)
+                botones_descarga(st.session_state.prl_resultado, f"PRL_{tipo_prl.split('(')[0].strip()}")
 
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
