@@ -26,6 +26,7 @@ import qrcode
 import gc
 import html
 import numpy as np
+import random
 
 # Intentar importar OpenCV para el lector de QR
 try:
@@ -242,6 +243,24 @@ def boton_superpoder(texto_base, instruccion_poder, key_suffix, modelo, api_key)
             st.info(resultado)
             botones_descarga(resultado, f"Superpoder_{key_suffix}")
 
+# 🆕 NUEVA FUNCIÓN: CAJÓN DE IDEAS PERSONALIZADO
+def cajon_ideas_personalizado(contexto_pestana, modelo, api_key):
+    st.markdown("---")
+    st.markdown("### 🧠 Tu Idea Propia (Control Total)")
+    st.caption(f"¿Tienes otra idea para {contexto_pestana}? Escríbela aquí y la IA la ejecutará usando el contexto de la app.")
+    
+    idea_libre = st.text_area("Escribe tu instrucción personalizada:", placeholder="Ej: Haz un resumen enfocado en los costes... / Escribe un poema sobre esto... / Ignora todo y hazme una lista de ideas...", key=f"idea_libre_{contexto_pestana}")
+    
+    if st.button("🚀 Ejecutar mi Idea", key=f"btn_idea_libre_{contexto_pestana}", type="primary"):
+        if idea_libre:
+            with st.spinner("Procesando tu idea..."):
+                res = llamar_ia(modelo, idea_libre, api_key)
+                st.success("¡Resultado de tu idea!")
+                st.info(res)
+                botones_descarga(res, f"Idea_Libre_{contexto_pestana}")
+        else:
+            st.warning("Escribe primero tu idea.")
+
 # ==========================================
 # INTERFAZ PRINCIPAL
 # ==========================================
@@ -333,6 +352,8 @@ with macro_tabs[0]:
                 st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
                 st.text_area("Resultado:", value=st.session_state.analisis_ia, height=400)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Doc")
+                
+        cajon_ideas_personalizado("Análisis de Documentos", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### Creación de Documentos (Word/Excel/PPT)")
@@ -352,6 +373,8 @@ with macro_tabs[0]:
         if st.session_state.office_text:
             boton_superpoder(st.session_state.office_text, "Reescribe este documento para que sea un 200% más persuasivo, estructurado y profesional", "office", modelo_seleccionado, api_key_gemini)
             
+        cajon_ideas_personalizado("Creación de Documentos", modelo_seleccionado, api_key_gemini)
+
     with sub[2]:
         st.markdown("#### PDF Pro")
         titulo_pdf = st.text_input("Título del documento:")
@@ -363,6 +386,8 @@ with macro_tabs[0]:
         if st.session_state.pdf_text:
             boton_superpoder(st.session_state.pdf_text, "Añade un resumen ejecutivo al principio y amplía las conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
             
+        cajon_ideas_personalizado("PDF Pro", modelo_seleccionado, api_key_gemini)
+
     with sub[3]:
         st.markdown("#### Mapas Mentales")
         col_tema, col_modo = st.columns([2, 1])
@@ -377,6 +402,8 @@ with macro_tabs[0]:
             st.html(f"<div class='mermaid'>{st.session_state.mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
             boton_superpoder(f"Añade 3 ramas innovadoras y disruptivas al siguiente mapa mental (código Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa con Ramas Creativas", "mapa", modelo_seleccionado, api_key_gemini)
             
+        cajon_ideas_personalizado("Mapas Mentales", modelo_seleccionado, api_key_gemini)
+
     with sub[4]:
         col_qr1, col_qr2 = st.columns(2)
         with col_qr1:
@@ -397,6 +424,8 @@ with macro_tabs[0]:
                     if data: st.success(f"Contenido: **{data}**")
                     else: st.warning("No se detectó ningún QR.")
                     
+        cajon_ideas_personalizado("QR y CV", modelo_seleccionado, api_key_gemini)
+
     with sub[5]:
         st.markdown("#### Portapapeles Universal")
         texto_uni = st.text_area("Pega cualquier texto aquí:")
@@ -407,6 +436,8 @@ with macro_tabs[0]:
             st.info(res)
         if st.session_state.clip_text:
             boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog estructurado y atractivo", "clip", modelo_seleccionado, api_key_gemini)
+            
+        cajon_ideas_personalizado("Portapapeles", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 2: WEB Y ACTUALIDAD
@@ -423,6 +454,7 @@ with macro_tabs[1]:
                     st.markdown(f"**[{r['titulo']}]({r['url']})**")
                     st.caption(r['resumen'])
                     st.markdown("---")
+        cajon_ideas_personalizado("Buscador Web", modelo_seleccionado, api_key_gemini)
                     
     with sub[1]:
         st.markdown("#### ⚽ Central de Deportes")
@@ -439,6 +471,7 @@ with macro_tabs[1]:
                     st.write(noti['resumen'])
                     st.markdown("---")
                 boton_superpoder(str(st.session_state.noticias_deportes), "Analiza estas noticias y dime cuál es la noticia más impactante y por qué", "noticias", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Noticias de Deportes", modelo_seleccionado, api_key_gemini)
         with tab_dep2:
             st.markdown("##### ⚡ Resultados y Directo")
             evento_directo = st.text_input("¿Qué resultados buscas?", placeholder="Ej: Resultados de LaLiga hoy")
@@ -451,6 +484,7 @@ with macro_tabs[1]:
                     st.info(st.session_state.dep_resultados)
             if st.session_state.dep_resultados:
                 boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico profundo de estos resultados como si fueras un entrenador de élite", "tactico", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Resultados Deportivos", modelo_seleccionado, api_key_gemini)
         with tab_dep3:
             st.markdown("##### 📊 Análisis Táctico y Clasificaciones")
             col_eq1, col_eq2 = st.columns(2)
@@ -469,6 +503,7 @@ with macro_tabs[1]:
                 with st.spinner("Buscando clasificación..."):
                     prompt_tabla = f"Dame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos) y un breve resumen de la lucha por el título."
                     st.info(llamar_ia(modelo_seleccionado, prompt_tabla, api_key_gemini))
+            cajon_ideas_personalizado("Análisis Deportivo", modelo_seleccionado, api_key_gemini)
         with tab_dep4:
             st.markdown("##### 🏋️ Entrenamiento y Nutrición")
             objetivo = st.text_input("¿Qué necesitas?", placeholder="Ej: Rutina para ganar masa muscular")
@@ -480,6 +515,8 @@ with macro_tabs[1]:
                     st.info(st.session_state.plan_deporte)
             if st.session_state.plan_deporte:
                 boton_superpoder(st.session_state.plan_deporte, "Añade una lista de suplementos naturales y una rutina de estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Entrenamiento", modelo_seleccionado, api_key_gemini)
+            
     with sub[2]:
         st.markdown("#### 📺 Guía de TV y Eventos")
         tab_tv1, tab_tv2, tab_tv3, tab_tv4 = st.tabs(["🍿 Cine", "📅 TV", "🎫 Entradas", "🎮 Trivia"])
@@ -493,6 +530,7 @@ with macro_tabs[1]:
                     st.info(st.session_state.cine_rec)
             if st.session_state.cine_rec:
                 boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas (películas no tan famosas) que encajen con esto", "cine", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Cine y Series", modelo_seleccionado, api_key_gemini)
         with tab_tv2:
             canal_tv = st.text_input("¿Qué canal buscas?", placeholder="Ej: Programación de esta noche en Telecinco")
             if st.button("Buscar Programación", key="btn_tv_prog") and canal_tv:
@@ -504,6 +542,7 @@ with macro_tabs[1]:
                     st.info(st.session_state.tv_prog)
             if st.session_state.tv_prog:
                 boton_superpoder(st.session_state.tv_prog, "Dime cuál es el programa más recomendado de esta parrilla y por qué", "tv", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Programación TV", modelo_seleccionado, api_key_gemini)
         with tab_tv3:
             evento_buscar = st.text_input("¿Qué evento buscas?", placeholder="Ej: Concierto de Taylor Swift")
             ciudad = st.text_input("¿En qué ciudad?", placeholder="Ej: Madrid")
@@ -516,6 +555,7 @@ with macro_tabs[1]:
                     st.info(st.session_state.entradas)
             if st.session_state.entradas:
                 boton_superpoder(st.session_state.entradas, "Dame un plan de viaje de 24 horas alrededor de este evento (dónde comer, qué visitar)", "entradas", modelo_seleccionado, api_key_gemini)
+            cajon_ideas_personalizado("Entradas de Eventos", modelo_seleccionado, api_key_gemini)
         with tab_tv4:
             juego = st.radio("Elige el juego:", ["Adivinar la película", "Curiosidades de series", "Preguntas de deportes"], horizontal=True)
             if st.button("¡Jugar!", key="btn_jugar_trivia"):
@@ -523,6 +563,8 @@ with macro_tabs[1]:
                     prompt_juego = f"Juego de 3 preguntas trivia sobre '{juego}'. Da respuestas al final."
                     st.session_state.trivia = llamar_ia(modelo_seleccionado, prompt_juego, api_key_gemini)
                     st.info(st.session_state.trivia)
+            cajon_ideas_personalizado("Trivia", modelo_seleccionado, api_key_gemini)
+            
     with sub[3]:
         st.markdown("#### 🎥 Resumidor de YouTube")
         url_yt = st.text_input("Pega la URL del vídeo:")
@@ -536,6 +578,8 @@ with macro_tabs[1]:
             except Exception as e: st.error(f"Error: {e}")
         if st.session_state.yt_text:
             boton_superpoder(st.session_state.yt_text, "Saca 3 ideas de negocio o proyectos que se puedan derivar de este resumen", "yt", modelo_seleccionado, api_key_gemini)
+        cajon_ideas_personalizado("YouTube", modelo_seleccionado, api_key_gemini)
+        
     with sub[4]:
         st.markdown("#### 📰 Lector de Páginas Web")
         url_web = st.text_input("Pega el enlace de una noticia o web:")
@@ -552,6 +596,7 @@ with macro_tabs[1]:
                 except Exception as e: st.error(f"Error: {e}")
         if st.session_state.web_text:
             boton_superpoder(st.session_state.web_text, "Dame una opinión crítica sobre el sesgo o la veracidad de este artículo", "web", modelo_seleccionado, api_key_gemini)
+        cajon_ideas_personalizado("Lector de Webs", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 3: MULTIMEDIA
@@ -623,6 +668,8 @@ with macro_tabs[2]:
                 st.info(st.session_state.analisis_ia)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Multimedia")
                 boton_superpoder(st.session_state.analisis_ia, "Extrae información forense de este análisis (qué se oculta, qué es sospechoso)", "multi", modelo_seleccionado, api_key_gemini)
+                
+        cajon_ideas_personalizado("Análisis Multimedia", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### Generador Visual")
@@ -634,6 +681,8 @@ with macro_tabs[2]:
         if st.session_state.img_url:
             st.image(st.session_state.img_url, use_container_width=True)
             boton_superpoder(f"Genera un prompt para recrear esta imagen pero en un estilo cinematográfico y oscuro: {prompt_img}", "Crear Prompt Alternativo", "visual", modelo_seleccionado, api_key_gemini)
+            
+        cajon_ideas_personalizado("Generador Visual", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
         st.markdown("#### 🛡️ Generador de Logotipos e Identidad")
@@ -661,6 +710,8 @@ with macro_tabs[2]:
                 url_logo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_logo)}?width=1024&height=1024&nologo=true"
                 st.image(url_logo, caption=f"Propuesta de Logo para {nombre_marca}", use_container_width=True)
                 st.markdown(f"[Descargar Logo en Alta Resolución]({url_logo})")
+                
+        cajon_ideas_personalizado("Creación de Logos", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
         st.markdown("#### Descargador")
@@ -684,6 +735,8 @@ with macro_tabs[2]:
                         os.rmdir(temp_dir)
         if st.session_state.dl_bytes:
             st.download_button("💾 Guardar archivo", st.session_state.dl_bytes, st.session_state.dl_filename)
+            
+        cajon_ideas_personalizado("Descargas", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 4: ASISTENTES IA
@@ -701,6 +754,8 @@ with macro_tabs[3]:
                 st.session_state.chat_history.append({"role": "assistant", "content": res})
                 st.chat_message("assistant").write(res)
                 
+        cajon_ideas_personalizado("Chat IA", modelo_seleccionado, api_key_gemini)
+
     with sub[1]:
         st.markdown("#### Sintetizador de Voz")
         texto_pod = st.text_area("Escribe el texto que quieres escuchar:")
@@ -710,6 +765,8 @@ with macro_tabs[3]:
                 audio = generar_audio_sincrono(texto_pod, voz)
                 if audio: st.audio(audio, format="audio/mp3")
                 
+        cajon_ideas_personalizado("Sintetizador de Voz", modelo_seleccionado, api_key_gemini)
+
     with sub[2]:
         st.markdown("#### Chat con Documentos")
         archivos = st.file_uploader("Sube documentos (PDF, Word, TXT):", type=["pdf", "txt", "docx"], accept_multiple_files=True)
@@ -724,6 +781,8 @@ with macro_tabs[3]:
                     res = llamar_ia(modelo_seleccionado, f"Basándote en esto:\n{texto_completo}\nResponde: {prompt}", api_key_gemini)
                     st.session_state.pdf_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
+                    
+        cajon_ideas_personalizado("Chat con PDFs", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
         st.markdown("#### 🕵️‍♂️ Creador de Agentes IA")
@@ -760,6 +819,8 @@ with macro_tabs[3]:
                     res = llamar_ia(modelo_seleccionado, prompt_con_rol, api_key_gemini)
                     st.session_state.agente_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
+                    
+        cajon_ideas_personalizado("Agentes Custom", modelo_seleccionado, api_key_gemini)
 
     with sub[4]:
         st.markdown("#### 🍳 El Chef Virtual")
@@ -781,6 +842,8 @@ with macro_tabs[3]:
                 st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"Haz un menú semanal para 4 personas. {preferencias}. Añade lista de la compra.", api_key_gemini)
             if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
             
+        cajon_ideas_personalizado("Cocina", modelo_seleccionado, api_key_gemini)
+
     with sub[5]:
         st.markdown("#### 📖 Cuentacuentos")
         prota = st.text_input("Nombre del protagonista:")
@@ -792,6 +855,8 @@ with macro_tabs[3]:
                 audio = generar_audio_sincrono(cuento, "es-ES-ElviraNeural")
                 if audio: st.audio(audio, format="audio/mp3")
                 
+        cajon_ideas_personalizado("Cuentos", modelo_seleccionado, api_key_gemini)
+
     with sub[6]:
         st.markdown("#### Asistente de Código")
         req_code = st.text_area("Pega un código para explicarlo o pide uno nuevo:")
@@ -799,6 +864,8 @@ with macro_tabs[3]:
             res = llamar_ia(modelo_seleccionado, f"Actúa como programador senior. Explica o mejora esto:\n{req_code}", api_key_gemini)
             st.code(res, language="python")
             
+        cajon_ideas_personalizado("Código", modelo_seleccionado, api_key_gemini)
+
     with sub[7]:
         st.markdown("#### Traductor")
         texto_trad = st.text_area("Texto a traducir:")
@@ -806,6 +873,8 @@ with macro_tabs[3]:
         if st.button("Traducir") and texto_trad:
             res = llamar_ia(modelo_seleccionado, f"Traduce al {idioma}: {texto_trad}", api_key_gemini)
             st.info(res)
+            
+        cajon_ideas_personalizado("Traductor", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
@@ -838,6 +907,8 @@ with macro_tabs[4]:
             st.session_state.entrevista_resultado = llamar_ia(modelo_seleccionado, "Hazme 3 preguntas técnicas de nivel CCNA (redes) como si fueras un reclutador. Espera mi respuesta.", api_key_gemini)
         if st.session_state.entrevista_resultado: st.info(st.session_state.entrevista_resultado)
         
+        cajon_ideas_personalizado("Redes", modelo_seleccionado, api_key_gemini)
+
     with sub[1]:
         st.markdown("#### 💇‍♀️ Asistente de Peluquería")
         col_p1, col_p2 = st.columns(2)
@@ -855,6 +926,8 @@ with macro_tabs[4]:
                 st.session_state.presupuesto_resultado = llamar_ia(modelo_seleccionado, f"Crea un presupuesto profesional para: {servicios}. Tiempo: {tiempo}h. Sugiere precio competitivo y desglose.", api_key_gemini)
                 st.info(st.session_state.presupuesto_resultado)
                 
+        cajon_ideas_personalizado("Peluquería", modelo_seleccionado, api_key_gemini)
+
     with sub[2]:
         st.markdown("#### 📚 Asistente de Deberes")
         nivel = st.selectbox("Nivel Educativo:", ["Primaria", "ESO", "Bachillerato", "Universidad"])
@@ -865,7 +938,8 @@ with macro_tabs[4]:
             st.success("Explicación:")
             st.info(res)
             
-    # 🆕 NUEVA PESTAÑA: PRL
+        cajon_ideas_personalizado("Deberes", modelo_seleccionado, api_key_gemini)
+
     with sub[3]:
         st.markdown("#### 🦺 Asistente de Prevención de Riesgos Laborales")
         st.caption("Herramientas para técnicos de PRL: charlas, evaluaciones y dudas legales.")
@@ -898,6 +972,8 @@ with macro_tabs[4]:
                 st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, prompt_prl, api_key_gemini)
                 st.text_area("Documento Generado:", value=st.session_state.prl_resultado, height=400)
                 botones_descarga(st.session_state.prl_resultado, f"PRL_{tipo_prl.split('(')[0].strip()}")
+                
+        cajon_ideas_personalizado("PRL", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
@@ -923,6 +999,8 @@ with macro_tabs[5]:
                 st.info(st.session_state.analisis_ia)
                 botones_descarga(st.session_state.analisis_ia, f"Viaje_{destino}")
                 
+        cajon_ideas_personalizado("Viajes", modelo_seleccionado, api_key_gemini)
+
     with sub[1]:
         st.markdown("#### 💰 Finanzas del Hogar")
         col_f1, col_f2 = st.columns(2)
@@ -945,6 +1023,8 @@ with macro_tabs[5]:
                 cuota = prestamo * (i * (1 + i)**n) / ((1 + i)**n - 1)
                 st.success(f"Tu cuota mensual sería de **{cuota:.2f}€**.")
                 
+        cajon_ideas_personalizado("Finanzas", modelo_seleccionado, api_key_gemini)
+
     with sub[2]:
         st.markdown("#### ✉️ Cartas y Mensajes")
         
@@ -960,6 +1040,8 @@ with macro_tabs[5]:
                 st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_mensaje, api_key_gemini)
                 st.text_area("Resultado:", value=st.session_state.analisis_ia, height=300)
                 botones_descarga(st.session_state.analisis_ia, f"{tipo_mensaje.replace(' ', '_')}")
+                
+        cajon_ideas_personalizado("Cartas y Mensajes", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
@@ -1024,6 +1106,8 @@ with macro_tabs[6]:
             with col_letra:
                 st.text_area("Letra de la Canción:", value=st.session_state.letra_cancion, height=500)
                 botones_descarga(st.session_state.letra_cancion, f"Letra_{st.session_state.titulo_cancion}")
+                
+        cajon_ideas_personalizado("Música", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### 🎨 Poesía y Rimas")
@@ -1041,3 +1125,5 @@ with macro_tabs[6]:
                 if st.button("🔊 Recitar Poema"):
                     audio_poema = generar_audio_sincrono(poema, "es-ES-ElviraNeural")
                     if audio_poema: st.audio(audio_poema, format="audio/mp3")
+                    
+        cajon_ideas_personalizado("Poesía", modelo_seleccionado, api_key_gemini)
