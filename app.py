@@ -45,14 +45,13 @@ st.set_page_config(page_title="Xavilu Network", page_icon="logo.png", layout="wi
 MAX_FILE_MB = 25
 MAX_TEXTO_IA = 60_000
 
-# --- NUEVO: RUTA PARA GUARDAR INFORMES ---
-# Crea una carpeta en el escritorio llamada "Informes_Xavilu"
+# --- RUTA PARA GUARDAR INFORMES ---
 RUTA_INFORMES = os.path.join(os.path.expanduser("~"), "Desktop", "Informes_Xavilu")
 if not os.path.exists(RUTA_INFORMES):
     try:
         os.makedirs(RUTA_INFORMES)
     except:
-        pass # Si falla (ej. en la nube), no pasa nada
+        pass 
 
 # --- ESTADO DE SESIÓN ---
 _defaults = {
@@ -150,23 +149,26 @@ def leer_archivo_universal(upload, modelo_ia):
 def llamar_ia(modelo, prompt, api_key_gemini=""):
     prompt = prompt[:MAX_TEXTO_IA]
     
-    if api_key_gemini.strip() and HAS_GEMINI:
+    # --- LÓGICA CORREGIDA: Si hay clave, usar Gemini OBLIGATORIAMENTE ---
+    if api_key_gemini.strip():
+        if not HAS_GEMINI:
+            return "[ERROR] La librería google-genai no está instalada."
         try: 
-            # CORREGIDO: Modelo actualizado a gemini-3.8-flash
             response = genai.Client(api_key=api_key_gemini).models.generate_content(
                 model='gemini-3.8-flash', 
                 contents=prompt
             )
             return response.text + "\n\n*(Procesado en la Nube con Gemini)*"
         except Exception as e: 
-            pass 
+            return f"[ERROR GEMINI] {e}"
             
+    # Si NO hay clave, intentar Ollama (Local)
     try: 
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         response = client.chat(model=modelo, messages=[{"role": "user", "content": prompt}], options={"temperature": 0.2, "num_ctx": 8192, "repeat_penalty": 1.2})
         return response["message"]["content"].split("</think>")[-1].strip() + "\n\n*(Procesado en Local con Ollama)*"
     except Exception as e: 
-        return f"[ERROR] No se pudo conectar con ninguna IA. Detalle: {e}"
+        return f"[ERROR LOCAL] No se pudo conectar con Ollama. Detalle: {e}"
 
 def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
     if not HAS_GEMINI:
@@ -176,7 +178,6 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
         try:
             client = genai.Client(api_key=api_key_gemini)
             parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
-            # CORREGIDO: Modelo actualizado a gemini-3.8-flash
             response = client.models.generate_content(
                 model='gemini-3.8-flash',
                 contents=[prompt, parte_archivo]
@@ -192,7 +193,6 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF()
     pdf.add_page()
-    
     font_path = "C:/Windows/Fonts/arial.ttf"
     if os.path.exists(font_path):
         pdf.add_font("Arial", "", font_path, uni=True)
@@ -216,15 +216,14 @@ def generar_pdf_pro(titulo, contenido):
     pdf.multi_cell(0, 8, txt=contenido)
     pdf_bytes = bytes(pdf.output())
     
-    # NUEVO: Guardar copia en la carpeta local
     try:
         nombre_archivo = f"{titulo.replace(' ', '_').replace('/', '_')}.pdf"
         ruta_completa = os.path.join(RUTA_INFORMES, nombre_archivo)
         with open(ruta_completa, "wb") as f:
             f.write(pdf_bytes)
+        # st.toast para no llenar la pantalla móvil
         st.toast(f"📁 Guardado en: {ruta_completa}")
     except: pass
-        
     return pdf_bytes
 
 def generar_word(texto):
@@ -236,15 +235,12 @@ def generar_word(texto):
             else: doc.add_paragraph(p.strip())
     out = BytesIO(); doc.save(out); out.seek(0)
     word_bytes = out.getvalue()
-    
-    # NUEVO: Guardar copia
     try:
         nombre_archivo = f"Documento_{int(time.time())}.docx"
         ruta_completa = os.path.join(RUTA_INFORMES, nombre_archivo)
         with open(ruta_completa, "wb") as f:
             f.write(word_bytes)
     except: pass
-    
     return word_bytes
 
 def generar_excel(texto_csv):
@@ -257,15 +253,12 @@ def generar_excel(texto_csv):
             if row_idx == 1: cell.font = Font(bold=True)
     out = BytesIO(); wb.save(out); out.seek(0)
     excel_bytes = out.getvalue()
-    
-    # NUEVO: Guardar copia
     try:
         nombre_archivo = f"Tabla_{int(time.time())}.xlsx"
         ruta_completa = os.path.join(RUTA_INFORMES, nombre_archivo)
         with open(ruta_completa, "wb") as f:
             f.write(excel_bytes)
     except: pass
-    
     return excel_bytes
 
 def generar_pptx(titulo, texto):
@@ -279,15 +272,12 @@ def generar_pptx(titulo, texto):
         if len(slide.placeholders) > 1: slide.placeholders[1].text = "\n".join(lineas[1:]) if len(lineas) > 1 else ""
     out = BytesIO(); prs.save(out); out.seek(0)
     pptx_bytes = out.getvalue()
-    
-    # NUEVO: Guardar copia
     try:
         nombre_archivo = f"Presentacion_{int(time.time())}.pptx"
         ruta_completa = os.path.join(RUTA_INFORMES, nombre_archivo)
         with open(ruta_completa, "wb") as f:
             f.write(pptx_bytes)
     except: pass
-    
     return pptx_bytes
 
 def botones_descarga(texto, nombre_archivo="documento"):
@@ -302,7 +292,6 @@ def botones_descarga(texto, nombre_archivo="documento"):
                 mime="text/plain", 
                 key=f"btn_txt_{nombre_archivo}"
             )
-            # NUEVO: Guardar TXT
             try:
                 ruta_completa = os.path.join(RUTA_INFORMES, f"{nombre_archivo}_{int(time.time())}.txt")
                 with open(ruta_completa, "w", encoding="utf-8") as f:
@@ -363,7 +352,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Mostrar la ruta de guardado en la barra lateral
 with st.sidebar:
     if os.path.exists("logo.png"):
         with open("logo.png", "rb") as image_file:
@@ -383,9 +371,7 @@ with st.sidebar:
         
     st.markdown("---")
     st.markdown("<p style='font-size:12px; color:#00f0ff; text-align:center;'>SYSTEM STATUS: OPTIMAL</p>", unsafe_allow_html=True)
-    
-    # NUEVO: Mostrar ruta de guardado
-    st.markdown(f"<p style='font-size:11px; color:#d4af37; text-align:center;'>📁 Los archivos se guardan en:<br><b>{RUTA_INFORMES}</b></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:11px; color:#d4af37; text-align:center;'>📁 Guardado local:<br><b>Escritorio/Informes_Xavilu</b></p>", unsafe_allow_html=True)
 
 # --- 19 PESTAÑAS ---
 tabs = st.tabs([
