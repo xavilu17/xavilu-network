@@ -26,7 +26,6 @@ import qrcode
 import gc
 import html
 import numpy as np
-import hashlib
 
 # Intentar importar OpenCV para el lector de QR
 try:
@@ -61,7 +60,8 @@ except ImportError:
 st.set_page_config(page_title="Xavilu Network Pro", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 MAX_FILE_MB = 50
 MAX_TEXTO_IA = 60_000
-GEMINI_MODEL = "gemini-2.0-flash"
+# ✅ MODELO CORREGIDO SEGÚN EL ÚLTIMO ERROR
+GEMINI_MODEL = "gemini-3.8-flash"
 
 # --- ESTADO DE SESIÓN ---
 _defaults = {
@@ -73,7 +73,8 @@ _defaults = {
     "presupuesto_resultado": "", "noticias_deportes": [], "resumen_deportivo": "",
     "evento_resultados": None, "office_text": "", "pdf_text": "", "clip_text": "",
     "dep_resultados": "", "partido_analisis": "", "plan_deporte": "",
-    "cine_rec": "", "tv_prog": "", "entradas": "", "trivia": "", "yt_text": "", "web_text": ""
+    "cine_rec": "", "tv_prog": "", "entradas": "", "trivia": "", "yt_text": "", "web_text": "",
+    "letra_cancion": "", "titulo_cancion": "", "portada_cancion": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -192,10 +193,8 @@ def generar_pptx(titulo, texto):
 def botones_descarga(texto, nombre_por_defecto="documento"):
     if texto:
         st.markdown("---")
-        # Creamos un identificador único para evitar errores de Streamlit
         key_unica = f"{nombre_por_defecto}".replace(" ", "_")
         
-        # NUEVO: Caja de texto para personalizar el nombre
         nombre_elegido = st.text_input(
             "📝 Ponle nombre a tu archivo (sin extensión):", 
             value=nombre_por_defecto, 
@@ -203,7 +202,6 @@ def botones_descarga(texto, nombre_por_defecto="documento"):
             help="Escribe cómo quieres que se llame el archivo antes de descargarlo."
         )
         
-        # Limpiamos el nombre por si el usuario pone caracteres no permitidos en Windows
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_')
         if not nombre_limpio: nombre_limpio = nombre_por_defecto
 
@@ -254,7 +252,8 @@ with st.sidebar:
 
 macro_tabs = st.tabs([
     "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA",
-    "🤖 ASISTENTES IA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR"
+    "🤖 ASISTENTES IA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",
+    "🎵 MÚSICA Y ARTE"
 ])
 
 # ==========================================
@@ -731,3 +730,81 @@ with macro_tabs[5]:
                 st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_mensaje, api_key_gemini)
                 st.text_area("Resultado:", value=st.session_state.analisis_ia, height=300)
                 botones_descarga(st.session_state.analisis_ia, f"{tipo_mensaje.replace(' ', '_')}")
+
+# ==========================================
+# CATEGORÍA 7: MÚSICA Y ARTE
+# ==========================================
+with macro_tabs[6]:
+    sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
+    
+    with sub[0]:
+        st.markdown("#### 🎵 Estudio de Creación Musical")
+        st.caption("Crea la letra, la portada y escucha una maqueta de tu canción (voz recitada).")
+        
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            tema_cancion = st.text_input("¿De qué trata la canción?", placeholder="Ej: Un amor de verano, superación personal...")
+        with col_m2:
+            genero = st.selectbox("Género Musical:", ["Pop", "Rock", "Rap/Trap", "Reggaetón", "Balada", "Indie"])
+            
+        tono = st.select_slider("Tono de la canción:", options=["Muy triste", "Melancólico", "Alegre", "Fiestero", "Épico"])
+        
+        if st.button("🎼 Escribir Canción", type="primary", key="btn_crear_cancion") and tema_cancion:
+            with st.spinner("Componiendo la letra..."):
+                prompt_cancion = f"Actúa como un compositor de éxito. Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. El tono debe ser {tono}. Estructura la canción claramente con etiquetas: [Verso 1], [Coro], [Verso 2], [Puente], [Coro Final]. Sé creativo y rítmico."
+                letra = llamar_ia(modelo_seleccionado, prompt_cancion, api_key_gemini)
+                st.session_state.letra_cancion = letra
+                
+                # Extraer un título aproximado (primera línea o idea)
+                titulo_prompt = f"Basándote en esta letra, dame SOLO un título corto y pegadizo (máximo 5 palabras):\n{letra[:500]}"
+                st.session_state.titulo_cancion = llamar_ia(modelo_seleccionado, titulo_prompt, api_key_gemini).replace('"', '').strip()
+                
+                # Generar portada
+                prompt_img_cancion = f"Album cover art, {genero} style, mood {tono}, about {tema_cancion}, high quality, 4k, artistic"
+                st.session_state.portada_cancion = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_img_cancion)}?width=1024&height=1024&nologo=true"
+                
+        if st.session_state.letra_cancion:
+            st.markdown(f"### 🎶 Título: {st.session_state.titulo_cancion}")
+            
+            col_portada, col_letra = st.columns([1, 2])
+            with col_portada:
+                st.image(st.session_state.portada_cancion, caption="Portada del Single", use_container_width=True)
+                
+                # Opciones de audio
+                st.markdown("#### 🎙️ Escuchar Maqueta")
+                st.info("Como no podemos generar música instrumental real, aquí tienes la letra recitada. Prueba diferentes voces para ver cuál encaja mejor.")
+                voz_cancion = st.selectbox("Elige la voz:", [
+                    "es-MX-JorgeNeural (Recomendado para Rap/Recitado)", 
+                    "es-ES-ElviraNeural (Recomendado para Baladas)", 
+                    "es-AR-TomasNeural (Tono más grave)"
+                ], key="voz_cancion")
+                
+                voz_id = voz_cancion.split(" ")[0]
+                
+                if st.button("🔊 Generar Audio de la Letra", key="btn_audio_cancion"):
+                    with st.spinner("Grabando maqueta..."):
+                        audio_letra = generar_audio_sincrono(st.session_state.letra_cancion, voz_id)
+                        if audio_letra:
+                            st.audio(audio_letra, format="audio/mp3")
+                            st.download_button("💾 Descargar Audio (.mp3)", audio_letra, f"{st.session_state.titulo_cancion}.mp3", "audio/mpeg")
+
+            with col_letra:
+                st.text_area("Letra de la Canción:", value=st.session_state.letra_cancion, height=500)
+                botones_descarga(st.session_state.letra_cancion, f"Letra_{st.session_state.titulo_cancion}")
+
+    with sub[1]:
+        st.markdown("#### 🎨 Poesía y Rimas")
+        st.caption("Genera poemas personalizados para regalar o para inspirarte.")
+        
+        tema_poema = st.text_input("¿Sobre qué quieres el poema?", placeholder="Ej: El mar, mi mascota, el paso del tiempo...")
+        estilo_poema = st.selectbox("Estilo:", ["Clásico y Romántico", "Divertido y Loco", "Épico y Épico", "Haiku (Corto)"])
+        
+        if st.button("✒️ Escribir Poema", type="primary") and tema_poema:
+            with st.spinner("Inspirándose..."):
+                prompt_poema = f"Escribe un poema {estilo_poema} sobre: '{tema_poema}'. Que tenga rima y una estructura bonita."
+                poema = llamar_ia(modelo_seleccionado, prompt_poema, api_key_gemini)
+                st.text_area("Poema:", value=poema, height=300)
+                botones_descarga(poema, f"Poema_{tema_poema}")
+                if st.button("🔊 Recitar Poema"):
+                    audio_poema = generar_audio_sincrono(poema, "es-ES-ElviraNeural")
+                    if audio_poema: st.audio(audio_poema, format="audio/mp3")
