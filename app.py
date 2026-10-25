@@ -146,15 +146,21 @@ def leer_archivo_universal(upload, modelo_ia):
         return "\n".join([sh.text for s in Presentation(upload).slides for sh in s.shapes if hasattr(sh, "text") and sh.text])
     return "Formato no reconocido."
 
+# --- NUEVA FUNCIÓN: CACHEAR EL CLIENTE DE GEMINI ---
+@st.cache_resource
+def get_gemini_client(api_key):
+    """Crea y cachea el cliente de Gemini para evitar que se cierre entre ejecuciones."""
+    return genai.Client(api_key=api_key)
+
 def llamar_ia(modelo, prompt, api_key_gemini=""):
     prompt = prompt[:MAX_TEXTO_IA]
     
-    # --- LÓGICA CORREGIDA: Si hay clave, usar Gemini OBLIGATORIAMENTE ---
     if api_key_gemini.strip():
         if not HAS_GEMINI:
             return "[ERROR] La librería google-genai no está instalada."
         try: 
-            response = genai.Client(api_key=api_key_gemini).models.generate_content(
+            client = get_gemini_client(api_key_gemini)
+            response = client.models.generate_content(
                 model='gemini-3.8-flash', 
                 contents=prompt
             )
@@ -162,7 +168,6 @@ def llamar_ia(modelo, prompt, api_key_gemini=""):
         except Exception as e: 
             return f"[ERROR GEMINI] {e}"
             
-    # Si NO hay clave, intentar Ollama (Local)
     try: 
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         response = client.chat(model=modelo, messages=[{"role": "user", "content": prompt}], options={"temperature": 0.2, "num_ctx": 8192, "repeat_penalty": 1.2})
@@ -176,7 +181,7 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
     intentos = 3
     for i in range(intentos):
         try:
-            client = genai.Client(api_key=api_key_gemini)
+            client = get_gemini_client(api_key_gemini)
             parte_archivo = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
             response = client.models.generate_content(
                 model='gemini-3.8-flash',
@@ -221,7 +226,6 @@ def generar_pdf_pro(titulo, contenido):
         ruta_completa = os.path.join(RUTA_INFORMES, nombre_archivo)
         with open(ruta_completa, "wb") as f:
             f.write(pdf_bytes)
-        # st.toast para no llenar la pantalla móvil
         st.toast(f"📁 Guardado en: {ruta_completa}")
     except: pass
     return pdf_bytes
