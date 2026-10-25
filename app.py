@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CAJONES DORADOS BLINDADO ---
+# --- 🎨 CSS SÚPER NEÓN (OPCIÓN 1) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -127,40 +127,39 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: CAJONES DORADOS 🌟 */
+    /* 🌟 PESTAÑAS: SÚPER NEÓN 🌟 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        border-bottom: 2px solid #d4af37 !important;
+        gap: 15px !important;
+        border-bottom: 2px solid rgba(0, 240, 255, 0.2) !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important;
-        border: 1px solid #ffd700 !important;
-        border-radius: 8px 8px 0 0 !important;
-        color: #000000 !important;
+        background-color: transparent !important;
+        color: #a0a0a0 !important; /* Gris claro para inactivas */
         font-family: 'Orbitron', sans-serif !important;
-        font-weight: 900 !important;
-        padding: 10px 20px !important;
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important;
-        text-transform: uppercase !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+        padding: 10px 15px !important;
+        border: none !important;
+        transition: all 0.3s ease !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important;
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important;
-        transform: translateY(-2px);
+        color: #00f0ff !important;
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important;
-        border-bottom: 4px solid #ff007f !important;
-        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important;
+        color: #00f0ff !important; /* Cian neón al seleccionar */
+        text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff !important;
+        border-bottom: 3px solid #FF007F !important; /* Línea rosa neón */
+        background: rgba(0, 240, 255, 0.05) !important;
+        border-radius: 10px 10px 0 0 !important;
     }
     
-    /* Ocultar la línea roja fea que pone Streamlit por defecto */
+    /* Ocultar la línea roja fea por defecto */
     [data-baseweb="tab-highlight"] {
         background-color: transparent !important;
         display: none !important;
     }
     [data-baseweb="tab-border"] {
-        background-color: transparent !important;
         display: none !important;
     }
     
