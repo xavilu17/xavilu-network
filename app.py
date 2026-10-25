@@ -59,7 +59,7 @@ except ImportError:
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Xavilu Network Pro", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
-MAX_FILE_MB = 50
+MAX_FILE_MB = 1000 # ✅ Aumentado a 1000MB (1GB)
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-3.8-flash"
 
@@ -243,7 +243,6 @@ def boton_superpoder(texto_base, instruccion_poder, key_suffix, modelo, api_key)
             st.info(resultado)
             botones_descarga(resultado, f"Superpoder_{key_suffix}")
 
-# 🆕 NUEVA FUNCIÓN: CAJÓN DE IDEAS PERSONALIZADO
 def cajon_ideas_personalizado(contexto_pestana, modelo, api_key):
     st.markdown("---")
     st.markdown("### 🧠 Tu Idea Propia (Control Total)")
@@ -273,7 +272,6 @@ with st.sidebar:
     except: api_key_gemini = st.text_input("Gemini API Key", type="password")
     
     st.markdown("---")
-    # 🧠 CEREBRO GLOBAL
     st.markdown("### 🧠 Cerebro Global")
     st.caption("Sube cualquier archivo (foto, audio, pdf). La IA lo leerá y lo usará en TODAS las pestañas.")
     archivo_global = st.file_uploader("📁 Contexto Global", type=["pdf", "txt", "docx", "png", "jpg", "jpeg", "mp3", "wav", "mp4"], key="up_global")
@@ -291,7 +289,7 @@ with st.sidebar:
                 else:
                     ctx = leer_archivo_universal(archivo_global, modelo_seleccionado)
                 
-                st.session_state.global_context = ctx[:5000] # Limitamos a 5000 para no saturar
+                st.session_state.global_context = ctx[:5000]
                 st.session_state.global_file_name = archivo_global.name
                 st.success("✅ Archivo memorizado.")
                 
@@ -320,7 +318,6 @@ with macro_tabs[0]:
     sub = st.tabs(["📁 ANÁLISIS", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
     with sub[0]:
         st.markdown("#### Análisis Avanzado de Documentos")
-        
         with st.expander("💡 Cajón de Ideas (¿Qué puedo hacer con mi archivo?)"):
             st.write("- **Auditoría:** Busca contradicciones o letra pequeña.")
             st.write("- **Estudio:** Convierte el texto en un test de preguntas.")
@@ -328,41 +325,28 @@ with macro_tabs[0]:
             st.write("- **Traducción:** Pasa todo el documento a otro idioma.")
         
         archivo = st.file_uploader("Sube un PDF, Word, Excel o TXT", type=["pdf", "txt", "docx", "xlsx"], key="up_dat")
-        
-        st.session_state.doc_opcion = st.selectbox(
-            "🎯 Selecciona el tipo de análisis:", 
-            ["Resumen Ejecutivo", "Extraer Fechas, Nombres y Cifras", "Buscar Contradicciones o Errores", "Crear un Cuestionario (Test)", "Traducir el documento al Inglés"]
-        )
+        st.session_state.doc_opcion = st.selectbox("🎯 Selección de análisis:", ["Resumen Ejecutivo", "Extraer Fechas y Cifras", "Buscar Errores", "Crear Test", "Traducir al Inglés"])
         
         if archivo and st.button("🔎 Ejecutar Análisis Seleccionado", key="btn_dat", type="primary"):
             with st.spinner("Analizando..."):
                 texto = leer_archivo_universal(archivo, modelo_seleccionado)
-                
-                if st.session_state.doc_opcion == "Resumen Ejecutivo":
-                    prompt = f"Haz un resumen ejecutivo muy claro de este documento. Destaca las ideas principales:\n{texto}"
-                elif st.session_state.doc_opcion == "Extraer Fechas, Nombres y Cifras":
-                    prompt = f"Actúa como un analista de datos. Extrae en forma de lista todas las fechas, nombres propios y cifras numéricas importantes de este texto:\n{texto}"
-                elif st.session_state.doc_opcion == "Buscar Contradicciones o Errores":
-                    prompt = f"Actúa como un auditor. Lee este documento y busca contradicciones, datos incoherentes o cosas que no cuadren:\n{texto}"
-                elif st.session_state.doc_opcion == "Crear un Cuestionario (Test)":
-                    prompt = f"Basándote en este documento, genera un cuestionario de 5 preguntas tipo test (con 4 opciones) y da las respuestas correctas al final para evaluar mi comprensión:\n{texto}"
-                else:
-                    prompt = f"Traduce todo este documento al inglés manteniendo el tono y formato:\n{texto}"
+                if st.session_state.doc_opcion == "Resumen Ejecutivo": prompt = f"Haz un resumen ejecutivo de este documento:\n{texto}"
+                elif st.session_state.doc_opcion == "Extraer Fechas y Cifras": prompt = f"Extrae todas las fechas, nombres y cifras de este texto:\n{texto}"
+                elif st.session_state.doc_opcion == "Buscar Errores": prompt = f"Busca contradicciones o datos incoherentes en este texto:\n{texto}"
+                elif st.session_state.doc_opcion == "Crear Test": prompt = f"Crea un test de 5 preguntas (con respuestas al final) de este texto:\n{texto}"
+                else: prompt = f"Traduce al inglés este documento:\n{texto}"
                 
                 st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
                 st.text_area("Resultado:", value=st.session_state.analisis_ia, height=400)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Doc")
-                
         cajon_ideas_personalizado("Análisis de Documentos", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### Creación de Documentos (Word/Excel/PPT)")
         col_form, col_prompt = st.columns([1, 2])
-        with col_form:
-            formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"])
-            st.info("Dile a la IA qué necesitas y lo generará en el formato elegido.")
-        with col_prompt:
-            prompt_office = st.text_area("¿Qué documento quieres crear?", placeholder="Ej: Un presupuesto para un cliente de reformas...")
+        with col_form: formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"])
+        with col_prompt: prompt_office = st.text_area("¿Qué documento quieres crear?", placeholder="Ej: Un presupuesto para un cliente...")
+        
         if st.button("Generar Documento", key="btn_office", type="primary") and prompt_office:
             with st.spinner("Generando..."):
                 texto = llamar_ia(modelo_seleccionado, prompt_office, api_key_gemini)
@@ -371,8 +355,7 @@ with macro_tabs[0]:
                 elif formato == "Excel": st.download_button("📥 Descargar Excel", generar_excel(texto), "doc.xlsx")
                 else: st.download_button("📥 Descargar PPTX", generar_pptx("Título", texto), "doc.pptx")
         if st.session_state.office_text:
-            boton_superpoder(st.session_state.office_text, "Reescribe este documento para que sea un 200% más persuasivo, estructurado y profesional", "office", modelo_seleccionado, api_key_gemini)
-            
+            boton_superpoder(st.session_state.office_text, "Haz este documento un 200% más persuasivo", "office", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Creación de Documentos", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
@@ -384,8 +367,7 @@ with macro_tabs[0]:
             st.session_state.pdf_text = texto
             st.download_button("📥 Descargar PDF", generar_pdf_pro(titulo_pdf, texto), f"{titulo_pdf}.pdf")
         if st.session_state.pdf_text:
-            boton_superpoder(st.session_state.pdf_text, "Añade un resumen ejecutivo al principio y amplía las conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
-            
+            boton_superpoder(st.session_state.pdf_text, "Añade resumen ejecutivo y conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("PDF Pro", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
@@ -393,6 +375,7 @@ with macro_tabs[0]:
         col_tema, col_modo = st.columns([2, 1])
         with col_tema: tema = st.text_input("Tema Central:", placeholder="Ej: Redes informáticas")
         with col_modo: modo_infantil = st.checkbox("🎨 Modo Infantil (Emojis)", value=False)
+        
         if st.button("🎯 Trazar Mapa", type="primary", key="btn_mapa") and tema:
             prompt = f"Genera código Mermaid para un mapa mental de '{tema}'."
             if modo_infantil: prompt += " Usa emojis y colores 'classDef rojo fill:#FF6B6B'."
@@ -400,8 +383,7 @@ with macro_tabs[0]:
             st.session_state.mermaid_code = html.escape(codigo.replace("```mermaid", "").replace("```", "").strip())
         if st.session_state.mermaid_code:
             st.html(f"<div class='mermaid'>{st.session_state.mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
-            boton_superpoder(f"Añade 3 ramas innovadoras y disruptivas al siguiente mapa mental (código Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa con Ramas Creativas", "mapa", modelo_seleccionado, api_key_gemini)
-            
+            boton_superpoder(f"Añade 3 ramas innovadoras a este mapa mental (Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa", "mapa", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Mapas Mentales", modelo_seleccionado, api_key_gemini)
 
     with sub[4]:
@@ -416,14 +398,13 @@ with macro_tabs[0]:
             st.markdown("#### Lector QR")
             img_qr = st.file_uploader("Sube una imagen de QR:", type=["png", "jpg", "jpeg"])
             if img_qr:
-                if not HAS_CV2: st.error("Instala opencv-python: `pip install opencv-python`")
+                if not HAS_CV2: st.error("Instala opencv-python.")
                 else:
                     img = Image.open(img_qr).convert('RGB')
                     detector = cv2.QRCodeDetector()
                     data, _, _ = detector.detectAndDecode(np.array(img))
                     if data: st.success(f"Contenido: **{data}**")
                     else: st.warning("No se detectó ningún QR.")
-                    
         cajon_ideas_personalizado("QR y CV", modelo_seleccionado, api_key_gemini)
 
     with sub[5]:
@@ -435,8 +416,7 @@ with macro_tabs[0]:
             st.session_state.clip_text = res
             st.info(res)
         if st.session_state.clip_text:
-            boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog estructurado y atractivo", "clip", modelo_seleccionado, api_key_gemini)
-            
+            boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog", "clip", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Portapapeles", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -470,8 +450,9 @@ with macro_tabs[1]:
                     st.markdown(f"**{noti['titulo']}** - *{noti['fecha']}*")
                     st.write(noti['resumen'])
                     st.markdown("---")
-                boton_superpoder(str(st.session_state.noticias_deportes), "Analiza estas noticias y dime cuál es la noticia más impactante y por qué", "noticias", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(str(st.session_state.noticias_deportes), "Analiza la noticia más impactante", "noticias", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Noticias de Deportes", modelo_seleccionado, api_key_gemini)
+            
         with tab_dep2:
             st.markdown("##### ⚡ Resultados y Directo")
             evento_directo = st.text_input("¿Qué resultados buscas?", placeholder="Ej: Resultados de LaLiga hoy")
@@ -479,12 +460,12 @@ with macro_tabs[1]:
                 with st.spinner("Buscando marcadores..."):
                     res_web = buscar_en_internet(evento_directo)
                     contexto = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web])
-                    prompt_directo = f"Dame los resultados de: '{evento_directo}'. Datos: {contexto}"
-                    st.session_state.dep_resultados = llamar_ia(modelo_seleccionado, prompt_directo, api_key_gemini)
+                    st.session_state.dep_resultados = llamar_ia(modelo_seleccionado, f"Dame los resultados de: '{evento_directo}'. Datos: {contexto}", api_key_gemini)
                     st.info(st.session_state.dep_resultados)
             if st.session_state.dep_resultados:
-                boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico profundo de estos resultados como si fueras un entrenador de élite", "tactico", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico de élite", "tactico", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Resultados Deportivos", modelo_seleccionado, api_key_gemini)
+            
         with tab_dep3:
             st.markdown("##### 📊 Análisis Táctico y Clasificaciones")
             col_eq1, col_eq2 = st.columns(2)
@@ -496,25 +477,25 @@ with macro_tabs[1]:
                     st.session_state.partido_analisis = llamar_ia(modelo_seleccionado, prompt_partido, api_key_gemini)
                     st.info(st.session_state.partido_analisis)
             if st.session_state.partido_analisis:
-                boton_superpoder(st.session_state.partido_analisis, "Dame 3 apuestas seguras y el jugador clave que decidirá el partido", "partido", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.partido_analisis, "Dame el jugador clave y las apuestas seguras", "partido", modelo_seleccionado, api_key_gemini)
             st.markdown("---")
             liga_tabla = st.selectbox("Consultar Clasificación:", ["LaLiga EA Sports", "Premier League", "NBA", "Euroliga", "Fórmula 1"], key="sel_tabla")
             if st.button("🏆 Ver Tabla", key="btn_ver_tabla"):
                 with st.spinner("Buscando clasificación..."):
-                    prompt_tabla = f"Dame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos) y un breve resumen de la lucha por el título."
+                    prompt_tabla = f"Dame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos)."
                     st.info(llamar_ia(modelo_seleccionado, prompt_tabla, api_key_gemini))
             cajon_ideas_personalizado("Análisis Deportivo", modelo_seleccionado, api_key_gemini)
+            
         with tab_dep4:
             st.markdown("##### 🏋️ Entrenamiento y Nutrición")
             objetivo = st.text_input("¿Qué necesitas?", placeholder="Ej: Rutina para ganar masa muscular")
-            deporte_pract = st.selectbox("Deporte principal:", ["Fútbol", "Running", "Gimnasio/Musculación", "Ciclismo", "Baloncesto", "Tenis"])
+            deporte_pract = st.selectbox("Deporte principal:", ["Fútbol", "Running", "Gimnasio", "Ciclismo", "Baloncesto", "Tenis"])
             if st.button("Generar Plan", key="btn_plan_deporte") and objetivo:
                 with st.spinner("Diseñando plan..."):
-                    prompt_plan = f"Entrenador personal. El usuario practica {deporte_pract} y necesita: '{objetivo}'. Dame un plan semanal."
-                    st.session_state.plan_deporte = llamar_ia(modelo_seleccionado, prompt_plan, api_key_gemini)
+                    st.session_state.plan_deporte = llamar_ia(modelo_seleccionado, f"Entrenador personal. Deporte: {deporte_pract}. Objetivo: '{objetivo}'. Dame un plan semanal.", api_key_gemini)
                     st.info(st.session_state.plan_deporte)
             if st.session_state.plan_deporte:
-                boton_superpoder(st.session_state.plan_deporte, "Añade una lista de suplementos naturales y una rutina de estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.plan_deporte, "Añade suplementos y estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entrenamiento", modelo_seleccionado, api_key_gemini)
             
     with sub[2]:
@@ -529,20 +510,21 @@ with macro_tabs[1]:
                     st.session_state.cine_rec = llamar_ia(modelo_seleccionado, prompt_cine, api_key_gemini)
                     st.info(st.session_state.cine_rec)
             if st.session_state.cine_rec:
-                boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas (películas no tan famosas) que encajen con esto", "cine", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas", "cine", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Cine y Series", modelo_seleccionado, api_key_gemini)
+            
         with tab_tv2:
             canal_tv = st.text_input("¿Qué canal buscas?", placeholder="Ej: Programación de esta noche en Telecinco")
             if st.button("Buscar Programación", key="btn_tv_prog") and canal_tv:
                 with st.spinner("Buscando parrilla..."):
                     res_web_tv = buscar_en_internet(canal_tv)
                     contexto_tv = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web_tv])
-                    prompt_tv = f"Programación de hoy para: '{canal_tv}'. Datos: {contexto_tv}"
-                    st.session_state.tv_prog = llamar_ia(modelo_seleccionado, prompt_tv, api_key_gemini)
+                    st.session_state.tv_prog = llamar_ia(modelo_seleccionado, f"Programación de hoy para: '{canal_tv}'. Datos: {contexto_tv}", api_key_gemini)
                     st.info(st.session_state.tv_prog)
             if st.session_state.tv_prog:
-                boton_superpoder(st.session_state.tv_prog, "Dime cuál es el programa más recomendado de esta parrilla y por qué", "tv", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.tv_prog, "Dime el programa más recomendado", "tv", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Programación TV", modelo_seleccionado, api_key_gemini)
+            
         with tab_tv3:
             evento_buscar = st.text_input("¿Qué evento buscas?", placeholder="Ej: Concierto de Taylor Swift")
             ciudad = st.text_input("¿En qué ciudad?", placeholder="Ej: Madrid")
@@ -550,18 +532,17 @@ with macro_tabs[1]:
                 with st.spinner("Buscando disponibilidad..."):
                     res_entradas = buscar_en_internet(f"entradas {evento_buscar} {ciudad}")
                     contexto_entradas = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_entradas])
-                    prompt_entradas = f"Info de: '{evento_buscar}' en {ciudad}. Datos: {contexto_entradas}"
-                    st.session_state.entradas = llamar_ia(modelo_seleccionado, prompt_entradas, api_key_gemini)
+                    st.session_state.entradas = llamar_ia(modelo_seleccionado, f"Info de: '{evento_buscar}' en {ciudad}. Datos: {contexto_entradas}", api_key_gemini)
                     st.info(st.session_state.entradas)
             if st.session_state.entradas:
-                boton_superpoder(st.session_state.entradas, "Dame un plan de viaje de 24 horas alrededor de este evento (dónde comer, qué visitar)", "entradas", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.entradas, "Plan de viaje de 24h alrededor del evento", "entradas", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entradas de Eventos", modelo_seleccionado, api_key_gemini)
+            
         with tab_tv4:
             juego = st.radio("Elige el juego:", ["Adivinar la película", "Curiosidades de series", "Preguntas de deportes"], horizontal=True)
             if st.button("¡Jugar!", key="btn_jugar_trivia"):
                 with st.spinner("Generando juego..."):
-                    prompt_juego = f"Juego de 3 preguntas trivia sobre '{juego}'. Da respuestas al final."
-                    st.session_state.trivia = llamar_ia(modelo_seleccionado, prompt_juego, api_key_gemini)
+                    st.session_state.trivia = llamar_ia(modelo_seleccionado, f"Juego de 3 preguntas trivia sobre '{juego}'. Da respuestas al final.", api_key_gemini)
                     st.info(st.session_state.trivia)
             cajon_ideas_personalizado("Trivia", modelo_seleccionado, api_key_gemini)
             
@@ -577,7 +558,7 @@ with macro_tabs[1]:
                 st.text_area("Resumen:", value=resumen, height=300)
             except Exception as e: st.error(f"Error: {e}")
         if st.session_state.yt_text:
-            boton_superpoder(st.session_state.yt_text, "Saca 3 ideas de negocio o proyectos que se puedan derivar de este resumen", "yt", modelo_seleccionado, api_key_gemini)
+            boton_superpoder(st.session_state.yt_text, "Saca 3 ideas de negocio de este resumen", "yt", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("YouTube", modelo_seleccionado, api_key_gemini)
         
     with sub[4]:
@@ -595,7 +576,7 @@ with macro_tabs[1]:
                     st.text_area("Resumen:", value=resumen, height=300)
                 except Exception as e: st.error(f"Error: {e}")
         if st.session_state.web_text:
-            boton_superpoder(st.session_state.web_text, "Dame una opinión crítica sobre el sesgo o la veracidad de este artículo", "web", modelo_seleccionado, api_key_gemini)
+            boton_superpoder(st.session_state.web_text, "Opinión crítica sobre el sesgo de este artículo", "web", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Lector de Webs", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -605,11 +586,10 @@ with macro_tabs[2]:
     sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"])
     with sub[0]:
         st.markdown("#### Análisis Inteligente de Archivos")
-        
         with st.expander("💡 Cajón de Ideas (¿Qué puedo hacer con este archivo?)"):
-            st.write("- **Si es foto:** Puedo pedirle que me extraiga el texto (OCR) o que me diga qué ropa lleva la gente.")
-            st.write("- **Si es audio:** Puedo pedirle que me haga un resumen o que traduzca una entrevista.")
-            st.write("- **Si es vídeo:** Puedo pedirle que me diga qué escenarios aparecen o de qué hablan los protagonistas.")
+            st.write("- **Si es foto:** Extraer texto (OCR) o describir ropa.")
+            st.write("- **Si es audio:** Resumen o traducción de entrevista.")
+            st.write("- **Si es vídeo:** Qué escenarios aparecen o de qué hablan.")
             
         archivo_multi = st.file_uploader("📎 Sube tu archivo aquí", type=["png", "jpg", "jpeg", "webp", "mp4", "mov", "mp3", "wav"], key="up_multi")
         if archivo_multi:
@@ -617,57 +597,40 @@ with macro_tabs[2]:
             if nombre.endswith((".png", ".jpg", ".jpeg", ".webp")):
                 st.image(archivo_multi, use_container_width=True)
                 mime_type = "image/jpeg" if nombre.endswith((".jpg", ".jpeg")) else f"image/{nombre.split('.')[-1]}"
-                opcion_img = st.radio("Opciones para Imagen:", [
-                    "👁️ Describir la imagen detalladamente", 
-                    "📝 Extraer todo el texto (OCR)", 
-                    "🎨 Generar un prompt para recrearla",
-                    "🕵️‍♂️ Analizar si tiene fotomontaje o IA"
-                ])
+                opcion_img = st.radio("Opciones para Imagen:", ["👁️ Describir", "📝 Extraer texto (OCR)", "🎨 Prompt para recrearla", "🕵️‍♂️ Analizar si es IA"])
                 if st.button("Ejecutar Acción en Imagen", type="primary"):
                     if "Describir" in opcion_img: prompt = "Describe detalladamente esta imagen."
                     elif "texto" in opcion_img: prompt = "Extrae todo el texto visible (OCR)."
                     elif "prompt" in opcion_img: prompt = "Escribe un prompt en inglés para Midjourney que replique esta imagen."
-                    else: prompt = "Analiza la imagen y dime si parece real o generada por IA / editada. Fíjate en las sombras, manos y texturas."
-                    
+                    else: prompt = "Analiza la imagen y dime si parece real o generada por IA. Fíjate en las sombras, manos y texturas."
                     with st.spinner("Procesando..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
             
             elif nombre.endswith((".mp3", ".wav")):
                 st.audio(archivo_multi)
                 mime_type = "audio/mp3" if nombre.endswith(".mp3") else "audio/wav"
-                opcion_aud = st.radio("Opciones para Audio:", [
-                    "📝 Transcribir el audio a texto", 
-                    "📋 Hacer un resumen del audio", 
-                    "🌍 Traducir el audio al inglés",
-                    "🎭 Analizar el tono emocional (¿está enfadado, triste?)"
-                ])
+                opcion_aud = st.radio("Opciones para Audio:", ["📝 Transcribir", "📋 Resumen", "🌍 Traducir al inglés", "🎭 Analizar tono emocional"])
                 if st.button("Ejecutar Acción en Audio", type="primary"):
                     if "Transcribir" in opcion_aud: prompt = "Transcribe exactamente lo que se dice."
-                    elif "Resumir" in opcion_aud: prompt = "Haz un resumen de lo que se habla."
+                    elif "Resumen" in opcion_aud: prompt = "Haz un resumen de lo que se habla."
                     elif "Traducir" in opcion_aud: prompt = "Traduce al inglés lo que se dice."
-                    else: prompt = "Escucha este audio y dime qué tono emocional tiene (alegre, triste, agresivo, neutro) y por qué."
-                    
+                    else: prompt = "Escucha este audio y dime qué tono emocional tiene y por qué."
                     with st.spinner("Procesando..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
             
             elif nombre.endswith((".mp4", ".mov")):
                 st.video(archivo_multi)
                 mime_type = "video/mp4"
-                opcion_vid = st.radio("Opciones para Vídeo:", [
-                    "📋 Resumir lo que ocurre en el vídeo", 
-                    "🔍 Describir los elementos visuales y escenas", 
-                    "🗣️ Analizar el tono o los diálogos"
-                ])
+                opcion_vid = st.radio("Opciones para Vídeo:", ["📋 Resumir", "🔍 Describir escenas", "🗣️ Analizar diálogos"])
                 if st.button("Ejecutar Acción en Vídeo", type="primary"):
                     if "Resumir" in opcion_vid: prompt = "Resume el contenido de este vídeo."
-                    elif "visuales" in opcion_vid: prompt = "Describe detalladamente las escenas."
+                    elif "escenas" in opcion_vid: prompt = "Describe detalladamente las escenas."
                     else: prompt = "Analiza los diálogos y el tono del vídeo."
-                    
-                    with st.spinner("Procesando vídeo (puede tardar)..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
+                    with st.spinner("Procesando vídeo..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
             
             if st.session_state.analisis_ia:
                 st.success("✅ Análisis completado:")
                 st.info(st.session_state.analisis_ia)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Multimedia")
-                boton_superpoder(st.session_state.analisis_ia, "Extrae información forense de este análisis (qué se oculta, qué es sospechoso)", "multi", modelo_seleccionado, api_key_gemini)
+                boton_superpoder(st.session_state.analisis_ia, "Información forense de este análisis", "multi", modelo_seleccionado, api_key_gemini)
                 
         cajon_ideas_personalizado("Análisis Multimedia", modelo_seleccionado, api_key_gemini)
 
@@ -680,37 +643,27 @@ with macro_tabs[2]:
             st.session_state.img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_final)}?width=1024&height=1024&nologo=true&enhance=false"
         if st.session_state.img_url:
             st.image(st.session_state.img_url, use_container_width=True)
-            boton_superpoder(f"Genera un prompt para recrear esta imagen pero en un estilo cinematográfico y oscuro: {prompt_img}", "Crear Prompt Alternativo", "visual", modelo_seleccionado, api_key_gemini)
-            
+            boton_superpoder(f"Genera un prompt cinematográfico para: {prompt_img}", "Crear Prompt Alternativo", "visual", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Generador Visual", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
         st.markdown("#### 🛡️ Generador de Logotipos e Identidad")
-        st.caption("Crea logotipos profesionales para tu marca, negocio o proyecto.")
-        
-        with st.expander("💡 Cajón de Ideas para Logos"):
-            st.write("- **Cafetería:** Minimalista, líneas finas, tonos tierra.")
-            st.write("- **App de Tecnología:** 3D, colores neón, moderno.")
-            st.write("- **Marca de Ropa:** Vintage, estilo sello, blanco y negro.")
-            
         col_logo1, col_logo2 = st.columns(2)
         with col_logo1:
             nombre_marca = st.text_input("Nombre de la marca:")
             estilo_logo = st.selectbox("Estilo de diseño:", ["Minimalista y limpio", "Corporativo moderno", "3D e Impactante", "Vintage y Retro", "Cyberpunk / Neón"])
         with col_logo2:
             color_logo = st.color_picker("Color principal de la marca:", "#d4af37")
-            icono_logo = st.text_input("Icono o símbolo (opcional):", placeholder="Ej: Un lobo, una taza, un rayo...")
+            icono_logo = st.text_input("Icono o símbolo (opcional):", placeholder="Ej: Un lobo, una taza...")
             
         if st.button("🛡️ Generar Logo", type="primary", key="btn_gen_logo") and nombre_marca:
             with st.spinner("Diseñando logotipo..."):
                 prompt_logo = f"Professional brand logo design for '{nombre_marca}', {estilo_logo} style, primary color {color_logo}, "
                 if icono_logo: prompt_logo += f"with an icon of {icono_logo}, "
                 prompt_logo += "flat vector graphic, minimalist, clean white background, centered, high quality, no text, corporate identity"
-                
                 url_logo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_logo)}?width=1024&height=1024&nologo=true"
-                st.image(url_logo, caption=f"Propuesta de Logo para {nombre_marca}", use_container_width=True)
+                st.image(url_logo, caption=f"Propuesta para {nombre_marca}", use_container_width=True)
                 st.markdown(f"[Descargar Logo en Alta Resolución]({url_logo})")
-                
         cajon_ideas_personalizado("Creación de Logos", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
@@ -735,7 +688,6 @@ with macro_tabs[2]:
                         os.rmdir(temp_dir)
         if st.session_state.dl_bytes:
             st.download_button("💾 Guardar archivo", st.session_state.dl_bytes, st.session_state.dl_filename)
-            
         cajon_ideas_personalizado("Descargas", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -753,7 +705,6 @@ with macro_tabs[3]:
                 res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
                 st.session_state.chat_history.append({"role": "assistant", "content": res})
                 st.chat_message("assistant").write(res)
-                
         cajon_ideas_personalizado("Chat IA", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
@@ -764,7 +715,6 @@ with macro_tabs[3]:
             with st.spinner("Generando voz..."):
                 audio = generar_audio_sincrono(texto_pod, voz)
                 if audio: st.audio(audio, format="audio/mp3")
-                
         cajon_ideas_personalizado("Sintetizador de Voz", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
@@ -772,98 +722,75 @@ with macro_tabs[3]:
         archivos = st.file_uploader("Sube documentos (PDF, Word, TXT):", type=["pdf", "txt", "docx"], accept_multiple_files=True)
         if archivos:
             texto_completo = "".join([leer_archivo_universal(a, modelo_seleccionado) for a in archivos])[:MAX_TEXTO_IA]
-            st.success(f"✅ {len(archivos)} documentos leídos. Puedes preguntar.")
+            st.success(f"✅ {len(archivos)} documentos leídos.")
             for msg in st.session_state.pdf_chat_history: st.chat_message(msg["role"]).write(msg["content"])
             if prompt := st.chat_input("Pregúntale a los documentos..."):
                 st.session_state.pdf_chat_history.append({"role": "user", "content": prompt})
                 st.chat_message("user").write(prompt)
-                with st.spinner("Buscando en el texto..."):
+                with st.spinner("Buscando..."):
                     res = llamar_ia(modelo_seleccionado, f"Basándote en esto:\n{texto_completo}\nResponde: {prompt}", api_key_gemini)
                     st.session_state.pdf_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
-                    
         cajon_ideas_personalizado("Chat con PDFs", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
         st.markdown("#### 🕵️‍♂️ Creador de Agentes IA")
-        st.caption("Crea un personaje o experto con una personalidad única y chatea con él.")
+        nombre_agente = st.text_input("Nombre del Agente:", placeholder="Ej: Albert, el Profesor de Física")
+        rol_agente = st.text_area("Personalidad:", placeholder="Ej: Eres un profesor divertido. Explicas usando dibujos animados.", height=100)
         
-        with st.container():
-            nombre_agente = st.text_input("Nombre del Agente:", placeholder="Ej: Albert, el Profesor de Física")
-            rol_agente = st.text_area("Personalidad y Reglas (System Prompt):", 
-                                      placeholder="Ej: Eres un profesor de física muy divertido. Explicas conceptos complejos usando ejemplos de dibujos animados. Usas muchos emojis.",
-                                      height=100)
-            
-            if st.button("✨ Crear / Activar Agente", type="primary"):
-                if nombre_agente and rol_agente:
-                    st.session_state.agente_activo = {"nombre": nombre_agente, "rol": rol_agente}
-                    st.session_state.agente_chat_history = [] # Limpiar chat al crear nuevo agente
-                    st.success(f"Agente '{nombre_agente}' activado y listo para hablar.")
-                else:
-                    st.warning("Ponle un nombre y una personalidad al agente para activarlo.")
+        if st.button("✨ Crear / Activar Agente", type="primary"):
+            if nombre_agente and rol_agente:
+                st.session_state.agente_activo = {"nombre": nombre_agente, "rol": rol_agente}
+                st.session_state.agente_chat_history = []
+                st.success(f"Agente '{nombre_agente}' listo.")
                     
         if st.session_state.get("agente_activo"):
             agente = st.session_state.agente_activo
-            st.markdown(f"---")
             st.markdown(f"### 💬 Hablando con: **{agente['nombre']}**")
-            
-            for msg in st.session_state.agente_chat_history: 
-                st.chat_message(msg["role"]).write(msg["content"])
-                
-            if prompt := st.chat_input(f"Escribe un mensaje para {agente['nombre']}..."):
+            for msg in st.session_state.agente_chat_history: st.chat_message(msg["role"]).write(msg["content"])
+            if prompt := st.chat_input(f"Mensaje para {agente['nombre']}..."):
                 st.session_state.agente_chat_history.append({"role": "user", "content": prompt})
                 st.chat_message("user").write(prompt)
-                
-                with st.spinner(f"{agente['nombre']} está pensando..."):
-                    prompt_con_rol = f"INSTRUCCIONES DEL SISTEMA (ERES ESTE AGENTE):\n{agente['rol']}\n\nEl usuario dice: {prompt}"
+                with st.spinner("Pensando..."):
+                    prompt_con_rol = f"INSTRUCCIONES DEL SISTEMA (ERES ESTE AGENTE):\n{agente['rol']}\n\nUsuario: {prompt}"
                     res = llamar_ia(modelo_seleccionado, prompt_con_rol, api_key_gemini)
                     st.session_state.agente_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
-                    
         cajon_ideas_personalizado("Agentes Custom", modelo_seleccionado, api_key_gemini)
 
     with sub[4]:
         st.markdown("#### 🍳 El Chef Virtual")
-        
-        with st.expander("💡 Cajón de Ideas para Cocinar"):
-            st.write("- Pídele un **menú semanal** equilibrado para 4 personas.")
-            st.write("- Dile los ingredientes que tienes y pídele **una receta express** de 15 minutos.")
-            st.write("- Pídele **alternativas saludables** para una receta de postre.")
-            
         col_c1, col_c2 = st.columns(2)
         with col_c1:
-            ingredientes = st.text_area("¿Qué tienes en la nevera?", placeholder="Pollo, arroz, tomate...")
+            ingredientes = st.text_area("¿Qué tienes en la nevera?")
             if st.button("Dame una receta") and ingredientes:
-                st.session_state.receta_generada = llamar_ia(modelo_seleccionado, f"Tengo {ingredientes}. Dame una receta rápida.", api_key_gemini)
+                st.session_state.receta_generada = llamar_ia(modelo_seleccionado, f"Tengo {ingredientes}. Dame una receta.", api_key_gemini)
             if st.session_state.receta_generada: st.info(st.session_state.receta_generada)
         with col_c2:
-            preferencias = st.text_input("¿Menú semanal? (Alergias, gustos)")
+            preferencias = st.text_input("¿Menú semanal?")
             if st.button("Generar Menú + Compra") and preferencias:
-                st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"Haz un menú semanal para 4 personas. {preferencias}. Añade lista de la compra.", api_key_gemini)
+                st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"Menú semanal para 4. {preferencias}.", api_key_gemini)
             if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
-            
         cajon_ideas_personalizado("Cocina", modelo_seleccionado, api_key_gemini)
 
     with sub[5]:
         st.markdown("#### 📖 Cuentacuentos")
-        prota = st.text_input("Nombre del protagonista:")
+        prota = st.text_input("Protagonista:")
         lugar = st.text_input("Lugar mágico:")
         if st.button("✨ Crear Cuento") and prota and lugar:
-            cuento = llamar_ia(modelo_seleccionado, f"Cuento infantil. Protagonista: {prota}, Lugar: {lugar}. Moraleja al final.", api_key_gemini)
+            cuento = llamar_ia(modelo_seleccionado, f"Cuento. Protagonista: {prota}, Lugar: {lugar}.", api_key_gemini)
             st.text_area("Cuento:", value=cuento, height=300)
             if st.button("🔊 Leer en voz alta"):
                 audio = generar_audio_sincrono(cuento, "es-ES-ElviraNeural")
                 if audio: st.audio(audio, format="audio/mp3")
-                
         cajon_ideas_personalizado("Cuentos", modelo_seleccionado, api_key_gemini)
 
     with sub[6]:
         st.markdown("#### Asistente de Código")
-        req_code = st.text_area("Pega un código para explicarlo o pide uno nuevo:")
+        req_code = st.text_area("Pega un código o pide uno nuevo:")
         if st.button("Procesar Código") and req_code:
-            res = llamar_ia(modelo_seleccionado, f"Actúa como programador senior. Explica o mejora esto:\n{req_code}", api_key_gemini)
+            res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req_code}", api_key_gemini)
             st.code(res, language="python")
-            
         cajon_ideas_personalizado("Código", modelo_seleccionado, api_key_gemini)
 
     with sub[7]:
@@ -871,9 +798,7 @@ with macro_tabs[3]:
         texto_trad = st.text_area("Texto a traducir:")
         idioma = st.selectbox("Idioma destino:", ["Inglés", "Francés", "Alemán", "Italiano"])
         if st.button("Traducir") and texto_trad:
-            res = llamar_ia(modelo_seleccionado, f"Traduce al {idioma}: {texto_trad}", api_key_gemini)
-            st.info(res)
-            
+            st.info(llamar_ia(modelo_seleccionado, f"Traduce al {idioma}: {texto_trad}", api_key_gemini))
         cajon_ideas_personalizado("Traductor", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -883,30 +808,19 @@ with macro_tabs[4]:
     sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
     with sub[0]:
         st.markdown("#### 🌐 Herramientas de Redes")
-        
-        with st.expander("💡 Cajón de Ideas para Redes"):
-            st.write("- Pídele que te explique la diferencia entre **TCP y UDP** con una analogía.")
-            st.write("- Pídele el comando de Linux para **ver las IPs conectadas** a tu red.")
-            st.write("- Pídele **3 preguntas de examen** sobre subnetting.")
-            
         col_r1, col_r2 = st.columns(2)
         with col_r1:
             ip = st.text_input("IP/CIDR (Ej: 192.168.1.0/24)")
             if st.button("Calcular Red") and ip:
-                st.session_state.redes_resultado = llamar_ia(modelo_seleccionado, f"Calcula máscara, rango, broadcast y hosts para: {ip}", api_key_gemini)
-                st.info(st.session_state.redes_resultado)
+                st.info(llamar_ia(modelo_seleccionado, f"Calcula máscara, rango, broadcast y hosts para: {ip}", api_key_gemini))
         with col_r2:
-            tarea = st.text_input("¿Qué necesitas hacer? (Ej: ver puertos abiertos)")
+            tarea = st.text_input("¿Qué necesitas hacer?")
             so = st.selectbox("Sistema:", ["Windows", "Linux", "Cisco"])
             if st.button("Buscar Comando") and tarea:
-                st.session_state.redes_resultado = llamar_ia(modelo_seleccionado, f"Comando para {so} que haga: {tarea}. Explícalo.", api_key_gemini)
-                st.info(st.session_state.redes_resultado)
-        st.markdown("---")
-        st.markdown("**Simulador de Entrevista Técnica**")
-        if st.button("Comenzar Entrevista (Nivel CCNA)"):
-            st.session_state.entrevista_resultado = llamar_ia(modelo_seleccionado, "Hazme 3 preguntas técnicas de nivel CCNA (redes) como si fueras un reclutador. Espera mi respuesta.", api_key_gemini)
-        if st.session_state.entrevista_resultado: st.info(st.session_state.entrevista_resultado)
+                st.info(llamar_ia(modelo_seleccionado, f"Comando para {so}: {tarea}. Explícalo.", api_key_gemini))
         
+        if st.button("Comenzar Entrevista (Nivel CCNA)"):
+            st.info(llamar_ia(modelo_seleccionado, "Hazme 3 preguntas de nivel CCNA.", api_key_gemini))
         cajon_ideas_personalizado("Redes", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
@@ -917,62 +831,37 @@ with macro_tabs[4]:
             deseado = st.text_input("Color deseado:")
             estado = st.selectbox("Estado del pelo:", ["Sano", "Teñido", "Decolorado", "Dañado"])
             if st.button("Calcular Fórmula") and actual and deseado:
-                st.session_state.pelo_resultado = llamar_ia(modelo_seleccionado, f"Fórmula para pasar de {actual} a {deseado}. Pelo {estado}. Da tintes, oxidantes y pasos.", api_key_gemini)
-                st.info(st.session_state.pelo_resultado)
+                st.info(llamar_ia(modelo_seleccionado, f"Fórmula de {actual} a {deseado}. Pelo {estado}.", api_key_gemini))
         with col_p2:
-            servicios = st.text_area("Servicios a realizar (Ej: Mechas, corte, peinado):")
-            tiempo = st.number_input("Tiempo estimado (horas):", min_value=1.0, step=0.5)
+            servicios = st.text_area("Servicios:")
+            tiempo = st.number_input("Horas:", min_value=1.0)
             if st.button("Calcular Presupuesto") and servicios:
-                st.session_state.presupuesto_resultado = llamar_ia(modelo_seleccionado, f"Crea un presupuesto profesional para: {servicios}. Tiempo: {tiempo}h. Sugiere precio competitivo y desglose.", api_key_gemini)
-                st.info(st.session_state.presupuesto_resultado)
-                
+                st.info(llamar_ia(modelo_seleccionado, f"Presupuesto para: {servicios}. Tiempo: {tiempo}h.", api_key_gemini))
         cajon_ideas_personalizado("Peluquería", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
         st.markdown("#### 📚 Asistente de Deberes")
-        nivel = st.selectbox("Nivel Educativo:", ["Primaria", "ESO", "Bachillerato", "Universidad"])
+        nivel = st.selectbox("Nivel:", ["Primaria", "ESO", "Bachillerato", "Universidad"])
         materia = st.selectbox("Materia:", ["Matemáticas", "Lengua", "Ciencias", "Historia", "Idiomas"])
-        duda = st.text_area("Escribe tu duda o ejercicio:")
+        duda = st.text_area("Duda:")
         if st.button("Explicar Duda") and duda:
-            res = llamar_ia(modelo_seleccionado, f"Eres un profesor. Nivel: {nivel}. Materia: {materia}. Explica esto paso a paso y con ejemplos: {duda}", api_key_gemini)
-            st.success("Explicación:")
-            st.info(res)
-            
+            st.info(llamar_ia(modelo_seleccionado, f"Profesor. Nivel: {nivel}. Materia: {materia}. Explica: {duda}", api_key_gemini))
         cajon_ideas_personalizado("Deberes", modelo_seleccionado, api_key_gemini)
 
     with sub[3]:
         st.markdown("#### 🦺 Asistente de Prevención de Riesgos Laborales")
-        st.caption("Herramientas para técnicos de PRL: charlas, evaluaciones y dudas legales.")
-        
-        with st.expander("💡 Cajón de Ideas PRL"):
-            st.write("- Pide una **charla de 5 minutos** sobre el uso seguro de escaleras de mano.")
-            st.write("- Pide una **evaluación de riesgos** para un puesto de repartidor en moto.")
-            st.write("- Pregunta **qué EPIs** son obligatorios para soldadura.")
-            
-        tipo_prl = st.selectbox("¿Qué necesitas generar hoy?", [
-            "Charla de 5 Minutos (Seguridad)",
-            "Evaluación de Riesgos (Puesto/Tarea)",
-            "Recomendación de EPIs (Equipos de Protección)",
-            "Consulta Legal / Normativa (Ley 31/1995, RD...)"
-        ])
-        
-        contexto_prl = st.text_area("Describe el puesto, la tarea o la duda legal:", placeholder="Ej: Trabajo en altura para cambiar una bombilla en un almacén con una escalera de tijera.")
+        tipo_prl = st.selectbox("¿Qué necesitas generar?", ["Charla de 5 Minutos", "Evaluación de Riesgos", "Recomendación de EPIs", "Consulta Legal / Normativa"])
+        contexto_prl = st.text_area("Describe la tarea o duda:", placeholder="Ej: Trabajo en altura con escalera de tijera.")
         
         if st.button("🦺 Generar Documento PRL", type="primary") and contexto_prl:
-            with st.spinner("Redactando informe técnico..."):
-                if "Charla" in tipo_prl:
-                    prompt_prl = f"Actúa como un Técnico Superior en PRL. Escribe una Charla de 5 minutos, directa y dinámica, para los trabajadores sobre: '{contexto_prl}'. Incluye: 1. Riesgos principales. 2. Medidas preventivas. 3. EPIs necesarios."
-                elif "Evaluación" in tipo_prl:
-                    prompt_prl = f"Actúa como un Técnico en PRL. Realiza una Evaluación de Riesgos simplificada para: '{contexto_prl}'. Enumera los riesgos (físicos, ergonómicos, etc.), la probabilidad, la gravedad y las medidas preventivas a adoptar."
-                elif "EPIs" in tipo_prl:
-                    prompt_prl = f"Actúa como experto en seguridad laboral. Dime detalladamente qué Equipos de Protección Individual (EPIs) son obligatorios y recomendados para: '{contexto_prl}'. Explica por qué y menciona la normativa aplicable."
-                else:
-                    prompt_prl = f"Actúa como asesor legal en PRL. Responde a la siguiente duda técnica o legal con base en la Ley de Prevención de Riesgos Laborales (España): '{contexto_prl}'. Sé riguroso y cita artículos si es posible."
-                
-                st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, prompt_prl, api_key_gemini)
-                st.text_area("Documento Generado:", value=st.session_state.prl_resultado, height=400)
-                botones_descarga(st.session_state.prl_resultado, f"PRL_{tipo_prl.split('(')[0].strip()}")
-                
+            if "Charla" in tipo_prl: prompt_prl = f"Charla de 5 min de PRL sobre: '{contexto_prl}'."
+            elif "Evaluación" in tipo_prl: prompt_prl = f"Evaluación de riesgos simplificada para: '{contexto_prl}'."
+            elif "EPIs" in tipo_prl: prompt_prl = f"EPIs obligatorios para: '{contexto_prl}'."
+            else: prompt_prl = f"Consulta legal en PRL (España): '{contexto_prl}'."
+            
+            st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, prompt_prl, api_key_gemini)
+            st.text_area("Documento:", value=st.session_state.prl_resultado, height=400)
+            botones_descarga(st.session_state.prl_resultado, "Documento_PRL")
         cajon_ideas_personalizado("PRL", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -982,65 +871,46 @@ with macro_tabs[5]:
     sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
     with sub[0]:
         st.markdown("#### 🌍 Planificador de Viajes")
-        
-        with st.expander("💡 Cajón de Ideas para Viajar"):
-            st.write("- Pide un **itinerario con niños** para no aburrirlos.")
-            st.write("- Pide una **lista de la maleta** según el clima del destino.")
-            st.write("- Pide **restaurantes económicos** típicos del lugar.")
-            
-        destino = st.text_input("¿A dónde quieres ir?", placeholder="Ej: Roma, Nueva York, un pueblo de Asturias...")
+        destino = st.text_input("Destino:")
         col_v1, col_v2 = st.columns(2)
-        with col_v1: dias = st.number_input("¿Cuántos días?", min_value=1, max_value=30, value=3)
-        with col_v2: compania = st.selectbox("¿Con quién viajas?", ["Pareja", "Familia con niños", "Amigos", "Solo/a", "Tercera edad"])
+        with col_v1: dias = st.number_input("Días:", min_value=1, value=3)
+        with col_v2: compania = st.selectbox("Compañía:", ["Pareja", "Familia", "Amigos", "Solo/a"])
         if st.button("✈️ Generar Itinerario", type="primary") and destino:
-            with st.spinner("Planificando tu viaje..."):
-                prompt_viaje = f"Actúa como un guía de viajes experto. Diseña un itinerario de {dias} días para {destino} viajando con {compania}. Incluye qué ver cada día (mañana, tarde y noche), recomendaciones de comida, un presupuesto aproximado y una lista de 5 cosas imprescindibles para la maleta."
-                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_viaje, api_key_gemini)
-                st.info(st.session_state.analisis_ia)
-                botones_descarga(st.session_state.analisis_ia, f"Viaje_{destino}")
-                
+            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"Itinerario {dias} días en {destino} con {compania}.", api_key_gemini)
+            st.info(st.session_state.analisis_ia)
+            botones_descarga(st.session_state.analisis_ia, f"Viaje_{destino}")
         cajon_ideas_personalizado("Viajes", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### 💰 Finanzas del Hogar")
         col_f1, col_f2 = st.columns(2)
         with col_f1:
-            st.markdown("**Calculadora de Ahorro**")
-            ingresos = st.number_input("Ingresos netos mensuales (€):", min_value=0)
-            gastos = st.number_input("Gastos fijos mensuales (€):", min_value=0)
+            st.markdown("**Ahorro**")
+            ingresos = st.number_input("Ingresos (€):")
+            gastos = st.number_input("Gastos (€):")
             if st.button("Calcular Ahorro"):
                 ahorro = ingresos - gastos
-                if ahorro > 0: st.success(f"Te quedan **{ahorro}€** al mes. ¡Puedes ahorrar!")
-                else: st.error(f"Te faltan **{abs(ahorro)}€** al mes. Hay que ajustar gastos.")
+                if ahorro > 0: st.success(f"Ahorras **{ahorro}€**.")
+                else: st.error(f"Faltan **{abs(ahorro)}€**.")
         with col_f2:
-            st.markdown("**Calculadora de Hipoteca**")
-            prestamo = st.number_input("Importe del préstamo (€):", value=150000, step=10000)
-            interes = st.number_input("Interés anual (%):", value=3.0, step=0.1)
-            años = st.number_input("Años a pagar:", value=30, step=1)
+            st.markdown("**Hipoteca**")
+            prestamo = st.number_input("Préstamo (€):", value=150000)
+            interes = st.number_input("Interés (%):", value=3.0)
+            años = st.number_input("Años:", value=30)
             if st.button("Calcular Cuota"):
-                i = (interes / 100) / 12
-                n = años * 12
+                i = (interes / 100) / 12; n = años * 12
                 cuota = prestamo * (i * (1 + i)**n) / ((1 + i)**n - 1)
-                st.success(f"Tu cuota mensual sería de **{cuota:.2f}€**.")
-                
+                st.success(f"Cuota: **{cuota:.2f}€**.")
         cajon_ideas_personalizado("Finanzas", modelo_seleccionado, api_key_gemini)
 
     with sub[2]:
         st.markdown("#### ✉️ Cartas y Mensajes")
-        
-        with st.expander("💡 Cajón de Ideas"):
-            st.write("- Pide un **discurso emotivo** para el cumpleaños de tu pareja.")
-            st.write("- Pide una **carta formal** para reclamar una factura del banco.")
-            
-        tipo_mensaje = st.selectbox("¿Qué tipo de mensaje necesitas?", ["Carta para los Reyes Magos", "Carta a Papá Noel", "Discurso de cumpleaños", "Mensaje de aniversario", "Carta formal de reclamación"])
-        detalles = st.text_area("Añade detalles (ej: nombre del niño, lo que ha hecho bien este año, o qué quieres reclamar):")
-        if st.button("✍️ Redactar Mensaje", type="primary") and detalles:
-            with st.spinner("Redactando..."):
-                prompt_mensaje = f"Actúa como un redactor experto. Escribe un/a {tipo_mensaje} basándote en estos detalles: {detalles}. Usa el tono adecuado (emotivo, divertido o formal según corresponda)."
-                st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, prompt_mensaje, api_key_gemini)
-                st.text_area("Resultado:", value=st.session_state.analisis_ia, height=300)
-                botones_descarga(st.session_state.analisis_ia, f"{tipo_mensaje.replace(' ', '_')}")
-                
+        tipo_mensaje = st.selectbox("Tipo:", ["Reyes Magos", "Papá Noel", "Discurso cumpleaños", "Carta formal de reclamación"])
+        detalles = st.text_area("Detalles:")
+        if st.button("✍️ Redactar", type="primary") and detalles:
+            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"Escribe {tipo_mensaje} con estos datos: {detalles}.", api_key_gemini)
+            st.text_area("Resultado:", value=st.session_state.analisis_ia, height=300)
+            botones_descarga(st.session_state.analisis_ia, "Mensaje")
         cajon_ideas_personalizado("Cartas y Mensajes", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -1048,82 +918,45 @@ with macro_tabs[5]:
 # ==========================================
 with macro_tabs[6]:
     sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
-    
     with sub[0]:
         st.markdown("#### 🎵 Estudio de Creación Musical")
-        st.caption("Crea la letra, la portada y escucha una maqueta de tu canción (voz recitada).")
-        
-        with st.expander("💡 Cajón de Ideas Musicales"):
-            st.write("- Pídele **una canción de superación** para dedicar en un cumpleaños.")
-            st.write("- Pídele una **canción de rap** que hable de la historia de España.")
-            
         col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            tema_cancion = st.text_input("¿De qué trata la canción?", placeholder="Ej: Un amor de verano, superación personal...")
-        with col_m2:
-            genero = st.selectbox("Género Musical:", ["Pop", "Rock", "Rap/Trap", "Reggaetón", "Balada", "Indie"])
-            
-        tono = st.select_slider("Tono de la canción:", options=["Muy triste", "Melancólico", "Alegre", "Fiestero", "Épico"])
+        with col_m1: tema_cancion = st.text_input("¿De qué trata?")
+        with col_m2: genero = st.selectbox("Género:", ["Pop", "Rock", "Rap", "Balada"])
+        tono = st.select_slider("Tono:", options=["Triste", "Melancólico", "Alegre", "Épico"])
         
         if st.button("🎼 Escribir Canción", type="primary", key="btn_crear_cancion") and tema_cancion:
-            with st.spinner("Componiendo la letra..."):
-                prompt_cancion = f"Actúa como un compositor de éxito. Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. El tono debe ser {tono}. Estructura la canción claramente con etiquetas: [Verso 1], [Coro], [Verso 2], [Puente], [Coro Final]. Sé creativo y rítmico."
-                letra = llamar_ia(modelo_seleccionado, prompt_cancion, api_key_gemini)
-                st.session_state.letra_cancion = letra
-                
-                # Extraer un título aproximado
-                titulo_prompt = f"Basándote en esta letra, dame SOLO un título corto y pegadizo (máximo 5 palabras):\n{letra[:500]}"
-                st.session_state.titulo_cancion = llamar_ia(modelo_seleccionado, titulo_prompt, api_key_gemini).replace('"', '').strip()
-                
-                # Generar portada
-                prompt_img_cancion = f"Album cover art, {genero} style, mood {tono}, about {tema_cancion}, high quality, 4k, artistic"
-                st.session_state.portada_cancion = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_img_cancion)}?width=1024&height=1024&nologo=true"
+            letra = llamar_ia(modelo_seleccionado, f"Canción {genero} sobre '{tema_cancion}', tono {tono}.", api_key_gemini)
+            st.session_state.letra_cancion = letra
+            titulo = llamar_ia(modelo_seleccionado, f"Título para esta letra:\n{letra[:500]}", api_key_gemini).strip()
+            st.session_state.titulo_cancion = titulo
+            st.session_state.portada_cancion = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Album cover ' + genero + ' ' + tema_cancion)}?width=1024&height=1024&nologo=true"
                 
         if st.session_state.letra_cancion:
-            st.markdown(f"### 🎶 Título: {st.session_state.titulo_cancion}")
-            
+            st.markdown(f"### 🎶 {st.session_state.titulo_cancion}")
             col_portada, col_letra = st.columns([1, 2])
             with col_portada:
-                st.image(st.session_state.portada_cancion, caption="Portada del Single", use_container_width=True)
-                
-                # Opciones de audio
-                st.markdown("#### 🎙️ Escuchar Maqueta")
-                voz_cancion = st.selectbox("Elige la voz:", [
-                    "es-MX-JorgeNeural (Recomendado para Rap)", 
-                    "es-ES-ElviraNeural (Recomendado para Baladas)", 
-                    "es-AR-TomasNeural (Tono más grave)"
-                ], key="voz_cancion")
-                
-                voz_id = voz_cancion.split(" ")[0]
-                
-                if st.button("🔊 Generar Audio de la Letra", key="btn_audio_cancion"):
-                    with st.spinner("Grabando maqueta..."):
-                        audio_letra = generar_audio_sincrono(st.session_state.letra_cancion, voz_id)
-                        if audio_letra:
-                            st.audio(audio_letra, format="audio/mp3")
-                            st.download_button("💾 Descargar Audio (.mp3)", audio_letra, f"{st.session_state.titulo_cancion}.mp3", "audio/mpeg")
-
+                st.image(st.session_state.portada_cancion, use_container_width=True)
+                voz_cancion = st.selectbox("Voz:", ["es-MX-JorgeNeural", "es-ES-ElviraNeural"])
+                if st.button("🔊 Generar Audio"):
+                    audio_letra = generar_audio_sincrono(st.session_state.letra_cancion, voz_cancion)
+                    if audio_letra:
+                        st.audio(audio_letra, format="audio/mp3")
+                        st.download_button("💾 MP3", audio_letra, f"{st.session_state.titulo_cancion}.mp3")
             with col_letra:
-                st.text_area("Letra de la Canción:", value=st.session_state.letra_cancion, height=500)
-                botones_descarga(st.session_state.letra_cancion, f"Letra_{st.session_state.titulo_cancion}")
-                
+                st.text_area("Letra:", value=st.session_state.letra_cancion, height=500)
+                botones_descarga(st.session_state.letra_cancion, "Letra")
         cajon_ideas_personalizado("Música", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
         st.markdown("#### 🎨 Poesía y Rimas")
-        st.caption("Genera poemas personalizados para regalar o para inspirarte.")
-        
-        tema_poema = st.text_input("¿Sobre qué quieres el poema?", placeholder="Ej: El mar, mi mascota, el paso del tiempo...")
-        estilo_poema = st.selectbox("Estilo:", ["Clásico y Romántico", "Divertido y Loco", "Épico y Épico", "Haiku (Corto)"])
-        
+        tema_poema = st.text_input("¿Sobre qué quieres el poema?")
+        estilo_poema = st.selectbox("Estilo:", ["Romántico", "Divertido", "Épico", "Haiku"])
         if st.button("✒️ Escribir Poema", type="primary") and tema_poema:
-            with st.spinner("Inspirándose..."):
-                prompt_poema = f"Escribe un poema {estilo_poema} sobre: '{tema_poema}'. Que tenga rima y una estructura bonita."
-                poema = llamar_ia(modelo_seleccionado, prompt_poema, api_key_gemini)
-                st.text_area("Poema:", value=poema, height=300)
-                botones_descarga(poema, f"Poema_{tema_poema}")
-                if st.button("🔊 Recitar Poema"):
-                    audio_poema = generar_audio_sincrono(poema, "es-ES-ElviraNeural")
-                    if audio_poema: st.audio(audio_poema, format="audio/mp3")
-                    
+            poema = llamar_ia(modelo_seleccionado, f"Poema {estilo_poema} sobre: '{tema_poema}'.", api_key_gemini)
+            st.text_area("Poema:", value=poema, height=300)
+            botones_descarga(poema, "Poema")
+            if st.button("🔊 Recitar Poema"):
+                audio_poema = generar_audio_sincrono(poema, "es-ES-ElviraNeural")
+                if audio_poema: st.audio(audio_poema, format="audio/mp3")
         cajon_ideas_personalizado("Poesía", modelo_seleccionado, api_key_gemini)
