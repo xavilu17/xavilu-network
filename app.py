@@ -83,12 +83,12 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK ---
+# --- 🎨 CSS CYBERPUNK DE LUJO (PESTAÑAS DORADAS) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
     
-    /* Fondo Negro Espacial con brillo sutil en el centro */
+    /* Fondo Negro Espacial */
     .stApp { 
         background-color: #000000 !important; 
         background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
@@ -127,34 +127,36 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: LETRAS CLARAS Y BRILLO NEÓN 🌟 */
+    /* 🌟 PESTAÑAS: CAJONES DORADOS MACIZOS 🌟 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px !important;
-        border-bottom: 2px solid rgba(0, 240, 255, 0.2) !important;
+        gap: 5px !important;
+        border-bottom: 2px solid #d4af37 !important;
+        padding-bottom: 5px !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: transparent !important;
-        color: #ffffff !important;
+        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important;
+        border: 1px solid #ffd700 !important;
+        border-radius: 6px 6px 0 0 !important;
+        color: #000000 !important; /* Letras negras para máximo contraste */
         font-family: 'Orbitron', sans-serif !important;
-        font-weight: bold !important;
-        font-size: 14px !important;
+        font-weight: 900 !important;
+        font-size: 13px !important;
         padding: 10px 15px !important;
-        border: none !important;
-        transition: all 0.3s ease !important;
-        opacity: 0.6 !important; 
+        transition: all 0.2s ease !important;
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important;
+        text-transform: uppercase !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        color: #00f0ff !important;
-        opacity: 1 !important;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
+        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important;
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important;
+        transform: translateY(-2px);
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #00f0ff !important; 
-        text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff !important;
-        border-bottom: 3px solid #FF007F !important; 
-        background: rgba(0, 240, 255, 0.1) !important; 
-        border-radius: 10px 10px 0 0 !important;
-        opacity: 1 !important; 
+        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important;
+        color: #000000 !important;
+        border: 1px solid #ffffff !important;
+        border-bottom: 4px solid #ff007f !important; /* Detalle rosa neón */
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important;
     }
     
     /* Ocultar la línea de Streamlit por defecto */
