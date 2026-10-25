@@ -86,17 +86,32 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V81 - PARCHE DE SEGURIDAD) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V83 - FINAL DEFINITIVO) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
 
+/* Fondo Negro Espacial */
 .stApp { 
     background-color: #000000 !important; 
     background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
     color: #f7dfa3 !important; 
     font-family: 'Rajdhani', sans-serif !important; 
 }
+
+/* Ocultar la barra superior blanca y el botón Deploy */
+header[data-testid="stHeader"] {
+    background-color: #000000 !important;
+    background: #000000 !important;
+}
+[data-testid="stAppDeployButton"] {
+    display: none !important;
+}
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+/* Título Principal DORADO */
 h1 { 
     font-family: 'Orbitron', sans-serif !important; 
     color: #FFD700 !important; 
@@ -104,6 +119,8 @@ h1 {
     text-align: center; 
     letter-spacing: 3px; 
 }
+
+/* Subtítulos (Neón Rosa/Cian) */
 h2, h3 { 
     font-family: 'Orbitron', sans-serif !important; 
     color: #ffffff !important; 
@@ -111,12 +128,16 @@ h2, h3 {
     text-align: center; 
     letter-spacing: 3px; 
 }
+
+/* Títulos de sección (h4) */
 h4 {
     font-family: 'Orbitron', sans-serif !important;
     color: #00f0ff !important;
     text-shadow: 0 0 8px #00f0ff, 0 0 15px #FF007F !important;
     letter-spacing: 1px;
 }
+
+/* Etiquetas de inputs */
 [data-testid="stWidgetLabel"] p { 
     color: #00f0ff !important; 
     font-family: 'Orbitron', sans-serif !important; 
@@ -130,11 +151,15 @@ h4 {
     display: inline-block !important; 
     margin-bottom: 8px !important; 
 }
+
+/* Barra lateral */
 [data-testid="stSidebar"] { 
     background-color: rgba(5, 5, 10, 0.98) !important; 
     border-right: 2px solid #00f0ff !important; 
     box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
 }
+
+/* 🌟 BOTONES COMO PESTAÑAS 🌟 */
 div.stButton > button[kind="secondary"] {
     background-color: #0a0a0a !important;
     color: #ffffff !important;
@@ -170,6 +195,8 @@ div.stButton > button[kind="primary"] {
     transform: translateY(-1px) !important;
     width: 100% !important;
 }
+
+/* Cajas de texto e inputs normales */
 .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
     background-color: #0a0a0a !important; 
     border: 1px solid #00f0ff !important; 
@@ -182,12 +209,16 @@ div.stButton > button[kind="primary"] {
     border: 1px solid #FF007F !important; 
     box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
 }
+
+/* Chat Input (Legacy) */
 [data-testid="stChatInput"] {
     background-color: #0a0a0a !important;
     border: 1px solid #00f0ff !important;
     border-radius: 10px !important;
     box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
 }
+
+/* 🔥 CHAT INPUT PRO (Opción 3) 🔥 */
 [data-testid="stTextInput"] div,
 [data-testid="stTextInput"] input {
     background-color: #0a0a0a !important;
@@ -216,6 +247,8 @@ div.stButton > button[kind="primary"] {
     color: #888888 !important;
     opacity: 1 !important;
 }
+
+/* Botones normales y de descarga */
 div.stButton > button:not([kind="primary"]):not([kind="secondary"]), div[data-testid="stDownloadButton"] > button { 
     background: #0a0a0a !important; 
     color: #00f0ff !important; 
@@ -234,6 +267,8 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
     transform: translateY(-2px); 
     box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
 }
+
+/* Mensajes del Chat */
 [data-testid="stChatMessage"] { 
     background: rgba(10, 10, 15, 0.8) !important; 
     border: 1px solid #FF007F !important; 
@@ -241,12 +276,16 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
     padding: 10px; 
     box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important;
 }
+
+/* Alertas */
 .stAlert { 
     border-radius: 10px; 
     font-weight: bold; 
     background-color: rgba(0, 240, 255, 0.1) !important;
     border-left: 5px solid #00f0ff !important;
 }
+
+/* Reducir hueco entre menús */
 [data-testid="stVerticalBlock"] > div {
     padding-bottom: 0.5rem !important;
 }
@@ -298,7 +337,7 @@ def buscar_noticias_deportivas(deporte, liga):
         return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in res]
     except: return []
 
-# 🛠️ PARCHE 1: VALIDACIÓN DE TAMAÑO DE ARCHIVO
+# VALIDACIÓN DE TAMAÑO DE ARCHIVO
 def leer_archivo_universal(upload, modelo_ia):
     if upload.size > MAX_FILE_MB * 1024 * 1024:
         st.error(f"❌ El archivo **{upload.name}** pesa más de {MAX_FILE_MB} MB. Por seguridad, no se puede procesar.")
@@ -362,14 +401,14 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     except Exception as e: 
         return f"[ERROR LOCAL] {e}"
 
-# 🛠️ PARCHE 2: BÚSQUEDA DE FUENTE MULTIPLATAFORMA
+# BÚSQUEDA DE FUENTE MULTIPLATAFORMA
 def obtener_ruta_fuente():
     rutas = [
-        "C:/Windows/Fonts/arial.ttf", # Windows
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", # Linux (Ubuntu/Debian)
-        "/usr/share/fonts/truetype/freefont/FreeSans.ttf", # Linux alternativo
-        "/Library/Fonts/Arial.ttf", # Mac
-        "/System/Library/Fonts/Supplemental/Arial.ttf" # Mac alternativo
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf"
     ]
     for ruta in rutas:
         if os.path.exists(ruta):
@@ -387,8 +426,17 @@ def generar_pdf_pro(titulo, contenido):
         pdf.set_font("Helvetica", size=11)
         contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
         
-    pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 20, txt="", ln=True); pdf.multi_cell(0, 10, txt=titulo, align='C')
-    pdf.set_font("Helvetica", "I", 12); pdf.cell(0, 10, txt="Generado por Xavilu Network Pro", align='C', ln=True); pdf.add_page()
+    # Cabecera sin salto de página forzado
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.cell(0, 20, txt="", ln=True)
+    pdf.multi_cell(0, 10, txt=titulo, align='C')
+    pdf.set_font("Helvetica", "I", 12)
+    pdf.cell(0, 10, txt="Generado por Xavilu Network Pro", align='C', ln=True)
+    
+    # Línea decorativa
+    pdf.set_draw_color(0, 240, 255)
+    pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5)
+    pdf.ln(15)
     
     if font_path: pdf.set_font("Arial", size=11)
     else: pdf.set_font("Helvetica", size=11)
@@ -542,7 +590,6 @@ with st.sidebar:
     archivo_global = st.file_uploader("📁 Contexto Global", type=["pdf", "txt", "docx", "png", "jpg", "jpeg", "mp3", "wav", "mp4"], key="up_global")
     
     if archivo_global:
-        # 🛠️ PARCHE 1.1: Validación de tamaño también en el cerebro global
         if archivo_global.size > MAX_FILE_MB * 1024 * 1024:
             st.error(f"❌ Archivo demasiado grande (Máx: {MAX_FILE_MB} MB).")
             st.stop()
@@ -575,7 +622,6 @@ with st.sidebar:
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
     if not HAS_CV2: st.warning("⚠️ `opencv-python` no instalado")
 
-# MENÚ MACRO PRINCIPAL
 macro_names = ["💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "🎵 MÚSICA Y ARTE"]
 macro_idx = custom_tabs(macro_names, "macro", 0)
 
@@ -808,9 +854,15 @@ elif macro_idx == 1:
             with st.spinner("Generando..."):
                 texto = llamar_ia(modelo_seleccionado, prompt_office, api_key_gemini)
                 st.session_state.office_text = texto
-                if formato == "Word": st.download_button("📥 Descargar Word", generar_word(texto), "doc.docx")
-                elif formato == "Excel": st.download_button("📥 Descargar Excel", generar_excel(texto), "doc.xlsx")
-                else: st.download_button("📥 Descargar PPTX", generar_pptx("Título", texto), "doc.pptx")
+                
+                nombre_office_def = "Documento_Xavilu"
+                nombre_office = st.text_input("📝 Nombre del archivo (sin extensión):", value=nombre_office_def, key="input_office_name")
+                nombre_office_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_office).strip().replace(' ', '_')
+                if not nombre_office_limpio: nombre_office_limpio = nombre_office_def
+                
+                if formato == "Word": st.download_button("📥 Descargar Word", generar_word(texto), f"{nombre_office_limpio}.docx")
+                elif formato == "Excel": st.download_button("📥 Descargar Excel", generar_excel(texto), f"{nombre_office_limpio}.xlsx")
+                else: st.download_button("📥 Descargar PPTX", generar_pptx("Título", texto), f"{nombre_office_limpio}.pptx")
         if st.session_state.office_text:
             boton_superpoder(st.session_state.office_text, "Haz este documento un 200% más persuasivo", "office", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Creación de Documentos", modelo_seleccionado, api_key_gemini)
@@ -822,7 +874,13 @@ elif macro_idx == 1:
         if st.button("Generar PDF", key="btn_pdf", type="primary") and titulo_pdf and contenido_pdf:
             texto = llamar_ia(modelo_seleccionado, contenido_pdf, api_key_gemini)
             st.session_state.pdf_text = texto
-            st.download_button("📥 Descargar PDF", generar_pdf_pro(titulo_pdf, texto), f"{titulo_pdf}.pdf")
+            
+            nombre_pdf = st.text_input("📝 Nombre del archivo (sin extensión):", value=titulo_pdf, key="input_pdf_name")
+            nombre_pdf_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_pdf).strip().replace(' ', '_')
+            if not nombre_pdf_limpio: nombre_pdf_limpio = "Documento"
+            
+            st.download_button("📥 Descargar PDF", generar_pdf_pro(titulo_pdf, texto), f"{nombre_pdf_limpio}.pdf")
+            
         if st.session_state.pdf_text:
             boton_superpoder(st.session_state.pdf_text, "Añade resumen ejecutivo y conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("PDF Pro", modelo_seleccionado, api_key_gemini)
@@ -1023,10 +1081,15 @@ elif macro_idx == 2:
                         tabla_elegida = st.selectbox("Selecciona la tabla que quieres descargar:", range(len(tablas)), format_func=lambda x: f"Tabla {x+1}")
                         df = tablas[tabla_elegida]
                         st.dataframe(df)
+                        
+                        nombre_excel = st.text_input("📝 Nombre del archivo Excel (sin extensión):", value="tabla_web", key="input_excel_name")
+                        nombre_excel_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_excel).strip().replace(' ', '_')
+                        if not nombre_excel_limpio: nombre_excel_limpio = "tabla_web"
+                        
                         out = BytesIO()
                         with pd.ExcelWriter(out, engine='openpyxl') as writer:
                             df.to_excel(writer, index=False, sheet_name='Datos_Web')
-                        st.download_button("📥 Descargar en Excel", out.getvalue(), "tabla_web.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        st.download_button("📥 Descargar en Excel", out.getvalue(), f"{nombre_excel_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     else:
                         st.warning("No se encontraron tablas en esa página.")
                 except Exception as e:
@@ -1176,7 +1239,6 @@ elif macro_idx == 3:
             else:
                 with st.spinner("Descargando..."):
                     temp_dir = tempfile.mkdtemp()
-                    # 🛠️ PARCHE 3: Límite de 720p para evitar OOM
                     ydl_opts = {
                         'outtmpl': os.path.join(temp_dir, "%(title)s.%(ext)s"), 
                         'quiet': True, 
@@ -1344,7 +1406,11 @@ elif macro_idx == 6:
                     audio_letra = generar_audio_sincrono(st.session_state.letra_cancion, voz_cancion)
                     if audio_letra:
                         st.audio(audio_letra, format="audio/mp3")
-                        st.download_button("💾 MP3", audio_letra, f"{st.session_state.titulo_cancion}.mp3")
+                        
+                        nombre_mp3 = st.text_input("📝 Nombre del MP3:", value=st.session_state.titulo_cancion, key="input_mp3_name")
+                        nombre_mp3_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_mp3).strip().replace(' ', '_')
+                        if not nombre_mp3_limpio: nombre_mp3_limpio = "cancion"
+                        st.download_button("💾 Descargar MP3", audio_letra, f"{nombre_mp3_limpio}.mp3")
             with col_letra:
                 st.text_area("Letra:", value=st.session_state.letra_cancion, height=500)
                 botones_descarga(st.session_state.letra_cancion, "Letra")
