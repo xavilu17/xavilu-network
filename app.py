@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK NEÓN (ROSA Y AZUL) ---
+# --- 🎨 CSS CAJONES DORADOS Y CYBERPUNK ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -131,29 +131,39 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* Pestañas (Tabs) */
+    /* 🌟 PESTAÑAS: CAJONES DORADOS 3D 🌟 */
     button[data-baseweb="tab"] { 
-        background: rgba(20, 20, 35, 0.8) !important; 
-        border: 1px solid #00f0ff !important; 
-        border-radius: 25px !important; 
-        color: #00f0ff !important; 
+        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important; 
+        border: 1px solid #ffd700 !important; 
+        border-radius: 6px 6px 0 0 !important; 
+        color: #000000 !important; 
         font-family: 'Orbitron', sans-serif !important; 
         font-size: 12px !important; 
-        padding: 10px 15px !important; 
+        font-weight: bold !important; 
+        padding: 12px 20px !important; 
         margin: 5px !important; 
-        transition: all 0.3s; 
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.1) !important;
+        transition: all 0.2s ease !important; 
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important; 
+        text-transform: uppercase !important;
     }
     button[data-baseweb="tab"]:hover { 
-        background: rgba(0, 240, 255, 0.2) !important; 
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.5) !important;
+        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important; 
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important; 
+        transform: translateY(-2px); 
     }
     button[data-baseweb="tab"][aria-selected="true"] { 
-        background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important; 
-        color: #000 !important; 
-        border: 1px solid #fff !important; 
-        box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
-        font-weight: bold !important;
+        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important; 
+        color: #000000 !important; 
+        border: 1px solid #ffffff !important; 
+        border-bottom: 4px solid #ff007f !important; 
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important; 
+        font-weight: 900 !important; 
+        transform: translateY(0); 
+    }
+    [data-baseweb="tab-list"] { 
+        border-bottom: 2px solid #d4af37 !important; 
+        gap: 5px !important; 
+        padding-bottom: 5px !important;
     }
     
     /* Cajas de texto e inputs */
