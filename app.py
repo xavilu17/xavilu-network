@@ -86,7 +86,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V77 - MUTATION OBSERVER) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V80 - PULIDO FINAL) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -99,13 +99,30 @@ st.markdown("""
     font-family: 'Rajdhani', sans-serif !important; 
 }
 
-/* Títulos */
-h1, h2, h3 { 
+/* Título Principal DORADO */
+h1 { 
+    font-family: 'Orbitron', sans-serif !important; 
+    color: #FFD700 !important; 
+    text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700, 0 0 35px #FF8C00 !important; 
+    text-align: center; 
+    letter-spacing: 3px; 
+}
+
+/* Subtítulos (Neón Rosa/Cian) */
+h2, h3 { 
     font-family: 'Orbitron', sans-serif !important; 
     color: #ffffff !important; 
     text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; 
     text-align: center; 
     letter-spacing: 3px; 
+}
+
+/* Títulos de sección (h4) */
+h4 {
+    font-family: 'Orbitron', sans-serif !important;
+    color: #00f0ff !important;
+    text-shadow: 0 0 8px #00f0ff, 0 0 15px #FF007F !important;
+    letter-spacing: 1px;
 }
 
 /* Etiquetas de inputs */
@@ -130,55 +147,41 @@ h1, h2, h3 {
     box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
 }
 
-/* 🌟 PESTAÑAS (TABS) - CSS TÁCTICO 🌟 */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 10px !important;
-    border-bottom: none !important;
-    flex-wrap: wrap !important;
-}
-/* El botón de la pestaña */
-button[data-baseweb="tab"] {
+/* 🌟 BOTONES COMO PESTAÑAS 🌟 */
+div.stButton > button[kind="secondary"] {
     background-color: #0a0a0a !important;
-    color: #00f0ff !important;
+    color: #ffffff !important; /* Texto BLANCO en inactivas */
     font-family: 'Orbitron', sans-serif !important;
     font-size: 13px !important;
     font-weight: bold !important;
     border: 1px solid #00f0ff !important;
     border-radius: 25px !important;
-    padding: 10px 20px !important;
+    padding: 10px 15px !important;
     margin-bottom: 5px !important;
     transition: all 0.3s ease !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+    width: 100% !important;
 }
-button[data-baseweb="tab"]:hover {
-    background-color: rgba(0, 240, 255, 0.1) !important;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.5) !important;
+div.stButton > button[kind="secondary"]:hover {
+    background-color: rgba(0, 240, 255, 0.15) !important;
+    color: #00f0ff !important; /* El hover sí es cian */
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.7) !important;
+    transform: translateY(-2px) !important;
 }
-/* Pestaña ACTIVA */
-button[data-baseweb="tab"][aria-selected="true"] {
+div.stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #00f0ff 0%, #FF007F 100%) !important;
-    border: 2px solid #ffffff !important;
-    box-shadow: 0 0 18px rgba(0, 240, 255, 0.9), 0 0 32px rgba(255, 0, 127, 0.7) !important;
-}
-/* Forzar texto negro en activa y cian en inactiva */
-button[data-baseweb="tab"][aria-selected="true"] * {
     color: #000000 !important;
-    fill: #000000 !important;
-    text-shadow: none !important;
-}
-button[data-baseweb="tab"][aria-selected="false"] * {
-    color: #00f0ff !important;
-    fill: #00f0ff !important;
-}
-
-/* Matar la línea roja de Streamlit por completo */
-div[data-baseweb="tab-highlight"], 
-div[data-baseweb="tab-border"],
-[data-baseweb="tab-highlight"], 
-[data-baseweb="tab-border"] {
-    display: none !important;
-    height: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    border: 2px solid #ffffff !important;
+    border-radius: 25px !important;
+    padding: 10px 15px !important;
+    margin-bottom: 5px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.9), 0 0 32px rgba(255, 0, 127, 0.7) !important;
+    transform: translateY(-1px) !important;
+    width: 100% !important;
 }
 
 /* Cajas de texto e inputs normales */
@@ -204,17 +207,16 @@ div[data-baseweb="tab-border"],
 }
 
 /* 🔥 CHAT INPUT PRO (Opción 3) 🔥 */
-[data-testid="stTextInput"],
-[data-testid="stTextInput"] > div,
-[data-testid="stTextInput"] > div > div,
-[data-testid="stTextInput"] div[data-baseweb="input"],
-[data-testid="stTextInput"] div[data-baseweb="base-input"],
-[data-testid="stTextInput"] div[data-baseweb="input"] > div {
-    background-color: #0a0a0a !important;
-}
+[data-testid="stTextInput"] div,
 [data-testid="stTextInput"] input {
     background-color: #0a0a0a !important;
     color: #ffffff !important;
+}
+[data-testid="stTextInput"] > div > div {
+    border: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stTextInput"] input {
     caret-color: #00f0ff !important;
     border: 1px solid #00f0ff !important;
     border-radius: 10px !important;
@@ -233,17 +235,9 @@ div[data-baseweb="tab-border"],
     color: #888888 !important;
     opacity: 1 !important;
 }
-[data-testid="stTextInput"] div[data-baseweb="input"] {
-    border: none !important;
-    box-shadow: none !important;
-}
-[data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button {
-    min-height: 44px !important;
-    height: 100% !important;
-}
 
 /* Botones normales */
-div.stButton > button, div[data-testid="stDownloadButton"] > button { 
+div.stButton > button:not([kind="primary"]):not([kind="secondary"]), div[data-testid="stDownloadButton"] > button { 
     background: #0a0a0a !important; 
     color: #00f0ff !important; 
     border: 1px solid #00f0ff !important; 
@@ -254,7 +248,7 @@ div.stButton > button, div[data-testid="stDownloadButton"] > button {
     transition: all 0.3s !important;
     box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
 }
-div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover { 
+div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[data-testid="stDownloadButton"] > button:hover { 
     background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important; 
     color: #000 !important; 
     border: 1px solid #fff !important; 
@@ -278,21 +272,28 @@ div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover 
     background-color: rgba(0, 240, 255, 0.1) !important;
     border-left: 5px solid #00f0ff !important;
 }
+
+/* Reducir hueco entre menús */
+[data-testid="stVerticalBlock"] > div {
+    padding-bottom: 0.5rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🛠️ JS FIXER CON MUTATION OBSERVER ---
+# --- 🛠️ JS FIXER: LIMPIADOR DE INPUTS ---
 def inyectar_js_fixer():
     components.html("""
     <script>
     (function() {
         var doc = window.parent.document;
-        
         function forzar() {
-            // 1. Arreglar Inputs
+            doc.querySelectorAll('[data-testid="stTextInput"] *').forEach(function(el) {
+                if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'div') {
+                    el.style.setProperty('background-color', '#0a0a0a', 'important');
+                    el.style.setProperty('color', '#ffffff', 'important');
+                }
+            });
             doc.querySelectorAll('[data-testid="stTextInput"] input').forEach(function(el) {
-                el.style.setProperty('background-color', '#0a0a0a', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
                 el.style.setProperty('border', '1px solid #00f0ff', 'important');
                 el.style.setProperty('border-radius', '10px', 'important');
                 el.style.setProperty('box-shadow', '0 0 10px rgba(0,240,255,0.3)', 'important');
@@ -300,70 +301,9 @@ def inyectar_js_fixer():
                 el.style.setProperty('caret-color', '#00f0ff', 'important');
                 el.style.setProperty('outline', 'none', 'important');
             });
-            
-            // 2. Arreglar Tabs (Pestañas)
-            doc.querySelectorAll('button[data-baseweb="tab"]').forEach(function(tab) {
-                tab.style.setProperty('border-radius', '25px', 'important');
-                tab.style.setProperty('padding', '10px 20px', 'important');
-                tab.style.setProperty('margin-bottom', '5px', 'important');
-                tab.style.setProperty('transition', 'all 0.3s ease', 'important');
-                tab.style.setProperty('font-family', "'Orbitron', sans-serif", 'important');
-                tab.style.setProperty('font-weight', 'bold', 'important');
-                tab.style.setProperty('font-size', '13px', 'important');
-                
-                var isActive = tab.getAttribute('aria-selected') === 'true';
-                
-                if (isActive) {
-                    tab.style.setProperty('background', 'linear-gradient(135deg, #00f0ff 0%, #FF007F 100%)', 'important');
-                    tab.style.setProperty('border', '2px solid #ffffff', 'important');
-                    tab.style.setProperty('box-shadow', '0 0 20px rgba(255,0,127,0.8), 0 0 30px rgba(0,240,255,0.6)', 'important');
-                    tab.style.setProperty('transform', 'translateY(-1px)', 'important');
-                    tab.querySelectorAll('*').forEach(function(child) {
-                        child.style.setProperty('color', '#000000', 'important');
-                        child.style.setProperty('fill', '#000000', 'important');
-                        child.style.setProperty('background', 'transparent', 'important');
-                    });
-                } else {
-                    tab.style.setProperty('background-color', '#0a0a0a', 'important');
-                    tab.style.setProperty('border', '1px solid #00f0ff', 'important');
-                    tab.style.setProperty('box-shadow', 'none', 'important');
-                    tab.style.setProperty('transform', 'none', 'important');
-                    tab.querySelectorAll('*').forEach(function(child) {
-                        child.style.setProperty('color', '#00f0ff', 'important');
-                        child.style.setProperty('background', 'transparent', 'important');
-                    });
-                }
-            });
-            
-            // 3. Matar la línea roja de Streamlit a base de JS
-            doc.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]').forEach(function(el) {
-                el.style.setProperty('display', 'none', 'important');
-                el.style.setProperty('height', '0', 'important');
-                el.style.setProperty('background', 'transparent', 'important');
-                el.style.setProperty('box-shadow', 'none', 'important');
-            });
         }
-        
-        // Ejecución inicial inmediata
         forzar();
-        
-        // MUTATION OBSERVER: Vigila cambios en el DOM en tiempo real
-        try {
-            var observer = new MutationObserver(function(mutations) {
-                forzar();
-            });
-            observer.observe(doc.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['aria-selected', 'data-baseweb', 'style'] // Especial atención a cambios de estado
-            });
-        } catch(e) {
-            console.log("MutationObserver no soportado o bloqueado:", e);
-        }
-        
-        // Fallback de seguridad por si el observer falla
-        setInterval(forzar, 1000); 
+        setInterval(forzar, 300);
     })();
     </script>
     """, height=0)
@@ -569,10 +509,30 @@ def chat_input_pro(key, placeholder="Escribe tu mensaje..."):
     
     return st.session_state.pop(msg_key, None)
 
+def custom_tabs(tab_names, key_name, default_idx=0):
+    """Sistema de pestañas custom usando botones (SIEMPRE 5 columnas por fila)."""
+    state_key = f"tab_state_{key_name}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = default_idx
+
+    max_cols = 5
+    for i in range(0, len(tab_names), max_cols):
+        chunk = tab_names[i:i + max_cols]
+        cols = st.columns(max_cols) # Siempre 5 columnas
+        for j, name in enumerate(chunk):
+            real_idx = i + j
+            with cols[j]:
+                is_active = (st.session_state[state_key] == real_idx)
+                btn_type = "primary" if is_active else "secondary"
+                if st.button(name, key=f"btn_{key_name}_{real_idx}", use_container_width=True, type=btn_type):
+                    st.session_state[state_key] = real_idx
+                    st.rerun()
+    return st.session_state[state_key]
+
 # ==========================================
 # INTERFAZ PRINCIPAL
 # ==========================================
-st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff; font-weight:bold; letter-spacing:2px;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
+st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 🪐 PANEL DE CONTROL")
@@ -617,19 +577,20 @@ with st.sidebar:
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
     if not HAS_CV2: st.warning("⚠️ `opencv-python` no instalado")
 
-macro_tabs = st.tabs([
-    "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD",
-    "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",
-    "🎵 MÚSICA Y ARTE"
-])
+# MENÚ MACRO PRINCIPAL
+macro_names = ["💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "🎵 MÚSICA Y ARTE"]
+macro_idx = custom_tabs(macro_names, "macro", 0)
+
+st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
 # CATEGORÍA 1: CHAT Y ASISTENTES IA
 # ==========================================
-with macro_tabs[0]:
-    sub = st.tabs(["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES CUSTOM", "⚖️ EL DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"])
+if macro_idx == 0:
+    sub_names = ["💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES CUSTOM", "⚖️ EL DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"]
+    sub_idx = custom_tabs(sub_names, "chat_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### 💬 Chat con IA")
         st.caption("Este chat tiene memoria. Recuerda lo que habéis hablado anteriormente.")
         
@@ -684,7 +645,7 @@ with macro_tabs[0]:
             
         cajon_ideas_personalizado("Chat IA", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### Sintetizador de Voz")
         texto_pod = st.text_area("Escribe el texto que quieres escuchar:", key="voz_texto")
         voz = st.selectbox("Selecciona la voz:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"], key="voz_select")
@@ -694,7 +655,7 @@ with macro_tabs[0]:
                 if audio: st.audio(audio, format="audio/mp3")
         cajon_ideas_personalizado("Sintetizador de Voz", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### Chat con Documentos")
         archivos = st.file_uploader("Sube documentos (PDF, Word, TXT):", type=["pdf", "txt", "docx"], accept_multiple_files=True, key="chat_pdf_up")
         if archivos:
@@ -711,7 +672,7 @@ with macro_tabs[0]:
                     st.chat_message("assistant").write(res)
         cajon_ideas_personalizado("Chat con PDFs", modelo_seleccionado, api_key_gemini)
 
-    with sub[3]:
+    elif sub_idx == 3:
         st.markdown("#### 🕵️‍♂️ Creador de Agentes IA")
         nombre_agente = st.text_input("Nombre del Agente:", placeholder="Ej: Albert, el Profesor de Física", key="agent_name")
         rol_agente = st.text_area("Personalidad:", placeholder="Ej: Eres un profesor divertido. Explicas usando dibujos animados.", height=100, key="agent_role")
@@ -737,7 +698,7 @@ with macro_tabs[0]:
                     st.chat_message("assistant").write(res)
         cajon_ideas_personalizado("Agentes Custom", modelo_seleccionado, api_key_gemini)
 
-    with sub[4]:
+    elif sub_idx == 4:
         st.markdown("#### ⚖️ La Balanza: El Debate")
         st.caption("Pon a prueba tus ideas. La IA defenderá una postura y luego la contraria.")
         
@@ -754,7 +715,7 @@ with macro_tabs[0]:
                 botones_descarga(st.session_state.debate_resultado, f"Debate_{tema_debate[:20]}")
         cajon_ideas_personalizado("Debate", modelo_seleccionado, api_key_gemini)
 
-    with sub[5]:
+    elif sub_idx == 5:
         st.markdown("#### 🍳 El Chef Virtual")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -769,7 +730,7 @@ with macro_tabs[0]:
                 if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
         cajon_ideas_personalizado("Cocina", modelo_seleccionado, api_key_gemini)
 
-    with sub[6]:
+    elif sub_idx == 6:
         st.markdown("#### 📖 Cuentacuentos")
         prota = st.text_input("Protagonista:", key="cuento_prota")
         lugar = st.text_input("Lugar mágico:", key="cuento_lugar")
@@ -781,7 +742,7 @@ with macro_tabs[0]:
                 if audio: st.audio(audio, format="audio/mp3")
         cajon_ideas_personalizado("Cuentos", modelo_seleccionado, api_key_gemini)
 
-    with sub[7]:
+    elif sub_idx == 7:
         st.markdown("#### Asistente de Código")
         req_code = st.text_area("Pega un código o pide uno nuevo:", key="code_req")
         if st.button("Procesar Código", key="btn_code") and req_code:
@@ -789,7 +750,7 @@ with macro_tabs[0]:
             st.code(res, language="python")
         cajon_ideas_personalizado("Código", modelo_seleccionado, api_key_gemini)
 
-    with sub[8]:
+    elif sub_idx == 8:
         st.markdown("#### Traductor")
         texto_trad = st.text_area("Texto a traducir:", key="trad_text")
         idioma = st.selectbox("Idioma destino:", ["Inglés", "Francés", "Alemán", "Italiano"], key="trad_lang")
@@ -800,10 +761,11 @@ with macro_tabs[0]:
 # ==========================================
 # CATEGORÍA 2: DOCUMENTOS Y TEXTO
 # ==========================================
-with macro_tabs[1]:
-    sub = st.tabs(["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
+elif macro_idx == 1:
+    sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"]
+    sub_idx = custom_tabs(sub_names, "doc_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### Análisis Avanzado de Documentos")
         archivo = st.file_uploader("Sube un PDF, Word, Excel o TXT", type=["pdf", "txt", "docx", "xlsx"], key="up_dat")
         st.session_state.doc_opcion = st.selectbox("🎯 Selección de análisis:", ["Resumen Ejecutivo", "Extraer Fechas y Cifras", "Buscar Errores", "Crear Test", "Traducir al Inglés"])
@@ -822,7 +784,7 @@ with macro_tabs[1]:
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Doc")
         cajon_ideas_personalizado("Análisis de Documentos", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### ⚖️ Comparador de Documentos")
         col_c1, col_c2 = st.columns(2)
         with col_c1: doc_original = st.file_uploader("Documento Original (A):", type=["pdf", "txt", "docx"], key="doc_a")
@@ -838,7 +800,7 @@ with macro_tabs[1]:
                 botones_descarga(st.session_state.analisis_ia, "Comparativa_Docs")
         cajon_ideas_personalizado("Comparador de Documentos", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### Creación de Documentos")
         col_form, col_prompt = st.columns([1, 2])
         with col_form: formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_format")
@@ -855,7 +817,7 @@ with macro_tabs[1]:
             boton_superpoder(st.session_state.office_text, "Haz este documento un 200% más persuasivo", "office", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Creación de Documentos", modelo_seleccionado, api_key_gemini)
 
-    with sub[3]:
+    elif sub_idx == 3:
         st.markdown("#### PDF Pro")
         titulo_pdf = st.text_input("Título del documento:", key="pdf_title")
         contenido_pdf = st.text_area("Contenido a incluir:", key="pdf_content")
@@ -867,7 +829,7 @@ with macro_tabs[1]:
             boton_superpoder(st.session_state.pdf_text, "Añade resumen ejecutivo y conclusiones", "pdf", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("PDF Pro", modelo_seleccionado, api_key_gemini)
 
-    with sub[4]:
+    elif sub_idx == 4:
         st.markdown("#### Mapas Mentales")
         col_tema, col_modo = st.columns([2, 1])
         with col_tema: tema = st.text_input("Tema Central:", placeholder="Ej: Redes informáticas", key="map_tema")
@@ -883,7 +845,7 @@ with macro_tabs[1]:
                 boton_superpoder(f"Añade 3 ramas innovadoras a este mapa mental (Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa", "mapa", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Mapas Mentales", modelo_seleccionado, api_key_gemini)
 
-    with sub[5]:
+    elif sub_idx == 5:
         col_qr1, col_qr2 = st.columns(2)
         with col_qr1:
             st.markdown("#### Generador QR")
@@ -904,7 +866,7 @@ with macro_tabs[1]:
                     else: st.warning("No se detectó ningún QR.")
         cajon_ideas_personalizado("QR y CV", modelo_seleccionado, api_key_gemini)
 
-    with sub[6]:
+    elif sub_idx == 6:
         st.markdown("#### Portapapeles Universal")
         texto_uni = st.text_area("Pega cualquier texto aquí:", key="clip_text")
         instruccion = st.text_input("¿Qué quieres que haga la IA con este texto?", key="clip_inst")
@@ -919,10 +881,11 @@ with macro_tabs[1]:
 # ==========================================
 # CATEGORÍA 3: WEB Y ACTUALIDAD
 # ==========================================
-with macro_tabs[2]:
-    sub = st.tabs(["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"])
+elif macro_idx == 2:
+    sub_names = ["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"]
+    sub_idx = custom_tabs(sub_names, "web_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### Buscador Global")
         q = st.text_input("Busca en internet:", key="web_q")
         if st.button("🔍 Buscar", key="btn_web", type="primary") and q:
@@ -934,11 +897,12 @@ with macro_tabs[2]:
                     st.markdown("---")
         cajon_ideas_personalizado("Buscador Web", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### ⚽ Central de Deportes")
-        tab_dep1, tab_dep2, tab_dep3, tab_dep4 = st.tabs(["📰 Noticias", "⚡ Resultados", "📊 Análisis", "🏋️ Entrenamiento"])
+        dep_names = ["📰 Noticias", "⚡ Resultados", "📊 Análisis", "🏋️ Entrenamiento"]
+        dep_idx = custom_tabs(dep_names, "dep_sub", 0)
         
-        with tab_dep1:
+        if dep_idx == 0:
             col_dep, col_liga = st.columns(2)
             with col_dep: deporte = st.selectbox("Deporte:", ["Fútbol", "Baloncesto", "Tenis", "Motor", "Ciclismo"], key="dep_sel_1")
             with col_liga: liga = st.selectbox("Liga:", ["Todas", "La Liga", "Premier League", "Champions League", "NBA"], key="dep_sel_2")
@@ -952,7 +916,7 @@ with macro_tabs[2]:
                 boton_superpoder(str(st.session_state.noticias_deportes), "Analiza la noticia más impactante", "noticias", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Noticias de Deportes", modelo_seleccionado, api_key_gemini)
 
-        with tab_dep2:
+        elif dep_idx == 1:
             st.markdown("##### ⚡ Resultados y Directo")
             evento_directo = st.text_input("¿Qué resultados buscas?", placeholder="Ej: Resultados de LaLiga hoy", key="dep_results_q")
             if st.button("Buscar Resultados", type="primary", key="btn_res_directo") and evento_directo:
@@ -965,7 +929,7 @@ with macro_tabs[2]:
                         boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico de élite", "tactico", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Resultados Deportivos", modelo_seleccionado, api_key_gemini)
 
-        with tab_dep3:
+        elif dep_idx == 2:
             st.markdown("##### 📊 Análisis Táctico y Clasificaciones")
             col_eq1, col_eq2 = st.columns(2)
             with col_eq1: equipo_local = st.text_input("Equipo Local:", placeholder="Ej: Real Madrid", key="dep_eq1")
@@ -985,7 +949,7 @@ with macro_tabs[2]:
                     st.info(llamar_ia(modelo_seleccionado, prompt_tabla, api_key_gemini))
             cajon_ideas_personalizado("Análisis Deportivo", modelo_seleccionado, api_key_gemini)
 
-        with tab_dep4:
+        elif dep_idx == 3:
             st.markdown("##### 🏋️ Entrenamiento y Nutrición")
             objetivo = st.text_input("¿Qué necesitas?", placeholder="Ej: Rutina para ganar masa muscular", key="dep_train_q")
             deporte_pract = st.selectbox("Deporte principal:", ["Fútbol", "Running", "Gimnasio", "Ciclismo", "Baloncesto", "Tenis"], key="dep_train_s")
@@ -997,11 +961,12 @@ with macro_tabs[2]:
                         boton_superpoder(st.session_state.plan_deporte, "Añade suplementos y estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entrenamiento", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### 📺 Guía de TV y Eventos")
-        tab_tv1, tab_tv2, tab_tv3, tab_tv4 = st.tabs(["🍿 Cine", "📅 TV", "🎫 Entradas", "🎮 Trivia"])
+        tv_names = ["🍿 Cine", "📅 TV", "🎫 Entradas", "🎮 Trivia"]
+        tv_idx = custom_tabs(tv_names, "tv_sub", 0)
         
-        with tab_tv1:
+        if tv_idx == 0:
             estado_animo = st.text_input("¿Qué te apetece ver?", placeholder="Ej: Comedia familiar", key="tv_animo")
             plataformas = st.multiselect("Tus plataformas:", ["Netflix", "Prime Video", "Disney+", "HBO Max", "Movistar+", "Filmin"], key="tv_plat")
             if st.button("🍿 Recomendar", type="primary", key="btn_rec_cine") and estado_animo:
@@ -1013,7 +978,7 @@ with macro_tabs[2]:
                         boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas", "cine", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Cine y Series", modelo_seleccionado, api_key_gemini)
 
-        with tab_tv2:
+        elif tv_idx == 1:
             canal_tv = st.text_input("¿Qué canal buscas?", placeholder="Ej: Programación de esta noche en Telecinco", key="tv_chan")
             if st.button("Buscar Programación", key="btn_tv_prog") and canal_tv:
                 with st.spinner("Buscando parrilla..."):
@@ -1025,7 +990,7 @@ with macro_tabs[2]:
                         boton_superpoder(st.session_state.tv_prog, "Dime el programa más recomendado", "tv", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Programación TV", modelo_seleccionado, api_key_gemini)
 
-        with tab_tv3:
+        elif tv_idx == 2:
             evento_buscar = st.text_input("¿Qué evento buscas?", placeholder="Ej: Concierto de Taylor Swift", key="tv_event")
             ciudad = st.text_input("¿En qué ciudad?", placeholder="Ej: Madrid", key="tv_city")
             if st.button("Buscar Entradas", key="btn_entradas") and evento_buscar:
@@ -1038,7 +1003,7 @@ with macro_tabs[2]:
                         boton_superpoder(st.session_state.entradas, "Plan de viaje de 24h alrededor del evento", "entradas", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entradas de Eventos", modelo_seleccionado, api_key_gemini)
 
-        with tab_tv4:
+        elif tv_idx == 3:
             juego = st.radio("Elige el juego:", ["Adivinar la película", "Curiosidades de series", "Preguntas de deportes"], horizontal=True, key="tv_trivia_game")
             if st.button("¡Jugar!", key="btn_jugar_trivia"):
                 with st.spinner("Generando juego..."):
@@ -1046,7 +1011,7 @@ with macro_tabs[2]:
                     st.info(st.session_state.trivia)
             cajon_ideas_personalizado("Trivia", modelo_seleccionado, api_key_gemini)
 
-    with sub[3]:
+    elif sub_idx == 3:
         st.markdown("#### 📊 Extractor de Tablas Web a Excel")
         st.caption("Pega la URL de una página que tenga una tabla (ej. clasificación, precios) y la IA extraerá los datos.")
         
@@ -1070,7 +1035,7 @@ with macro_tabs[2]:
                     st.error(f"Error al leer la web: {e}. Asegúrate de que la URL es correcta y contiene tablas.")
         cajon_ideas_personalizado("Extractor Web", modelo_seleccionado, api_key_gemini)
 
-    with sub[4]:
+    elif sub_idx == 4:
         st.markdown("#### 🎥 Resumidor de YouTube")
         url_yt = st.text_input("Pega la URL del vídeo:", key="yt_url")
         if st.button("Extraer y Resumir", key="btn_yt") and url_yt:
@@ -1085,7 +1050,7 @@ with macro_tabs[2]:
             boton_superpoder(st.session_state.yt_text, "Saca 3 ideas de negocio de este resumen", "yt", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("YouTube", modelo_seleccionado, api_key_gemini)
 
-    with sub[5]:
+    elif sub_idx == 5:
         st.markdown("#### 📰 Lector de Páginas Web")
         url_web = st.text_input("Pega el enlace de una noticia o web:", key="web_url")
         if st.button("Leer y Resumir Web", key="btn_read_web") and url_web:
@@ -1106,10 +1071,11 @@ with macro_tabs[2]:
 # ==========================================
 # CATEGORÍA 4: MULTIMEDIA
 # ==========================================
-with macro_tabs[3]:
-    sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"])
+elif macro_idx == 3:
+    sub_names = ["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### Análisis Inteligente de Archivos")
         with st.expander("💡 Cajón de Ideas (¿Qué puedo hacer con este archivo?)"):
             st.write("- **Si es foto:** Extraer texto (OCR) o describir ropa.")
@@ -1159,7 +1125,7 @@ with macro_tabs[3]:
         
         cajon_ideas_personalizado("Análisis Multimedia", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### Generador Visual")
         prompt_img = st.text_input("Describe la imagen (en español):", key="img_prompt")
         tipo_img = st.radio("Estilo:", ["Foto/Realista", "Dibujo para Colorear"], horizontal=True, key="img_style")
@@ -1183,7 +1149,7 @@ with macro_tabs[3]:
             boton_superpoder(f"Genera un prompt cinematográfico para: {prompt_img}", "Crear Prompt Alternativo", "visual", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Generador Visual", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### 🛡️ Generador de Logotipos e Identidad")
         col_logo1, col_logo2 = st.columns(2)
         with col_logo1:
@@ -1204,7 +1170,7 @@ with macro_tabs[3]:
                 st.markdown(f"[Descargar Logo en Alta Resolución]({url_logo})")
         cajon_ideas_personalizado("Creación de Logos", modelo_seleccionado, api_key_gemini)
 
-    with sub[3]:
+    elif sub_idx == 3:
         st.markdown("#### Descargador")
         url_dl = st.text_input("Pega la URL del vídeo/audio (YouTube, TikTok...):", key="dl_url")
         if st.button("⬇️ Descargar", type="primary", key="btn_dl") and url_dl:
@@ -1231,10 +1197,11 @@ with macro_tabs[3]:
 # ==========================================
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
-with macro_tabs[4]:
-    sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
+elif macro_idx == 4:
+    sub_names = ["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"]
+    sub_idx = custom_tabs(sub_names, "study_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### 🌐 Herramientas de Redes")
         col_r1, col_r2 = st.columns(2)
         with col_r1:
@@ -1251,7 +1218,7 @@ with macro_tabs[4]:
             st.info(llamar_ia(modelo_seleccionado, "Hazme 3 preguntas de nivel CCNA.", api_key_gemini))
         cajon_ideas_personalizado("Redes", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### 💇‍♀️ Asistente de Peluquería")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
@@ -1267,7 +1234,7 @@ with macro_tabs[4]:
                 st.info(llamar_ia(modelo_seleccionado, f"Presupuesto para: {servicios}. Tiempo: {tiempo}h.", api_key_gemini))
         cajon_ideas_personalizado("Peluquería", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### 📚 Asistente de Deberes")
         nivel = st.selectbox("Nivel:", ["Primaria", "ESO", "Bachillerato", "Universidad"], key="home_nivel")
         materia = st.selectbox("Materia:", ["Matemáticas", "Lengua", "Ciencias", "Historia", "Idiomas"], key="home_materia")
@@ -1276,7 +1243,7 @@ with macro_tabs[4]:
             st.info(llamar_ia(modelo_seleccionado, f"Profesor. Nivel: {nivel}. Materia: {materia}. Explica: {duda}", api_key_gemini))
         cajon_ideas_personalizado("Deberes", modelo_seleccionado, api_key_gemini)
 
-    with sub[3]:
+    elif sub_idx == 3:
         st.markdown("#### 🦺 Asistente de Prevención de Riesgos Laborales")
         tipo_prl = st.selectbox("¿Qué necesitas generar?", ["Charla de 5 Minutos", "Evaluación de Riesgos", "Recomendación de EPIs", "Consulta Legal / Normativa"], key="prl_tipo")
         contexto_prl = st.text_area("Describe la tarea o duda:", placeholder="Ej: Trabajo en altura con escalera de tijera.", key="prl_contexto")
@@ -1295,10 +1262,11 @@ with macro_tabs[4]:
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
 # ==========================================
-with macro_tabs[5]:
-    sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
+elif macro_idx == 5:
+    sub_names = ["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"]
+    sub_idx = custom_tabs(sub_names, "travel_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### 🌍 Planificador de Viajes")
         destino = st.text_input("Destino:", key="travel_dest")
         col_v1, col_v2 = st.columns(2)
@@ -1310,7 +1278,7 @@ with macro_tabs[5]:
             botones_descarga(st.session_state.analisis_ia, f"Viaje_{destino}")
         cajon_ideas_personalizado("Viajes", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### 💰 Finanzas del Hogar")
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -1332,7 +1300,7 @@ with macro_tabs[5]:
                 st.success(f"Cuota: **{cuota:.2f}€**.")
         cajon_ideas_personalizado("Finanzas", modelo_seleccionado, api_key_gemini)
 
-    with sub[2]:
+    elif sub_idx == 2:
         st.markdown("#### ✉️ Cartas y Mensajes")
         tipo_mensaje = st.selectbox("Tipo:", ["Reyes Magos", "Papá Noel", "Discurso cumpleaños", "Carta formal de reclamación"], key="letter_type")
         detalles = st.text_area("Detalles:", key="letter_details")
@@ -1345,10 +1313,11 @@ with macro_tabs[5]:
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
-with macro_tabs[6]:
-    sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
+elif macro_idx == 6:
+    sub_names = ["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
     
-    with sub[0]:
+    if sub_idx == 0:
         st.markdown("#### 🎵 Estudio de Creación Musical")
         col_m1, col_m2 = st.columns(2)
         with col_m1: tema_cancion = st.text_input("¿De qué trata?", key="song_theme")
@@ -1378,7 +1347,7 @@ with macro_tabs[6]:
                 botones_descarga(st.session_state.letra_cancion, "Letra")
         cajon_ideas_personalizado("Música", modelo_seleccionado, api_key_gemini)
 
-    with sub[1]:
+    elif sub_idx == 1:
         st.markdown("#### 🎨 Poesía y Rimas")
         tema_poema = st.text_input("¿Sobre qué quieres el poema?", key="poem_theme")
         estilo_poema = st.selectbox("Estilo:", ["Romántico", "Divertido", "Épico", "Haiku"], key="poem_style")
