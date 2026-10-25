@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import ollama
 import asyncio
 import edge_tts
@@ -59,6 +60,7 @@ except ImportError:
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Xavilu Network Pro", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
+
 MAX_FILE_MB = 1000
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-3.8-flash"
@@ -81,27 +83,278 @@ _defaults = {
     "debate_resultado": "", "img_prompt_en": ""
 }
 for _k, _v in _defaults.items():
-    if _k not in st.session_state: st.session_state[_k] = _v
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
-# --- CSS CYBERPUNK INTUITIVO ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V76 - TABS BLINDADAS) ---
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-    .stApp { background-color: #050505 !important; background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #050505 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
-    h1, h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #f7dfa3 !important; text-shadow: 0 0 10px #d4af37, 0 0 20px #d4af37 !important; text-align: center; letter-spacing: 2px; }
-    [data-testid="stWidgetLabel"] p { color: #00f0ff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: bold !important; text-transform: uppercase !important; background: rgba(0, 240, 255, 0.1) !important; padding: 5px 10px !important; border-left: 4px solid #00f0ff !important; border-radius: 4px !important; display: inline-block !important; margin-bottom: 8px !important; }
-    p, .stMarkdown p { color: #d4af37 !important; font-size: 16px; }
-    [data-testid="stSidebar"] { background-color: rgba(10, 10, 15, 0.9) !important; border-right: 1px solid #d4af37 !important; }
-    button[data-baseweb="tab"] { background: rgba(20, 20, 25, 0.8) !important; border: 1px solid #d4af37 !important; border-radius: 25px !important; color: #d4af37 !important; font-family: 'Orbitron', sans-serif !important; font-size: 12px !important; padding: 10px 15px !important; margin: 5px !important; transition: all 0.3s; }
-    button[data-baseweb="tab"]:hover { background: rgba(212, 175, 55, 0.2) !important; }
-    button[data-baseweb="tab"][aria-selected="true"] { background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%) !important; color: #000 !important; border: 1px solid #fff !important; box-shadow: 0 0 15px #d4af37 !important; }
-    .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { background-color: rgba(0, 0, 0, 0.8) !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; color: #f7dfa3 !important; font-size: 16px !important; }
-    div.stButton > button, div[data-testid="stDownloadButton"] > button { background: rgba(0, 0, 0, 0.8) !important; color: #d4af37 !important; border: 1px solid #d4af37 !important; border-radius: 25px !important; font-family: 'Orbitron', sans-serif !important; font-weight: bold !important; padding: 10px 20px !important; }
-    div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover { background: #d4af37 !important; color: #000 !important; transform: translateY(-2px); box-shadow: 0 0 15px #d4af37 !important; }
-    [data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.7) !important; border: 1px solid rgba(212, 175, 55, 0.4) !important; border-radius: 15px !important; padding: 10px; }
-    .stAlert { border-radius: 10px; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+
+/* Fondo Negro Espacial */
+.stApp { 
+    background-color: #000000 !important; 
+    background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; 
+    color: #f7dfa3 !important; 
+    font-family: 'Rajdhani', sans-serif !important; 
+}
+
+/* Títulos */
+h1, h2, h3 { 
+    font-family: 'Orbitron', sans-serif !important; 
+    color: #ffffff !important; 
+    text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; 
+    text-align: center; 
+    letter-spacing: 3px; 
+}
+
+/* Etiquetas de inputs */
+[data-testid="stWidgetLabel"] p { 
+    color: #00f0ff !important; 
+    font-family: 'Orbitron', sans-serif !important; 
+    font-size: 13px !important; 
+    font-weight: bold !important; 
+    text-transform: uppercase !important; 
+    background: rgba(0, 240, 255, 0.1) !important; 
+    padding: 5px 10px !important; 
+    border-left: 4px solid #FF007F !important; 
+    border-radius: 4px !important; 
+    display: inline-block !important; 
+    margin-bottom: 8px !important; 
+}
+
+/* Barra lateral */
+[data-testid="stSidebar"] { 
+    background-color: rgba(5, 5, 10, 0.98) !important; 
+    border-right: 2px solid #00f0ff !important; 
+    box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
+}
+
+/* 🌟 PESTAÑAS (TABS) - CSS TÁCTICO 🌟 */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 10px !important;
+    border-bottom: none !important;
+    flex-wrap: wrap !important;
+}
+/* El botón de la pestaña */
+button[data-baseweb="tab"] {
+    background-color: #0a0a0a !important;
+    color: #00f0ff !important;
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 13px !important;
+    font-weight: bold !important;
+    border: 1px solid #00f0ff !important;
+    border-radius: 25px !important;
+    padding: 10px 20px !important;
+    margin-bottom: 5px !important;
+    transition: all 0.3s ease !important;
+}
+button[data-baseweb="tab"]:hover {
+    background-color: rgba(0, 240, 255, 0.1) !important;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.5) !important;
+}
+/* Pestaña ACTIVA */
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: linear-gradient(135deg, #00f0ff 0%, #FF007F 100%) !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.9), 0 0 32px rgba(255, 0, 127, 0.7) !important;
+}
+/* Forzar texto negro en activa y cian en inactiva */
+button[data-baseweb="tab"][aria-selected="true"] * {
+    color: #000000 !important;
+    fill: #000000 !important;
+    text-shadow: none !important;
+}
+button[data-baseweb="tab"][aria-selected="false"] * {
+    color: #00f0ff !important;
+    fill: #00f0ff !important;
+}
+
+/* Matar la línea roja de Streamlit por completo */
+div[data-baseweb="tab-highlight"], 
+div[data-baseweb="tab-border"],
+[data-baseweb="tab-highlight"], 
+[data-baseweb="tab-border"] {
+    display: none !important;
+    height: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Cajas de texto e inputs normales */
+.stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
+    background-color: #0a0a0a !important; 
+    border: 1px solid #00f0ff !important; 
+    border-radius: 8px !important; 
+    color: #ffffff !important; 
+    font-size: 16px !important; 
+    box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1) !important;
+}
+.stTextArea textarea:focus, .stTextInput input:focus { 
+    border: 1px solid #FF007F !important; 
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
+}
+
+/* Chat Input (Legacy) */
+[data-testid="stChatInput"] {
+    background-color: #0a0a0a !important;
+    border: 1px solid #00f0ff !important;
+    border-radius: 10px !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+}
+
+/* 🔥 CHAT INPUT PRO (Opción 3) 🔥 */
+[data-testid="stTextInput"],
+[data-testid="stTextInput"] > div,
+[data-testid="stTextInput"] > div > div,
+[data-testid="stTextInput"] div[data-baseweb="input"],
+[data-testid="stTextInput"] div[data-baseweb="base-input"],
+[data-testid="stTextInput"] div[data-baseweb="input"] > div {
+    background-color: #0a0a0a !important;
+}
+[data-testid="stTextInput"] input {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+    caret-color: #00f0ff !important;
+    border: 1px solid #00f0ff !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    font-size: 15px !important;
+    outline: none !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+    transition: all 0.3s ease !important;
+    width: 100% !important;
+}
+[data-testid="stTextInput"] input:focus {
+    border: 1px solid #FF007F !important;
+    box-shadow: 0 0 18px rgba(255, 0, 127, 0.6) !important;
+}
+[data-testid="stTextInput"] input::placeholder {
+    color: #888888 !important;
+    opacity: 1 !important;
+}
+[data-testid="stTextInput"] div[data-baseweb="input"] {
+    border: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button {
+    min-height: 44px !important;
+    height: 100% !important;
+}
+
+/* Botones normales */
+div.stButton > button, div[data-testid="stDownloadButton"] > button { 
+    background: #0a0a0a !important; 
+    color: #00f0ff !important; 
+    border: 1px solid #00f0ff !important; 
+    border-radius: 25px !important; 
+    font-family: 'Orbitron', sans-serif !important; 
+    font-weight: bold !important; 
+    padding: 10px 20px !important; 
+    transition: all 0.3s !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
+}
+div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover { 
+    background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important; 
+    color: #000 !important; 
+    border: 1px solid #fff !important; 
+    transform: translateY(-2px); 
+    box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; 
+}
+
+/* Mensajes del Chat */
+[data-testid="stChatMessage"] { 
+    background: rgba(10, 10, 15, 0.8) !important; 
+    border: 1px solid #FF007F !important; 
+    border-radius: 15px !important; 
+    padding: 10px; 
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important;
+}
+
+/* Alertas */
+.stAlert { 
+    border-radius: 10px; 
+    font-weight: bold; 
+    background-color: rgba(0, 240, 255, 0.1) !important;
+    border-left: 5px solid #00f0ff !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 🛠️ JS FIXER BLINDADO ---
+def inyectar_js_fixer():
+    components.html("""
+    <script>
+    (function() {
+        var doc = window.parent.document;
+        function forzar() {
+            // 1. Arreglar Inputs
+            doc.querySelectorAll('[data-testid="stTextInput"] input').forEach(function(el) {
+                el.style.setProperty('background-color', '#0a0a0a', 'important');
+                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('border', '1px solid #00f0ff', 'important');
+                el.style.setProperty('border-radius', '10px', 'important');
+                el.style.setProperty('box-shadow', '0 0 10px rgba(0,240,255,0.3)', 'important');
+                el.style.setProperty('padding', '10px 14px', 'important');
+                el.style.setProperty('caret-color', '#00f0ff', 'important');
+                el.style.setProperty('outline', 'none', 'important');
+            });
+            
+            // 2. Arreglar Tabs (Pestañas)
+            doc.querySelectorAll('button[data-baseweb="tab"]').forEach(function(tab) {
+                // Estilos base de la pastilla
+                tab.style.setProperty('border-radius', '25px', 'important');
+                tab.style.setProperty('padding', '10px 20px', 'important');
+                tab.style.setProperty('margin-bottom', '5px', 'important');
+                tab.style.setProperty('transition', 'all 0.3s ease', 'important');
+                tab.style.setProperty('font-family', "'Orbitron', sans-serif", 'important');
+                tab.style.setProperty('font-weight', 'bold', 'important');
+                tab.style.setProperty('font-size', '13px', 'important');
+                
+                var isActive = tab.getAttribute('aria-selected') === 'true';
+                
+                if (isActive) {
+                    // ESTADO ACTIVO: Degradado + Borde blanco + Glow
+                    tab.style.setProperty('background', 'linear-gradient(135deg, #00f0ff 0%, #FF007F 100%)', 'important');
+                    tab.style.setProperty('border', '2px solid #ffffff', 'important');
+                    tab.style.setProperty('box-shadow', '0 0 20px rgba(255,0,127,0.8), 0 0 30px rgba(0,240,255,0.6)', 'important');
+                    tab.style.setProperty('transform', 'translateY(-1px)', 'important');
+                    // Forzar texto negro en TODOS los hijos
+                    tab.querySelectorAll('*').forEach(function(child) {
+                        child.style.setProperty('color', '#000000', 'important');
+                        child.style.setProperty('fill', '#000000', 'important');
+                        child.style.setProperty('background', 'transparent', 'important');
+                    });
+                } else {
+                    // ESTADO INACTIVO: Fondo oscuro + Borde cian
+                    tab.style.setProperty('background-color', '#0a0a0a', 'important');
+                    tab.style.setProperty('border', '1px solid #00f0ff', 'important');
+                    tab.style.setProperty('box-shadow', 'none', 'important');
+                    tab.style.setProperty('transform', 'none', 'important');
+                    // Forzar texto cian en TODOS los hijos
+                    tab.querySelectorAll('*').forEach(function(child) {
+                        child.style.setProperty('color', '#00f0ff', 'important');
+                        child.style.setProperty('background', 'transparent', 'important');
+                    });
+                }
+            });
+            
+            // 3. Matar la línea roja de Streamlit a base de JS
+            doc.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]').forEach(function(el) {
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('height', '0', 'important');
+                el.style.setProperty('background', 'transparent', 'important');
+                el.style.setProperty('box-shadow', 'none', 'important');
+            });
+        }
+        
+        forzar();
+        setInterval(forzar, 300); // Se re-aplica constantemente (300ms para más rapidez)
+    })();
+    </script>
+    """, height=0)
+
+inyectar_js_fixer()
 
 # --- FUNCIONES BASE ---
 def buscar_en_internet(query):
@@ -129,7 +382,8 @@ def leer_archivo_universal(upload, modelo_ia):
     return "Formato no reconocido."
 
 @st.cache_resource
-def get_gemini_client(api_key): return genai.Client(api_key=api_key)
+def get_gemini_client(api_key): 
+    return genai.Client(api_key=api_key)
 
 def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
     if not HAS_GEMINI: return "[ERROR] Falta google-genai."
@@ -140,7 +394,9 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
             response = client.models.generate_content(model=GEMINI_MODEL, contents=[prompt, parte_archivo])
             return response.text
         except Exception as e:
-            if "503" in str(e) and i < 2: time.sleep(3); continue
+            if "503" in str(e) and i < 2: 
+                time.sleep(3)
+                continue
             else: return f"[ERROR GEMINI] {e}"
 
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
@@ -149,11 +405,11 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     if st.session_state.get("global_context"):
         nombre_archivo = st.session_state.get("global_file_name", "Archivo_Adjunto")
         prompt_final = f"[EL USUARIO HA ADJUNTADO EL SIGUIENTE ARCHIVO: {nombre_archivo}]\nCONTENIDO EXTRAÍDO DEL ARCHIVO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN DEL USUARIO]:\n{prompt_final}\n\n(Responde teniendo en cuenta el archivo adjunto si es relevante)."
-
+        
     if historial_chat:
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial de la conversación hasta ahora:\n{contexto_chat}\n\nNuevo mensaje del usuario:\n{prompt_final}\n\nResponde al nuevo mensaje."
-
+        
     if api_key_gemini.strip():
         if not HAS_GEMINI: return "[ERROR] Falta google-genai."
         for intento in range(3):
@@ -162,19 +418,27 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
                 response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt_final)
                 return response.text
             except Exception as e:
-                if "503" in str(e) and intento < 2: time.sleep(3); continue
+                if "503" in str(e) and intento < 2: 
+                    time.sleep(3)
+                    continue
                 return f"[ERROR GEMINI] {e}"
+                
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         response = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})
         return response["message"]["content"].split("</think>")[-1].strip()
-    except Exception as e: return f"[ERROR LOCAL] {e}"
+    except Exception as e: 
+        return f"[ERROR LOCAL] {e}"
 
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF(); pdf.add_page()
     font_path = "C:/Windows/Fonts/arial.ttf"
-    if os.path.exists(font_path): pdf.add_font("Arial", "", font_path, uni=True); pdf.set_font("Arial", size=11)
-    else: pdf.set_font("Helvetica", size=11); contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
+    if os.path.exists(font_path): 
+        pdf.add_font("Arial", "", font_path, uni=True)
+        pdf.set_font("Arial", size=11)
+    else: 
+        pdf.set_font("Helvetica", size=11)
+        contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
     pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 20, txt="", ln=True); pdf.multi_cell(0, 10, txt=titulo, align='C')
     pdf.set_font("Helvetica", "I", 12); pdf.cell(0, 10, txt="Generado por Xavilu Network Pro", align='C', ln=True); pdf.add_page()
     if os.path.exists(font_path): pdf.set_font("Arial", size=11)
@@ -211,10 +475,12 @@ def botones_descarga(texto, nombre_por_defecto="documento"):
         nombre_elegido = st.text_input("📝 Ponle nombre a tu archivo (sin extensión):", value=nombre_por_defecto, key=f"input_name_{key_unica}")
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_')
         if not nombre_limpio: nombre_limpio = nombre_por_defecto
-
+        
         c1, c2 = st.columns(2)
-        with c1: st.download_button("📥 Descargar (TXT)", texto.encode('utf-8'), f"{nombre_limpio}.txt", "text/plain", key=f"dl_txt_{key_unica}", use_container_width=True)
-        with c2: st.download_button("📄 Descargar (PDF)", generar_pdf_pro(nombre_limpio, texto), f"{nombre_limpio}.pdf", "application/pdf", key=f"dl_pdf_{key_unica}", use_container_width=True)
+        with c1: 
+            st.download_button("📥 Descargar (TXT)", texto.encode('utf-8'), f"{nombre_limpio}.txt", "text/plain", key=f"dl_txt_{key_unica}", use_container_width=True)
+        with c2: 
+            st.download_button("📄 Descargar (PDF)", generar_pdf_pro(nombre_limpio, texto), f"{nombre_limpio}.pdf", "application/pdf", key=f"dl_pdf_{key_unica}", use_container_width=True)
 
 def generar_audio_sincrono(texto, voz, exp=None):
     loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
@@ -256,16 +522,52 @@ def cajon_ideas_personalizado(contexto_pestana, modelo, api_key):
         else:
             st.warning("Escribe primero tu idea.")
 
+def chat_input_pro(key, placeholder="Escribe tu mensaje..."):
+    """Sustituto estilizado de st.chat_input (Opción 3: control total del CSS)."""
+    text_key = f"{key}_text"
+    msg_key  = f"{key}_msg"
+    
+    if text_key not in st.session_state:
+        st.session_state[text_key] = ""
+    
+    def _on_send():
+        msg = st.session_state.get(text_key, "").strip()
+        if msg:
+            st.session_state[msg_key] = msg
+            st.session_state[text_key] = ""
+    
+    col_in, col_btn = st.columns([6, 1])
+    with col_in:
+        st.text_input(
+            label=key,
+            placeholder=placeholder,
+            key=text_key,
+            label_visibility="collapsed"
+        )
+    with col_btn:
+        st.button(
+            "➤",
+            key=f"{key}_btn",
+            on_click=_on_send,
+            use_container_width=True,
+            type="primary"
+        )
+    
+    return st.session_state.pop(msg_key, None)
+
 # ==========================================
 # INTERFAZ PRINCIPAL
 # ==========================================
-st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
+st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#00f0ff; font-weight:bold; letter-spacing:2px;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 🪐 PANEL DE CONTROL")
     modelo_seleccionado = st.selectbox("Motor Local (Ollama)", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-    try: api_key_gemini = st.secrets["GEMINI_API_KEY"]; st.success("🔑 Gemini API OK")
-    except: api_key_gemini = st.text_input("Gemini API Key", type="password")
+    try: 
+        api_key_gemini = st.secrets["GEMINI_API_KEY"]
+        st.success("🔑 Gemini API OK")
+    except: 
+        api_key_gemini = st.text_input("Gemini API Key", type="password")
     
     st.markdown("---")
     st.markdown("### 🧠 Cerebro Global")
@@ -288,14 +590,14 @@ with st.sidebar:
                 st.session_state.global_context = ctx[:5000]
                 st.session_state.global_file_name = archivo_global.name
                 st.success("✅ Archivo memorizado.")
-                
+    
     if st.session_state.get("global_file_name"):
         st.info(f"Archivo Activo: **{st.session_state.global_file_name}**")
         if st.button("🗑️ Olvidar Archivo"):
             st.session_state.global_context = ""
             st.session_state.global_file_name = ""
             st.rerun()
-
+            
     st.markdown("---")
     st.caption("📁 Informes guardados en: Escritorio/Informes_Xavilu")
     if not HAS_YTDLP: st.warning("⚠️ `yt-dlp` no instalado")
@@ -334,7 +636,7 @@ with macro_tabs[0]:
 
         for msg in st.session_state.chat_history: 
             st.chat_message(msg["role"]).write(msg["content"])
-            
+        
         if st.session_state.chat_history:
             col_u1, col_u2, col_u3 = st.columns(3)
             with col_u1:
@@ -351,11 +653,11 @@ with macro_tabs[0]:
                         audio_chat = generar_audio_sincrono(ultimo_msg, "es-ES-ElviraNeural")
                         if audio_chat: st.audio(audio_chat, format="audio/mp3")
 
-        prompt = st.chat_input("Escribe tu mensaje...", key="chat_main_input")
+        prompt = chat_input_pro("main", "Escribe tu mensaje...")
         
         if quick_prompt:
             prompt = quick_prompt
-            
+        
         if prompt:
             st.session_state.chat_history.append({"role": "user", "content": prompt})
             st.chat_message("user").write(prompt)
@@ -364,8 +666,8 @@ with macro_tabs[0]:
                 res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, historial_chat=st.session_state.chat_history)
                 st.session_state.chat_history.append({"role": "assistant", "content": res})
                 st.chat_message("assistant").write(res)
-                st.rerun()
-                
+            st.rerun()
+            
         cajon_ideas_personalizado("Chat IA", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
@@ -385,11 +687,12 @@ with macro_tabs[0]:
             texto_completo = "".join([leer_archivo_universal(a, modelo_seleccionado) for a in archivos])[:MAX_TEXTO_IA]
             st.success(f"✅ {len(archivos)} documentos leídos.")
             for msg in st.session_state.pdf_chat_history: st.chat_message(msg["role"]).write(msg["content"])
-            if prompt := st.chat_input("Pregúntale a los documentos...", key="chat_pdf_input"):
-                st.session_state.pdf_chat_history.append({"role": "user", "content": prompt})
-                st.chat_message("user").write(prompt)
+            prompt_pdf = chat_input_pro("pdf", "Pregúntale a los documentos...")
+            if prompt_pdf:
+                st.session_state.pdf_chat_history.append({"role": "user", "content": prompt_pdf})
+                st.chat_message("user").write(prompt_pdf)
                 with st.spinner("Buscando..."):
-                    res = llamar_ia(modelo_seleccionado, f"Basándote en esto:\n{texto_completo}\nResponde: {prompt}", api_key_gemini, historial_chat=st.session_state.pdf_chat_history)
+                    res = llamar_ia(modelo_seleccionado, f"Basándote en esto:\n{texto_completo}\nResponde: {prompt_pdf}", api_key_gemini, historial_chat=st.session_state.pdf_chat_history)
                     st.session_state.pdf_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
         cajon_ideas_personalizado("Chat con PDFs", modelo_seleccionado, api_key_gemini)
@@ -404,16 +707,17 @@ with macro_tabs[0]:
                 st.session_state.agente_activo = {"nombre": nombre_agente, "rol": rol_agente}
                 st.session_state.agente_chat_history = []
                 st.success(f"Agente '{nombre_agente}' listo.")
-                    
+        
         if st.session_state.get("agente_activo"):
             agente = st.session_state.agente_activo
             st.markdown(f"### 💬 Hablando con: **{agente['nombre']}**")
             for msg in st.session_state.agente_chat_history: st.chat_message(msg["role"]).write(msg["content"])
-            if prompt := st.chat_input(f"Mensaje para {agente['nombre']}...", key="chat_agent_input"):
-                st.session_state.agente_chat_history.append({"role": "user", "content": prompt})
-                st.chat_message("user").write(prompt)
+            prompt_agent = chat_input_pro("agent", f"Mensaje para {agente['nombre']}...")
+            if prompt_agent:
+                st.session_state.agente_chat_history.append({"role": "user", "content": prompt_agent})
+                st.chat_message("user").write(prompt_agent)
                 with st.spinner("Pensando..."):
-                    prompt_con_rol = f"INSTRUCCIONES DEL SISTEMA (ERES ESTE AGENTE):\n{agente['rol']}\n\nUsuario: {prompt}"
+                    prompt_con_rol = f"INSTRUCCIONES DEL SISTEMA (ERES ESTE AGENTE):\n{agente['rol']}\n\nUsuario: {prompt_agent}"
                     res = llamar_ia(modelo_seleccionado, prompt_con_rol, api_key_gemini, historial_chat=st.session_state.agente_chat_history)
                     st.session_state.agente_chat_history.append({"role": "assistant", "content": res})
                     st.chat_message("assistant").write(res)
@@ -443,12 +747,12 @@ with macro_tabs[0]:
             ingredientes = st.text_area("¿Qué tienes en la nevera?", key="chef_ing")
             if st.button("Dame una receta", key="btn_chef_receta") and ingredientes:
                 st.session_state.receta_generada = llamar_ia(modelo_seleccionado, f"Tengo {ingredientes}. Dame una receta.", api_key_gemini)
-            if st.session_state.receta_generada: st.info(st.session_state.receta_generada)
+                if st.session_state.receta_generada: st.info(st.session_state.receta_generada)
         with col_c2:
             preferencias = st.text_input("¿Menú semanal?", key="chef_menu")
             if st.button("Generar Menú + Compra", key="btn_chef_menu") and preferencias:
                 st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"Menú semanal para 4. {preferencias}.", api_key_gemini)
-            if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
+                if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
         cajon_ideas_personalizado("Cocina", modelo_seleccionado, api_key_gemini)
 
     with sub[6]:
@@ -484,6 +788,7 @@ with macro_tabs[0]:
 # ==========================================
 with macro_tabs[1]:
     sub = st.tabs(["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"])
+    
     with sub[0]:
         st.markdown("#### Análisis Avanzado de Documentos")
         archivo = st.file_uploader("Sube un PDF, Word, Excel o TXT", type=["pdf", "txt", "docx", "xlsx"], key="up_dat")
@@ -508,7 +813,7 @@ with macro_tabs[1]:
         col_c1, col_c2 = st.columns(2)
         with col_c1: doc_original = st.file_uploader("Documento Original (A):", type=["pdf", "txt", "docx"], key="doc_a")
         with col_c2: doc_nuevo = st.file_uploader("Documento Modificado (B):", type=["pdf", "txt", "docx"], key="doc_b")
-            
+        
         if doc_original and doc_nuevo and st.button("Comparar Documentos", type="primary", key="btn_compare"):
             with st.spinner("Buscando diferencias..."):
                 texto_a = leer_archivo_universal(doc_original, modelo_seleccionado)
@@ -559,9 +864,9 @@ with macro_tabs[1]:
             if modo_infantil: prompt += " Usa emojis y colores 'classDef rojo fill:#FF6B6B'."
             codigo = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
             st.session_state.mermaid_code = html.escape(codigo.replace("```mermaid", "").replace("```", "").strip())
-        if st.session_state.mermaid_code:
-            st.html(f"<div class='mermaid'>{st.session_state.mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
-            boton_superpoder(f"Añade 3 ramas innovadoras a este mapa mental (Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa", "mapa", modelo_seleccionado, api_key_gemini)
+            if st.session_state.mermaid_code:
+                st.html(f"<div class='mermaid'>{st.session_state.mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
+                boton_superpoder(f"Añade 3 ramas innovadoras a este mapa mental (Mermaid):\n{st.session_state.mermaid_code}", "Expandir Mapa", "mapa", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Mapas Mentales", modelo_seleccionado, api_key_gemini)
 
     with sub[5]:
@@ -593,8 +898,8 @@ with macro_tabs[1]:
             res = llamar_ia(modelo_seleccionado, f"Instrucción: {instruccion}\n\nTexto: {texto_uni}", api_key_gemini)
             st.session_state.clip_text = res
             st.info(res)
-        if st.session_state.clip_text:
-            boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog", "clip", modelo_seleccionado, api_key_gemini)
+            if st.session_state.clip_text:
+                boton_superpoder(st.session_state.clip_text, "Convierte esto en un artículo de blog", "clip", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("Portapapeles", modelo_seleccionado, api_key_gemini)
 
 # ==========================================
@@ -602,6 +907,7 @@ with macro_tabs[1]:
 # ==========================================
 with macro_tabs[2]:
     sub = st.tabs(["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV & EVENTOS", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR DE WEBS"])
+    
     with sub[0]:
         st.markdown("#### Buscador Global")
         q = st.text_input("Busca en internet:", key="web_q")
@@ -613,10 +919,11 @@ with macro_tabs[2]:
                     st.caption(r['resumen'])
                     st.markdown("---")
         cajon_ideas_personalizado("Buscador Web", modelo_seleccionado, api_key_gemini)
-                    
+
     with sub[1]:
         st.markdown("#### ⚽ Central de Deportes")
         tab_dep1, tab_dep2, tab_dep3, tab_dep4 = st.tabs(["📰 Noticias", "⚡ Resultados", "📊 Análisis", "🏋️ Entrenamiento"])
+        
         with tab_dep1:
             col_dep, col_liga = st.columns(2)
             with col_dep: deporte = st.selectbox("Deporte:", ["Fútbol", "Baloncesto", "Tenis", "Motor", "Ciclismo"], key="dep_sel_1")
@@ -630,7 +937,7 @@ with macro_tabs[2]:
                     st.markdown("---")
                 boton_superpoder(str(st.session_state.noticias_deportes), "Analiza la noticia más impactante", "noticias", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Noticias de Deportes", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_dep2:
             st.markdown("##### ⚡ Resultados y Directo")
             evento_directo = st.text_input("¿Qué resultados buscas?", placeholder="Ej: Resultados de LaLiga hoy", key="dep_results_q")
@@ -640,10 +947,10 @@ with macro_tabs[2]:
                     contexto = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web])
                     st.session_state.dep_resultados = llamar_ia(modelo_seleccionado, f"Dame los resultados de: '{evento_directo}'. Datos: {contexto}", api_key_gemini)
                     st.info(st.session_state.dep_resultados)
-            if st.session_state.dep_resultados:
-                boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico de élite", "tactico", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.dep_resultados:
+                        boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico de élite", "tactico", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Resultados Deportivos", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_dep3:
             st.markdown("##### 📊 Análisis Táctico y Clasificaciones")
             col_eq1, col_eq2 = st.columns(2)
@@ -654,8 +961,8 @@ with macro_tabs[2]:
                     prompt_partido = f"Analiza el partido {equipo_local} vs {equipo_visitante}. Pronóstico final."
                     st.session_state.partido_analisis = llamar_ia(modelo_seleccionado, prompt_partido, api_key_gemini)
                     st.info(st.session_state.partido_analisis)
-            if st.session_state.partido_analisis:
-                boton_superpoder(st.session_state.partido_analisis, "Dame el jugador clave y las apuestas seguras", "partido", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.partido_analisis:
+                        boton_superpoder(st.session_state.partido_analisis, "Dame el jugador clave y las apuestas seguras", "partido", modelo_seleccionado, api_key_gemini)
             st.markdown("---")
             liga_tabla = st.selectbox("Consultar Clasificación:", ["LaLiga EA Sports", "Premier League", "NBA", "Euroliga", "Fórmula 1"], key="sel_tabla")
             if st.button("🏆 Ver Tabla", key="btn_ver_tabla"):
@@ -663,7 +970,7 @@ with macro_tabs[2]:
                     prompt_tabla = f"Dame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos)."
                     st.info(llamar_ia(modelo_seleccionado, prompt_tabla, api_key_gemini))
             cajon_ideas_personalizado("Análisis Deportivo", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_dep4:
             st.markdown("##### 🏋️ Entrenamiento y Nutrición")
             objetivo = st.text_input("¿Qué necesitas?", placeholder="Ej: Rutina para ganar masa muscular", key="dep_train_q")
@@ -672,13 +979,14 @@ with macro_tabs[2]:
                 with st.spinner("Diseñando plan..."):
                     st.session_state.plan_deporte = llamar_ia(modelo_seleccionado, f"Entrenador personal. Deporte: {deporte_pract}. Objetivo: '{objetivo}'. Dame un plan semanal.", api_key_gemini)
                     st.info(st.session_state.plan_deporte)
-            if st.session_state.plan_deporte:
-                boton_superpoder(st.session_state.plan_deporte, "Añade suplementos y estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.plan_deporte:
+                        boton_superpoder(st.session_state.plan_deporte, "Añade suplementos y estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entrenamiento", modelo_seleccionado, api_key_gemini)
-            
+
     with sub[2]:
         st.markdown("#### 📺 Guía de TV y Eventos")
         tab_tv1, tab_tv2, tab_tv3, tab_tv4 = st.tabs(["🍿 Cine", "📅 TV", "🎫 Entradas", "🎮 Trivia"])
+        
         with tab_tv1:
             estado_animo = st.text_input("¿Qué te apetece ver?", placeholder="Ej: Comedia familiar", key="tv_animo")
             plataformas = st.multiselect("Tus plataformas:", ["Netflix", "Prime Video", "Disney+", "HBO Max", "Movistar+", "Filmin"], key="tv_plat")
@@ -687,10 +995,10 @@ with macro_tabs[2]:
                     prompt_cine = f"Recomienda 3 películas o series. Busco: '{estado_animo}'. Plataformas: {', '.join(plataformas)}."
                     st.session_state.cine_rec = llamar_ia(modelo_seleccionado, prompt_cine, api_key_gemini)
                     st.info(st.session_state.cine_rec)
-            if st.session_state.cine_rec:
-                boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas", "cine", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.cine_rec:
+                        boton_superpoder(st.session_state.cine_rec, "Recomienda 3 joyas ocultas", "cine", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Cine y Series", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_tv2:
             canal_tv = st.text_input("¿Qué canal buscas?", placeholder="Ej: Programación de esta noche en Telecinco", key="tv_chan")
             if st.button("Buscar Programación", key="btn_tv_prog") and canal_tv:
@@ -699,10 +1007,10 @@ with macro_tabs[2]:
                     contexto_tv = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web_tv])
                     st.session_state.tv_prog = llamar_ia(modelo_seleccionado, f"Programación de hoy para: '{canal_tv}'. Datos: {contexto_tv}", api_key_gemini)
                     st.info(st.session_state.tv_prog)
-            if st.session_state.tv_prog:
-                boton_superpoder(st.session_state.tv_prog, "Dime el programa más recomendado", "tv", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.tv_prog:
+                        boton_superpoder(st.session_state.tv_prog, "Dime el programa más recomendado", "tv", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Programación TV", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_tv3:
             evento_buscar = st.text_input("¿Qué evento buscas?", placeholder="Ej: Concierto de Taylor Swift", key="tv_event")
             ciudad = st.text_input("¿En qué ciudad?", placeholder="Ej: Madrid", key="tv_city")
@@ -712,10 +1020,10 @@ with macro_tabs[2]:
                     contexto_entradas = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_entradas])
                     st.session_state.entradas = llamar_ia(modelo_seleccionado, f"Info de: '{evento_buscar}' en {ciudad}. Datos: {contexto_entradas}", api_key_gemini)
                     st.info(st.session_state.entradas)
-            if st.session_state.entradas:
-                boton_superpoder(st.session_state.entradas, "Plan de viaje de 24h alrededor del evento", "entradas", modelo_seleccionado, api_key_gemini)
+                    if st.session_state.entradas:
+                        boton_superpoder(st.session_state.entradas, "Plan de viaje de 24h alrededor del evento", "entradas", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Entradas de Eventos", modelo_seleccionado, api_key_gemini)
-            
+
         with tab_tv4:
             juego = st.radio("Elige el juego:", ["Adivinar la película", "Curiosidades de series", "Preguntas de deportes"], horizontal=True, key="tv_trivia_game")
             if st.button("¡Jugar!", key="btn_jugar_trivia"):
@@ -736,10 +1044,8 @@ with macro_tabs[2]:
                     if len(tablas) > 0:
                         st.success(f"¡Se han encontrado {len(tablas)} tablas!")
                         tabla_elegida = st.selectbox("Selecciona la tabla que quieres descargar:", range(len(tablas)), format_func=lambda x: f"Tabla {x+1}")
-                        
                         df = tablas[tabla_elegida]
                         st.dataframe(df)
-                        
                         out = BytesIO()
                         with pd.ExcelWriter(out, engine='openpyxl') as writer:
                             df.to_excel(writer, index=False, sheet_name='Datos_Web')
@@ -764,7 +1070,7 @@ with macro_tabs[2]:
         if st.session_state.yt_text:
             boton_superpoder(st.session_state.yt_text, "Saca 3 ideas de negocio de este resumen", "yt", modelo_seleccionado, api_key_gemini)
         cajon_ideas_personalizado("YouTube", modelo_seleccionado, api_key_gemini)
-        
+
     with sub[5]:
         st.markdown("#### 📰 Lector de Páginas Web")
         url_web = st.text_input("Pega el enlace de una noticia o web:", key="web_url")
@@ -788,6 +1094,7 @@ with macro_tabs[2]:
 # ==========================================
 with macro_tabs[3]:
     sub = st.tabs(["🖼️ ANÁLISIS MULTIMEDIA", "🎨 GENERADOR VISUAL", "🛡️ CREADOR DE LOGOS", "📥 DESCARGADOR"])
+    
     with sub[0]:
         st.markdown("#### Análisis Inteligente de Archivos")
         with st.expander("💡 Cajón de Ideas (¿Qué puedo hacer con este archivo?)"):
@@ -808,7 +1115,7 @@ with macro_tabs[3]:
                     elif "prompt" in opcion_img: prompt = "Escribe un prompt en inglés para Midjourney que replique esta imagen."
                     else: prompt = "Analiza la imagen y dime si parece real o generada por IA."
                     with st.spinner("Procesando..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
-            
+                    
             elif nombre.endswith((".mp3", ".wav")):
                 st.audio(archivo_multi)
                 mime_type = "audio/mp3" if nombre.endswith(".mp3") else "audio/wav"
@@ -819,7 +1126,7 @@ with macro_tabs[3]:
                     elif "Traducir" in opcion_aud: prompt = "Traduce al inglés lo que se dice."
                     else: prompt = "Escucha este audio y dime qué tono emocional tiene y por qué."
                     with st.spinner("Procesando..."): st.session_state.analisis_ia = analizar_archivo_con_gemini(archivo_multi.getvalue(), mime_type, prompt, api_key_gemini)
-            
+                    
             elif nombre.endswith((".mp4", ".mov")):
                 st.video(archivo_multi)
                 mime_type = "video/mp4"
@@ -835,7 +1142,7 @@ with macro_tabs[3]:
                 st.info(st.session_state.analisis_ia)
                 botones_descarga(st.session_state.analisis_ia, "Analisis_Multimedia")
                 boton_superpoder(st.session_state.analisis_ia, "Información forense de este análisis", "multi", modelo_seleccionado, api_key_gemini)
-                
+        
         cajon_ideas_personalizado("Análisis Multimedia", modelo_seleccionado, api_key_gemini)
 
     with sub[1]:
@@ -845,20 +1152,15 @@ with macro_tabs[3]:
         
         if st.button("Generar Imagen", key="btn_gen_visual") and prompt_img:
             with st.spinner("Traduciendo y generando imagen..."):
-                # 1. Traducimos el prompt al inglés para que el generador lo entienda perfectamente
                 prompt_traducido = llamar_ia(modelo_seleccionado, f"Traduce el siguiente texto al inglés para un generador de imágenes. Devuelve SOLO la traducción, sin comillas ni explicaciones: '{prompt_img}'", api_key_gemini)
-                
-                # 2. Limpiamos la traducción por si la IA añade texto extra
                 prompt_en_ingles = prompt_traducido.replace('"', '').replace("'", "").strip()
                 st.session_state.img_prompt_en = prompt_en_ingles
                 
-                # 3. Añadimos el estilo
                 if "Colorear" in tipo_img:
                     prompt_final = prompt_en_ingles + ", coloring book page, thick black outlines, pure white background, no color"
                 else:
                     prompt_final = prompt_en_ingles
                 
-                # 4. Generamos la URL
                 st.session_state.img_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_final)}?width=1024&height=1024&nologo=true&enhance=true"
         
         if st.session_state.img_url:
@@ -882,6 +1184,7 @@ with macro_tabs[3]:
                 prompt_logo = f"Professional brand logo design for '{nombre_marca}', {estilo_logo} style, primary color {color_logo}, "
                 if icono_logo: prompt_logo += f"with an icon of {icono_logo}, "
                 prompt_logo += "flat vector graphic, minimalist, clean white background, centered, high quality, no text, corporate identity"
+                
                 url_logo = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_logo)}?width=1024&height=1024&nologo=true"
                 st.image(url_logo, caption=f"Propuesta para {nombre_marca}", use_container_width=True)
                 st.markdown(f"[Descargar Logo en Alta Resolución]({url_logo})")
@@ -900,9 +1203,9 @@ with macro_tabs[3]:
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                             info = ydl.extract_info(url_dl, download=True)
                             nombre_archivo = ydl.prepare_filename(info)
-                        with open(nombre_archivo, "rb") as f: st.session_state.dl_bytes = f.read()
-                        st.session_state.dl_filename = os.path.basename(nombre_archivo)
-                        st.success(f"✅ **{info.get('title', 'Archivo')}** descargado.")
+                            with open(nombre_archivo, "rb") as f: st.session_state.dl_bytes = f.read()
+                            st.session_state.dl_filename = os.path.basename(nombre_archivo)
+                            st.success(f"✅ **{info.get('title', 'Archivo')}** descargado.")
                     except Exception as e: st.error(f"Error: {e}")
                     finally:
                         for archivo in os.listdir(temp_dir): os.remove(os.path.join(temp_dir, archivo))
@@ -916,6 +1219,7 @@ with macro_tabs[3]:
 # ==========================================
 with macro_tabs[4]:
     sub = st.tabs(["🌐 REDES Y SISTEMAS", "💇‍♀️ PELUQUERÍA", "📚 DEBERES Y ESTUDIO", "🦺 PRL (RIESGOS LABORALES)"])
+    
     with sub[0]:
         st.markdown("#### 🌐 Herramientas de Redes")
         col_r1, col_r2 = st.columns(2)
@@ -928,7 +1232,7 @@ with macro_tabs[4]:
             so = st.selectbox("Sistema:", ["Windows", "Linux", "Cisco"], key="net_os")
             if st.button("Buscar Comando", key="btn_net_cmd") and tarea:
                 st.info(llamar_ia(modelo_seleccionado, f"Comando para {so}: {tarea}. Explícalo.", api_key_gemini))
-        
+                
         if st.button("Comenzar Entrevista (Nivel CCNA)", key="btn_net_interview"):
             st.info(llamar_ia(modelo_seleccionado, "Hazme 3 preguntas de nivel CCNA.", api_key_gemini))
         cajon_ideas_personalizado("Redes", modelo_seleccionado, api_key_gemini)
@@ -979,6 +1283,7 @@ with macro_tabs[4]:
 # ==========================================
 with macro_tabs[5]:
     sub = st.tabs(["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS Y MENSAJES"])
+    
     with sub[0]:
         st.markdown("#### 🌍 Planificador de Viajes")
         destino = st.text_input("Destino:", key="travel_dest")
@@ -1028,6 +1333,7 @@ with macro_tabs[5]:
 # ==========================================
 with macro_tabs[6]:
     sub = st.tabs(["🎵 CREADOR DE CANCIONES", "🎨 POESÍA Y RIMAS"])
+    
     with sub[0]:
         st.markdown("#### 🎵 Estudio de Creación Musical")
         col_m1, col_m2 = st.columns(2)
@@ -1041,7 +1347,7 @@ with macro_tabs[6]:
             titulo = llamar_ia(modelo_seleccionado, f"Título para esta letra:\n{letra[:500]}", api_key_gemini).strip()
             st.session_state.titulo_cancion = titulo
             st.session_state.portada_cancion = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Album cover ' + genero + ' ' + tema_cancion)}?width=1024&height=1024&nologo=true"
-                
+            
         if st.session_state.letra_cancion:
             st.markdown(f"### 🎶 {st.session_state.titulo_cancion}")
             col_portada, col_letra = st.columns([1, 2])
