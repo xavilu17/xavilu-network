@@ -86,7 +86,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V76 - TABS BLINDADAS) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V77 - MUTATION OBSERVER) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -281,12 +281,13 @@ div.stButton > button:hover, div[data-testid="stDownloadButton"] > button:hover 
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🛠️ JS FIXER BLINDADO ---
+# --- 🛠️ JS FIXER CON MUTATION OBSERVER ---
 def inyectar_js_fixer():
     components.html("""
     <script>
     (function() {
         var doc = window.parent.document;
+        
         function forzar() {
             // 1. Arreglar Inputs
             doc.querySelectorAll('[data-testid="stTextInput"] input').forEach(function(el) {
@@ -302,7 +303,6 @@ def inyectar_js_fixer():
             
             // 2. Arreglar Tabs (Pestañas)
             doc.querySelectorAll('button[data-baseweb="tab"]').forEach(function(tab) {
-                // Estilos base de la pastilla
                 tab.style.setProperty('border-radius', '25px', 'important');
                 tab.style.setProperty('padding', '10px 20px', 'important');
                 tab.style.setProperty('margin-bottom', '5px', 'important');
@@ -314,24 +314,20 @@ def inyectar_js_fixer():
                 var isActive = tab.getAttribute('aria-selected') === 'true';
                 
                 if (isActive) {
-                    // ESTADO ACTIVO: Degradado + Borde blanco + Glow
                     tab.style.setProperty('background', 'linear-gradient(135deg, #00f0ff 0%, #FF007F 100%)', 'important');
                     tab.style.setProperty('border', '2px solid #ffffff', 'important');
                     tab.style.setProperty('box-shadow', '0 0 20px rgba(255,0,127,0.8), 0 0 30px rgba(0,240,255,0.6)', 'important');
                     tab.style.setProperty('transform', 'translateY(-1px)', 'important');
-                    // Forzar texto negro en TODOS los hijos
                     tab.querySelectorAll('*').forEach(function(child) {
                         child.style.setProperty('color', '#000000', 'important');
                         child.style.setProperty('fill', '#000000', 'important');
                         child.style.setProperty('background', 'transparent', 'important');
                     });
                 } else {
-                    // ESTADO INACTIVO: Fondo oscuro + Borde cian
                     tab.style.setProperty('background-color', '#0a0a0a', 'important');
                     tab.style.setProperty('border', '1px solid #00f0ff', 'important');
                     tab.style.setProperty('box-shadow', 'none', 'important');
                     tab.style.setProperty('transform', 'none', 'important');
-                    // Forzar texto cian en TODOS los hijos
                     tab.querySelectorAll('*').forEach(function(child) {
                         child.style.setProperty('color', '#00f0ff', 'important');
                         child.style.setProperty('background', 'transparent', 'important');
@@ -348,8 +344,26 @@ def inyectar_js_fixer():
             });
         }
         
+        // Ejecución inicial inmediata
         forzar();
-        setInterval(forzar, 300); // Se re-aplica constantemente (300ms para más rapidez)
+        
+        // MUTATION OBSERVER: Vigila cambios en el DOM en tiempo real
+        try {
+            var observer = new MutationObserver(function(mutations) {
+                forzar();
+            });
+            observer.observe(doc.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['aria-selected', 'data-baseweb', 'style'] // Especial atención a cambios de estado
+            });
+        } catch(e) {
+            console.log("MutationObserver no soportado o bloqueado:", e);
+        }
+        
+        // Fallback de seguridad por si el observer falla
+        setInterval(forzar, 1000); 
     })();
     </script>
     """, height=0)
