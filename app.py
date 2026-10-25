@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK DE LUJO (PESTAÑAS DORADAS) ---
+# --- 🎨 CSS CYBERPUNK CON LEGIBILIDAD MÁXIMA ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -127,44 +127,60 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: CAJONES DORADOS MACIZOS 🌟 */
+    /* 🌟 PESTAÑAS: LEGIBILIDAD MÁXIMA Y CAJONES DORADOS 🌟 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 5px !important;
-        border-bottom: 2px solid #d4af37 !important;
+        gap: 8px !important;
+        border-bottom: 2px solid #333 !important;
         padding-bottom: 5px !important;
     }
+    
+    /* Pestañas inactivas (Cristal oscuro con letras blancas) */
     .stTabs [data-baseweb="tab"] {
-        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important;
-        border: 1px solid #ffd700 !important;
-        border-radius: 6px 6px 0 0 !important;
-        color: #000000 !important; /* Letras negras para máximo contraste */
+        background-color: #1a1a1a !important; 
+        border: 1px solid #444 !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 10px 20px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    /* Forzar el color del texto interno */
+    .stTabs [data-baseweb="tab"] p, 
+    .stTabs [data-baseweb="tab"] div {
+        color: #ffffff !important; 
         font-family: 'Orbitron', sans-serif !important;
-        font-weight: 900 !important;
-        font-size: 13px !important;
-        padding: 10px 15px !important;
-        transition: all 0.2s ease !important;
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important;
-        text-transform: uppercase !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        opacity: 1 !important;
     }
+    
+    /* Al pasar el ratón */
     .stTabs [data-baseweb="tab"]:hover {
-        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important;
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important;
-        transform: translateY(-2px);
+        background-color: #222 !important;
+        border-color: #00f0ff !important;
     }
+    .stTabs [data-baseweb="tab"]:hover p,
+    .stTabs [data-baseweb="tab"]:hover div {
+        color: #00f0ff !important; 
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
+    }
+    
+    /* Pestaña seleccionada (Fondo dorado, letras negras) */
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important;
-        color: #000000 !important;
         border: 1px solid #ffffff !important;
-        border-bottom: 4px solid #ff007f !important; /* Detalle rosa neón */
-        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important;
+        border-bottom: 4px solid #FF007F !important; 
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+    }
+    
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] div {
+        color: #000000 !important; 
+        font-weight: 900 !important;
+        text-shadow: none !important;
     }
     
     /* Ocultar la línea de Streamlit por defecto */
     [data-baseweb="tab-highlight"] {
-        background-color: transparent !important;
-        display: none !important;
-    }
-    [data-baseweb="tab-border"] {
         display: none !important;
     }
     
