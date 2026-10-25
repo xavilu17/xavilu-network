@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK CON LEGIBILIDAD MÁXIMA ---
+# --- 🎨 CSS CYBERPUNK: PESTAÑAS TIPO BOTÓN NEÓN ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -127,56 +127,56 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: LEGIBILIDAD MÁXIMA Y CAJONES DORADOS 🌟 */
+    /* 🌟 PESTAÑAS ESTILO BOTÓN NEÓN 🌟 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px !important;
-        border-bottom: 2px solid #333 !important;
-        padding-bottom: 5px !important;
+        gap: 10px !important;
+        border-bottom: 2px solid rgba(0, 240, 255, 0.2) !important;
+        padding-bottom: 10px !important;
     }
     
-    /* Pestañas inactivas (Cristal oscuro con letras blancas) */
+    /* Pestañas inactivas (Igual que el botón "Ejecutar mi Idea") */
     .stTabs [data-baseweb="tab"] {
-        background-color: #1a1a1a !important; 
-        border: 1px solid #444 !important;
-        border-radius: 8px 8px 0 0 !important;
-        padding: 10px 20px !important;
+        background: rgba(10, 10, 10, 0.8) !important;
+        border: 2px solid #00f0ff !important;
+        border-radius: 25px !important;
+        padding: 8px 20px !important;
         transition: all 0.3s ease !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
+        opacity: 0.7 !important;
     }
     
-    /* Forzar el color del texto interno */
-    .stTabs [data-baseweb="tab"] p, 
+    /* Texto de las inactivas */
+    .stTabs [data-baseweb="tab"] p,
     .stTabs [data-baseweb="tab"] div {
-        color: #ffffff !important; 
+        color: #00f0ff !important;
         font-family: 'Orbitron', sans-serif !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
+        font-weight: bold !important;
+        font-size: 13px !important;
         opacity: 1 !important;
     }
     
     /* Al pasar el ratón */
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #222 !important;
-        border-color: #00f0ff !important;
-    }
-    .stTabs [data-baseweb="tab"]:hover p,
-    .stTabs [data-baseweb="tab"]:hover div {
-        color: #00f0ff !important; 
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.8) !important;
+        background: rgba(0, 240, 255, 0.1) !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
+        opacity: 1 !important;
+        transform: translateY(-2px);
     }
     
-    /* Pestaña seleccionada (Fondo dorado, letras negras) */
+    /* Pestaña activa (ENCENDIDA: Degradado rosa/cian y letras negras) */
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important;
-        border: 1px solid #ffffff !important;
-        border-bottom: 4px solid #FF007F !important; 
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+        background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important;
+        border: 2px solid #ffffff !important;
+        box-shadow: 0 0 25px rgba(255, 0, 127, 0.9) !important;
+        opacity: 1 !important;
+        transform: translateY(-2px);
     }
     
+    /* Texto de la pestaña activa */
     .stTabs [data-baseweb="tab"][aria-selected="true"] p,
     .stTabs [data-baseweb="tab"][aria-selected="true"] div {
-        color: #000000 !important; 
+        color: #000000 !important;
         font-weight: 900 !important;
-        text-shadow: none !important;
     }
     
     /* Ocultar la línea de Streamlit por defecto */
