@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CYBERPUNK: PESTAÑAS TIPO BOTÓN NEÓN ---
+# --- 🎨 CSS NUCLEAR PARA PESTAÑAS NEÓN ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -127,61 +127,56 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS ESTILO BOTÓN NEÓN 🌟 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px !important;
-        border-bottom: 2px solid rgba(0, 240, 255, 0.2) !important;
-        padding-bottom: 10px !important;
-    }
+    /* 🌟 PESTAÑAS: ATAQUE NUCLEAR AL ESTILO 🌟 */
     
-    /* Pestañas inactivas (Igual que el botón "Ejecutar mi Idea") */
-    .stTabs [data-baseweb="tab"] {
-        background: rgba(10, 10, 10, 0.8) !important;
+    /* 1. Ocultar la línea roja fea de Streamlit a la de ya */
+    [data-baseweb="tab-highlight"] { display: none !important; }
+    [data-baseweb="tab-border"] { display: none !important; }
+
+    /* 2. Pestañas Inactivas: Botón neón oscuro */
+    button[data-baseweb="tab"] {
+        background-color: #0a0a0a !important;
         border: 2px solid #00f0ff !important;
         border-radius: 25px !important;
-        padding: 8px 20px !important;
+        padding: 8px 18px !important;
+        margin: 0 5px !important;
+        opacity: 0.8 !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
-        opacity: 0.7 !important;
     }
-    
-    /* Texto de las inactivas */
-    .stTabs [data-baseweb="tab"] p,
-    .stTabs [data-baseweb="tab"] div {
+
+    /* 3. FORZAR EL COLOR DEL TEXTO INACTIVO (La parte difícil) */
+    button[data-baseweb="tab"] *,
+    button[data-baseweb="tab"] p,
+    button[data-baseweb="tab"] div {
         color: #00f0ff !important;
+        -webkit-text-fill-color: #00f0ff !important; /* Martillo nuclear */
         font-family: 'Orbitron', sans-serif !important;
         font-weight: bold !important;
-        font-size: 13px !important;
         opacity: 1 !important;
     }
-    
-    /* Al pasar el ratón */
-    .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(0, 240, 255, 0.1) !important;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
+
+    /* 4. Hover: Brillo al pasar el ratón */
+    button[data-baseweb="tab"]:hover {
         opacity: 1 !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
         transform: translateY(-2px);
     }
-    
-    /* Pestaña activa (ENCENDIDA: Degradado rosa/cian y letras negras) */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+
+    /* 5. Pestaña Activa: Degradado rosa/cian con texto negro */
+    button[data-baseweb="tab"][aria-selected="true"] {
         background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important;
         border: 2px solid #ffffff !important;
-        box-shadow: 0 0 25px rgba(255, 0, 127, 0.9) !important;
+        box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important;
         opacity: 1 !important;
-        transform: translateY(-2px);
     }
-    
-    /* Texto de la pestaña activa */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] p,
-    .stTabs [data-baseweb="tab"][aria-selected="true"] div {
+
+    /* 6. FORZAR EL COLOR DEL TEXTO ACTIVO a negro */
+    button[data-baseweb="tab"][aria-selected="true"] *,
+    button[data-baseweb="tab"][aria-selected="true"] p,
+    button[data-baseweb="tab"][aria-selected="true"] div {
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         font-weight: 900 !important;
-    }
-    
-    /* Ocultar la línea de Streamlit por defecto */
-    [data-baseweb="tab-highlight"] {
-        display: none !important;
     }
     
     /* Cajas de texto e inputs */
@@ -198,7 +193,7 @@ st.markdown("""
         box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; 
     }
     
-    /* Botones */
+    /* Botones normales */
     div.stButton > button, div[data-testid="stDownloadButton"] > button { 
         background: rgba(10, 10, 10, 0.8) !important; 
         color: #00f0ff !important; 
