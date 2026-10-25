@@ -83,7 +83,7 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
-# --- 🎨 CSS CAJONES DORADOS Y CYBERPUNK ---
+# --- 🎨 CSS CAJONES DORADOS BLINDADO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -96,7 +96,7 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif !important; 
     }
     
-    /* Títulos con brillo neón (Rosa y Azul) */
+    /* Títulos con brillo neón */
     h1, h2, h3 { 
         font-family: 'Orbitron', sans-serif !important; 
         color: #ffffff !important; 
@@ -118,11 +118,7 @@ st.markdown("""
         border-radius: 4px !important; 
         display: inline-block !important; 
         margin-bottom: 8px !important; 
-        text-shadow: 0 0 5px rgba(0, 240, 255, 0.5) !important; 
     }
-    
-    /* Textos generales */
-    p, .stMarkdown p { color: #e0e0e0 !important; font-size: 16px; }
     
     /* Barra lateral */
     [data-testid="stSidebar"] { 
@@ -131,39 +127,41 @@ st.markdown("""
         box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; 
     }
     
-    /* 🌟 PESTAÑAS: CAJONES DORADOS 3D 🌟 */
-    button[data-baseweb="tab"] { 
-        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important; 
-        border: 1px solid #ffd700 !important; 
-        border-radius: 6px 6px 0 0 !important; 
-        color: #000000 !important; 
-        font-family: 'Orbitron', sans-serif !important; 
-        font-size: 12px !important; 
-        font-weight: bold !important; 
-        padding: 12px 20px !important; 
-        margin: 5px !important; 
-        transition: all 0.2s ease !important; 
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important; 
+    /* 🌟 PESTAÑAS: CAJONES DORADOS 🌟 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 2px solid #d4af37 !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: linear-gradient(180deg, #b8860b 0%, #d4af37 50%, #8b6508 100%) !important;
+        border: 1px solid #ffd700 !important;
+        border-radius: 8px 8px 0 0 !important;
+        color: #000000 !important;
+        font-family: 'Orbitron', sans-serif !important;
+        font-weight: 900 !important;
+        padding: 10px 20px !important;
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 4px 6px rgba(0,0,0,0.8) !important;
         text-transform: uppercase !important;
     }
-    button[data-baseweb="tab"]:hover { 
-        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important; 
-        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important; 
-        transform: translateY(-2px); 
+    .stTabs [data-baseweb="tab"]:hover {
+        background: linear-gradient(180deg, #e6c200 0%, #ffd700 50%, #b8860b 100%) !important;
+        box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 0 15px rgba(255, 215, 0, 0.9) !important;
+        transform: translateY(-2px);
     }
-    button[data-baseweb="tab"][aria-selected="true"] { 
-        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important; 
-        color: #000000 !important; 
-        border: 1px solid #ffffff !important; 
-        border-bottom: 4px solid #ff007f !important; 
-        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important; 
-        font-weight: 900 !important; 
-        transform: translateY(0); 
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background: linear-gradient(180deg, #ffd700 0%, #fff8dc 50%, #ffd700 100%) !important;
+        border-bottom: 4px solid #ff007f !important;
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1) !important;
     }
-    [data-baseweb="tab-list"] { 
-        border-bottom: 2px solid #d4af37 !important; 
-        gap: 5px !important; 
-        padding-bottom: 5px !important;
+    
+    /* Ocultar la línea roja fea que pone Streamlit por defecto */
+    [data-baseweb="tab-highlight"] {
+        background-color: transparent !important;
+        display: none !important;
+    }
+    [data-baseweb="tab-border"] {
+        background-color: transparent !important;
+        display: none !important;
     }
     
     /* Cajas de texto e inputs */
