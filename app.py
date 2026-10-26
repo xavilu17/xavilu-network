@@ -87,7 +87,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V90 - ARCHIVOS EN TODAS PARTES) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V92 - TODO CON IDEAS) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -522,25 +522,36 @@ def generar_podcast_3_voces(guion, voz1, voz2, voz3):
         return None
     finally: loop.close()
 
-def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="Escribe tu idea o pulsa el botón..."):
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        texto_manual = st.text_input(label, placeholder=placeholder, key=f"{key_prefix}_manual")
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💡 Ideas IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
-            with st.spinner("Pensando..."):
-                prompt = f"Dame 3 ideas creativas y concisas para {contexto_ia}. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
-                res = llamar_ia(modelo, prompt, api_key)
-                lineas = [linea.strip("-*1234567890. ") for linea in res.split('\n') if len(linea.strip()) > 5]
-                st.session_state[f"{key_prefix}_sugs"] = lineas[:3]
-                
-    if st.session_state.get(f"{key_prefix}_sugs"):
-        opcion_ia = st.selectbox("✨ Selecciona una idea de la IA (o usa la tuya arriba):", st.session_state[f"{key_prefix}_sugs"], key=f"{key_prefix}_sel")
-        if opcion_ia:
-            return opcion_ia
+# 💡 FUNCIÓN MAESTRA DE IDEAS (Botón arriba, llena el input)
+def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="Escribe tu idea aquí..."):
+    input_key = f"{key_prefix}_text_input"
+    
+    if input_key not in st.session_state:
+        st.session_state[input_key] = ""
+        
+    # Botón de Generar Ideas
+    if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
+        with st.spinner("Pensando ideas..."):
+            prompt = f"Dame 3 ideas creativas y concisas para {contexto_ia}. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
+            res = llamar_ia(modelo, prompt, api_key)
+            lineas = [linea.strip("-*1234567890. ") for linea in res.split('\n') if len(linea.strip()) > 5]
+            st.session_state[f"{key_prefix}_sugs"] = lineas[:3]
             
-    return texto_manual
+    # Mostrar sugerencias
+    if st.session_state.get(f"{key_prefix}_sugs"):
+        st.markdown("✨ **Haz clic en una idea para usarla:**")
+        cols_ideas = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
+        for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
+            with cols_ideas[i]:
+                if st.button(idea, key=f"{key_prefix}_idea_btn_{i}", use_container_width=True):
+                    st.session_state[input_key] = idea
+                    del st.session_state[f"{key_prefix}_sugs"]
+                    st.rerun()
+
+    # Input de texto
+    texto = st.text_input(label, key=input_key, placeholder=placeholder)
+    
+    return texto
 
 def boton_superpoder(texto_base, instruccion_poder, key_suffix, modelo, api_key):
     if st.button(f"🚀 Activar Superpoder: {instruccion_poder}", key=f"super_{key_suffix}", type="secondary"):
