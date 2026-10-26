@@ -87,7 +87,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V88 - CAJAS DE IDEAS) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V89 - GUION EDITABLE) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -501,9 +501,7 @@ def generar_podcast_3_voces(guion, voz1, voz2, voz3):
         return None
     finally: loop.close()
 
-# 💡 NUEVA FUNCIÓN MAESTRA: CAMPO CON IDEAS
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="Escribe tu idea o pulsa el botón..."):
-    """Genera un input con botón de ideas IA."""
     col1, col2 = st.columns([4, 1])
     with col1:
         texto_manual = st.text_input(label, placeholder=placeholder, key=f"{key_prefix}_manual")
@@ -513,11 +511,9 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
             with st.spinner("Pensando..."):
                 prompt = f"Dame 3 ideas creativas y concisas para {contexto_ia}. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
                 res = llamar_ia(modelo, prompt, api_key)
-                # Limpiamos la respuesta
                 lineas = [linea.strip("-*1234567890. ") for linea in res.split('\n') if len(linea.strip()) > 5]
-                st.session_state[f"{key_prefix}_sugs"] = lineas[:3] # Guardamos máximo 3
+                st.session_state[f"{key_prefix}_sugs"] = lineas[:3]
                 
-    # Si hay sugerencias de la IA, mostramos el desplegable
     if st.session_state.get(f"{key_prefix}_sugs"):
         opcion_ia = st.selectbox("✨ Selecciona una idea de la IA (o usa la tuya arriba):", st.session_state[f"{key_prefix}_sugs"], key=f"{key_prefix}_sel")
         if opcion_ia:
@@ -687,8 +683,11 @@ if macro_idx == 0:
                 st.session_state.podcast_script = llamar_ia(modelo_seleccionado, prompt_pod, api_key_gemini)
                 
         if st.session_state.get("podcast_script"):
-            st.markdown("### 📜 Guion Generado")
-            st.text_area("Guion del Podcast:", value=st.session_state.podcast_script, height=400, key="pod_script_txt")
+            st.markdown("### 📜 Guion Generado (Editable)")
+            
+            # 🔥 AQUÍ ESTÁ EL CAMBIO: Guardamos lo que el usuario escriba
+            guion_editado = st.text_area("Guion del Podcast:", value=st.session_state.podcast_script, height=400, key="pod_script_txt_edit")
+            st.session_state.podcast_script = guion_editado
             
             st.markdown("#### 🎭 Asignación de Voces")
             col_v1, col_v2, col_v3 = st.columns(3)
@@ -701,6 +700,7 @@ if macro_idx == 0:
                 
             if st.button("🔊 Generar Audio del Podcast (3 Voces)", key="btn_pod_audio"):
                 with st.spinner("Generando audio (esto puede tardar un poco)..."):
+                    # 🔥 Usamos el guion editado
                     audio_pod = generar_podcast_3_voces(st.session_state.podcast_script, voz_pod1, voz_pod2, voz_pod3)
                     if audio_pod:
                         st.audio(audio_pod, format="audio/mp3")
@@ -710,6 +710,7 @@ if macro_idx == 0:
                         if not nombre_mp3_limpio: nombre_mp3_limpio = "podcast_3_voces"
                         st.download_button("💾 Descargar Podcast MP3", audio_pod, f"{nombre_mp3_limpio}.mp3")
                         
+            # 🔥 Descargamos el guion editado
             botones_descarga(st.session_state.podcast_script, "Guion_Podcast")
             
         cajon_ideas_personalizado("Podcast", modelo_seleccionado, api_key_gemini)
