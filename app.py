@@ -87,7 +87,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V89 - GUION EDITABLE) ---
+# --- 🎨 CSS NEGRO ESPACIAL Y CYBERPUNK (V90 - ARCHIVOS EN TODAS PARTES) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -324,6 +324,27 @@ def leer_archivo_universal(upload, modelo_ia):
         wb = openpyxl.load_workbook(upload, data_only=True)
         return "\n".join([" | ".join([str(c) for c in f if c is not None]) for h in wb.sheetnames for f in wb[h].iter_rows(values_only=True) if any(c is not None for c in f)])
     return "Formato no reconocido."
+
+# 📎 FUNCIÓN UNIVERSAL PARA ADJUNTAR ARCHIVO LOCALMENTE
+def cajita_adjuntar_archivo(key_suffix, modelo, api_key):
+    with st.expander("📎 Adjuntar archivo para esta acción (Opcional)"):
+        archivo = st.file_uploader("Sube PDF, Word, TXT o Imagen", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"], key=f"adj_{key_suffix}")
+        if archivo:
+            if archivo.size > MAX_FILE_MB * 1024 * 1024:
+                st.error(f"❌ Archivo demasiado grande (Máx: {MAX_FILE_MB} MB).")
+                return ""
+                
+            nombre = archivo.name.lower()
+            if nombre.endswith((".png", ".jpg", ".jpeg")):
+                with st.spinner("Analizando imagen con Gemini..."):
+                    ctx = analizar_archivo_con_gemini(archivo.getvalue(), "image/jpeg", "Describe esta imagen con todo detalle o extrae el texto (OCR).", api_key)
+                    st.success("✅ Imagen leída.")
+                    return f"\n[TEXTO EXTRAÍDO DE LA IMAGEN]:\n{ctx}\n"
+            else:
+                texto = leer_archivo_universal(archivo, modelo)
+                st.success(f"✅ Archivo '{archivo.name}' leído.")
+                return f"\n[CONTENIDO DEL ARCHIVO ADJUNTO '{archivo.name}']:\n{texto[:10000]}\n"
+    return ""
 
 @st.cache_resource
 def get_gemini_client(api_key): 
@@ -669,6 +690,8 @@ if macro_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts (3 Voces)")
         st.caption("La IA escribirá un guion con 3 locutores y podrás escucharlo con diferentes voces.")
         
+        contexto_adjunto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, api_key_gemini)
+        
         tema_pod = campo_con_ideas("Temática general del podcast:", "pod_tema", "un podcast de 3 locutores", modelo_seleccionado, api_key_gemini, placeholder="Ej: El futuro de la IA, Historia de Roma...")
         
         col_pod1, col_pod2 = st.columns(2)
@@ -679,13 +702,12 @@ if macro_idx == 0:
         
         if st.button("✨ Crear Guion a 3 Voces", type="primary", key="btn_gen_pod") and tema_pod:
             with st.spinner("Escribiendo guion..."):
-                prompt_pod = f"Escribe un guion para un podcast de {duracion_pod} minutos. El tema exacto es: '{tema_pod}'. Estilo: {estilo_pod}. Debe ser una conversación entre 3 locutores. Usa exactamente el formato 'Locutor 1: [texto]', 'Locutor 2: [texto]', 'Locutor 3: [texto]' para cada línea. Incluye introducción, desarrollo y despedida."
+                prompt_pod = f"{contexto_adjunto}\n\nEscribe un guion para un podcast de {duracion_pod} minutos. El tema exacto es: '{tema_pod}'. Estilo: {estilo_pod}. Debe ser una conversación entre 3 locutores. Usa exactamente el formato 'Locutor 1: [texto]', 'Locutor 2: [texto]', 'Locutor 3: [texto]' para cada línea. Incluye introducción, desarrollo y despedida."
                 st.session_state.podcast_script = llamar_ia(modelo_seleccionado, prompt_pod, api_key_gemini)
                 
         if st.session_state.get("podcast_script"):
             st.markdown("### 📜 Guion Generado (Editable)")
             
-            # 🔥 AQUÍ ESTÁ EL CAMBIO: Guardamos lo que el usuario escriba
             guion_editado = st.text_area("Guion del Podcast:", value=st.session_state.podcast_script, height=400, key="pod_script_txt_edit")
             st.session_state.podcast_script = guion_editado
             
@@ -700,7 +722,6 @@ if macro_idx == 0:
                 
             if st.button("🔊 Generar Audio del Podcast (3 Voces)", key="btn_pod_audio"):
                 with st.spinner("Generando audio (esto puede tardar un poco)..."):
-                    # 🔥 Usamos el guion editado
                     audio_pod = generar_podcast_3_voces(st.session_state.podcast_script, voz_pod1, voz_pod2, voz_pod3)
                     if audio_pod:
                         st.audio(audio_pod, format="audio/mp3")
@@ -710,7 +731,6 @@ if macro_idx == 0:
                         if not nombre_mp3_limpio: nombre_mp3_limpio = "podcast_3_voces"
                         st.download_button("💾 Descargar Podcast MP3", audio_pod, f"{nombre_mp3_limpio}.mp3")
                         
-            # 🔥 Descargamos el guion editado
             botones_descarga(st.session_state.podcast_script, "Guion_Podcast")
             
         cajon_ideas_personalizado("Podcast", modelo_seleccionado, api_key_gemini)
@@ -753,17 +773,19 @@ if macro_idx == 0:
                         audio_chat = generar_audio_sincrono(ultimo_msg, "es-ES-ElviraNeural")
                         if audio_chat: st.audio(audio_chat, format="audio/mp3")
 
+        contexto_adjunto = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, api_key_gemini)
         prompt = chat_input_pro("main", "Escribe tu mensaje...")
         
         if quick_prompt:
             prompt = quick_prompt
         
         if prompt:
+            prompt_con_archivo = f"{contexto_adjunto}\n\n{prompt}" if contexto_adjunto else prompt
             st.session_state.chat_history.append({"role": "user", "content": prompt})
             st.chat_message("user").write(prompt)
             
             with st.spinner("Pensando..."):
-                res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, historial_chat=st.session_state.chat_history)
+                res = llamar_ia(modelo_seleccionado, prompt_con_archivo, api_key_gemini, historial_chat=st.session_state.chat_history)
                 st.session_state.chat_history.append({"role": "assistant", "content": res})
                 st.chat_message("assistant").write(res)
             st.rerun()
@@ -827,11 +849,12 @@ if macro_idx == 0:
         st.markdown("#### ⚖️ La Balanza: El Debate")
         st.caption("Pon a prueba tus ideas. La IA defenderá una postura y luego la contraria.")
         
+        contexto_adjunto = cajita_adjuntar_archivo("debate_adj", modelo_seleccionado, api_key_gemini)
         tema_debate = campo_con_ideas("¿Sobre qué quieres debatir?", "debate_tema", "un tema polémico para debatir", modelo_seleccionado, api_key_gemini, placeholder="Ej: ¿Debería comprarme un coche eléctrico?")
         
         if st.button("Iniciar Debate", type="primary", key="btn_debate") and tema_debate:
             with st.spinner("Preparando argumentos..."):
-                prompt_debate = f"Actúa como un debate estructurado. El tema es: '{tema_debate}'. " \
+                prompt_debate = f"{contexto_adjunto}\n\nActúa como un debate estructurado. El tema es: '{tema_debate}'. " \
                                  f"1. Presenta los 3 argumentos MÁS FUERTES a favor. " \
                                  f"2. Presenta los 3 argumentos MÁS FUERTES en contra. " \
                                  f"3. Concluye con una reflexión neutral."
@@ -842,26 +865,30 @@ if macro_idx == 0:
 
     elif sub_idx == 6:
         st.markdown("#### 🍳 El Chef Virtual")
+        contexto_adjunto = cajita_adjuntar_archivo("chef_adj", modelo_seleccionado, api_key_gemini)
+        
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             ingredientes = campo_con_ideas("¿Qué tienes en la nevera?", "chef_ing", "recetas fáciles", modelo_seleccionado, api_key_gemini, placeholder="Ej: Pollo, arroz y tomate")
             if st.button("Dame una receta", key="btn_chef_receta") and ingredientes:
-                st.session_state.receta_generada = llamar_ia(modelo_seleccionado, f"Tengo {ingredientes}. Dame una receta.", api_key_gemini)
+                st.session_state.receta_generada = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nTengo {ingredientes}. Dame una receta.", api_key_gemini)
                 if st.session_state.receta_generada: st.info(st.session_state.receta_generada)
         with col_c2:
             preferencias = campo_con_ideas("¿Menú semanal?", "chef_menu", "menús semanales saludables", modelo_seleccionado, api_key_gemini, placeholder="Ej: Vegetariano y bajo en calorías")
             if st.button("Generar Menú + Compra", key="btn_chef_menu") and preferencias:
-                st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"Menú semanal para 4. {preferencias}.", api_key_gemini)
+                st.session_state.menu_generado = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nMenú semanal para 4. {preferencias}.", api_key_gemini)
                 if st.session_state.menu_generado: st.info(st.session_state.menu_generado)
         cajon_ideas_personalizado("Cocina", modelo_seleccionado, api_key_gemini)
 
     elif sub_idx == 7:
         st.markdown("#### 📖 Cuentacuentos")
+        contexto_adjunto = cajita_adjuntar_archivo("cuento_adj", modelo_seleccionado, api_key_gemini)
+        
         prota = campo_con_ideas("Protagonista:", "cuento_prota", "un protagonista de cuento", modelo_seleccionado, api_key_gemini, placeholder="Ej: Un dragón que no sabe volar")
         lugar = campo_con_ideas("Lugar mágico:", "cuento_lugar", "un lugar mágico para un cuento", modelo_seleccionado, api_key_gemini, placeholder="Ej: Un bosque de caramelos")
         
         if st.button("✨ Crear Cuento", key="btn_cuento") and prota and lugar:
-            cuento = llamar_ia(modelo_seleccionado, f"Cuento. Protagonista: {prota}, Lugar: {lugar}.", api_key_gemini)
+            cuento = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nCuento. Protagonista: {prota}, Lugar: {lugar}.", api_key_gemini)
             st.text_area("Cuento:", value=cuento, height=300, key="cuento_text")
             if st.button("🔊 Leer en voz alta", key="btn_cuento_tts"):
                 audio = generar_audio_sincrono(cuento, "es-ES-ElviraNeural")
@@ -870,15 +897,17 @@ if macro_idx == 0:
 
     elif sub_idx == 8:
         st.markdown("#### Asistente de Código")
+        contexto_adjunto = cajita_adjuntar_archivo("code_adj", modelo_seleccionado, api_key_gemini)
         req_code = campo_con_ideas("Pega un código o pide uno nuevo:", "code_req", "scripts útiles en Python", modelo_seleccionado, api_key_gemini, placeholder="Ej: Script para renombrar archivos")
         
         if st.button("Procesar Código", key="btn_code") and req_code:
-            res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req_code}", api_key_gemini)
+            res = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nProgramador senior. Explica o mejora:\n{req_code}", api_key_gemini)
             st.code(res, language="python")
         cajon_ideas_personalizado("Código", modelo_seleccionado, api_key_gemini)
 
     elif sub_idx == 9:
         st.markdown("#### 🌍 Traductor Universal")
+        contexto_adjunto = cajita_adjuntar_archivo("trad_adj", modelo_seleccionado, api_key_gemini)
         texto_trad = campo_con_ideas("Texto a traducir:", "trad_text", "frases útiles para traducir", modelo_seleccionado, api_key_gemini, placeholder="Escribe el texto o pide ideas...")
         
         col_origen, col_destino = st.columns(2)
@@ -890,9 +919,9 @@ if macro_idx == 0:
         if st.button("Traducir", key="btn_trad", type="primary") and texto_trad:
             with st.spinner("Traduciendo..."):
                 if idioma_origen == "Auto-detectar":
-                    prompt_trad = f"Detecta el idioma de este texto y tradúcelo al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
+                    prompt_trad = f"{contexto_adjunto}\n\nDetecta el idioma de este texto y tradúcelo al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
                 else:
-                    prompt_trad = f"Traduce este texto del {idioma_origen} al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
+                    prompt_trad = f"{contexto_adjunto}\n\nTraduce este texto del {idioma_origen} al {idioma_destino}. Devuelve solo la traducción:\n\n{texto_trad}"
                 
                 resultado_trad = llamar_ia(modelo_seleccionado, prompt_trad, api_key_gemini)
                 st.info(resultado_trad)
@@ -943,13 +972,15 @@ elif macro_idx == 1:
 
     elif sub_idx == 2:
         st.markdown("#### Creación de Documentos")
+        contexto_adjunto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, api_key_gemini)
+        
         col_form, col_prompt = st.columns([1, 2])
         with col_form: formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_format")
         with col_prompt: prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office_prompt", "documentos de oficina (presupuestos, informes)", modelo_seleccionado, api_key_gemini, placeholder="Ej: Un presupuesto para un cliente...")
         
         if st.button("Generar Documento", key="btn_office", type="primary") and prompt_office:
             with st.spinner("Generando..."):
-                texto = llamar_ia(modelo_seleccionado, prompt_office, api_key_gemini)
+                texto = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\n{prompt_office}", api_key_gemini)
                 st.session_state.office_text = texto
                 
                 nombre_office_def = "Documento_Xavilu"
@@ -966,11 +997,13 @@ elif macro_idx == 1:
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro")
+        contexto_adjunto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, api_key_gemini)
+        
         titulo_pdf = st.text_input("Título del documento:", key="pdf_title")
         contenido_pdf = campo_con_ideas("Contenido a incluir:", "pdf_content", "contenido para un PDF profesional", modelo_seleccionado, api_key_gemini, placeholder="Escribe el contenido o pide ideas...")
         
         if st.button("Generar PDF", key="btn_pdf", type="primary") and titulo_pdf and contenido_pdf:
-            texto = llamar_ia(modelo_seleccionado, contenido_pdf, api_key_gemini)
+            texto = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\n{contenido_pdf}", api_key_gemini)
             st.session_state.pdf_text = texto
             
             nombre_pdf = st.text_input("📝 Nombre del archivo (sin extensión):", value=titulo_pdf, key="input_pdf_name")
@@ -985,12 +1018,14 @@ elif macro_idx == 1:
 
     elif sub_idx == 4:
         st.markdown("#### Mapas Mentales")
+        contexto_adjunto = cajita_adjuntar_archivo("map_adj", modelo_seleccionado, api_key_gemini)
+        
         col_tema, col_modo = st.columns([2, 1])
         with col_tema: tema = campo_con_ideas("Tema Central:", "map_tema", "temas para mapas mentales", modelo_seleccionado, api_key_gemini, placeholder="Ej: Redes informáticas")
         with col_modo: modo_infantil = st.checkbox("🎨 Modo Infantil (Emojis)", value=False, key="map_kids")
         
         if st.button("🎯 Trazar Mapa", type="primary", key="btn_mapa") and tema:
-            prompt = f"Genera código Mermaid para un mapa mental de '{tema}'."
+            prompt = f"{contexto_adjunto}\n\nGenera código Mermaid para un mapa mental de '{tema}'."
             if modo_infantil: prompt += " Usa emojis y colores 'classDef rojo fill:#FF6B6B'."
             codigo = llamar_ia(modelo_seleccionado, prompt, api_key_gemini)
             st.session_state.mermaid_code = html.escape(codigo.replace("```mermaid", "").replace("```", "").strip())
@@ -1022,11 +1057,13 @@ elif macro_idx == 1:
 
     elif sub_idx == 6:
         st.markdown("#### Portapapeles Universal")
+        contexto_adjunto = cajita_adjuntar_archivo("clip_adj", modelo_seleccionado, api_key_gemini)
+        
         texto_uni = st.text_area("Pega cualquier texto aquí:", key="clip_text")
         instruccion = campo_con_ideas("¿Qué quieres que haga la IA con este texto?", "clip_inst", "instrucciones para procesar texto", modelo_seleccionado, api_key_gemini, placeholder="Ej: Resume esto, tradúcelo, haz un poema...")
         
         if st.button("Procesar Texto", key="btn_clip") and texto_uni and instruccion:
-            res = llamar_ia(modelo_seleccionado, f"Instrucción: {instruccion}\n\nTexto: {texto_uni}", api_key_gemini)
+            res = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nInstrucción: {instruccion}\n\nTexto: {texto_uni}", api_key_gemini)
             st.session_state.clip_text = res
             st.info(res)
             if st.session_state.clip_text:
@@ -1042,6 +1079,7 @@ elif macro_idx == 2:
     
     if sub_idx == 0:
         st.markdown("#### Buscador Global")
+        contexto_adjunto = cajita_adjuntar_archivo("web_adj", modelo_seleccionado, api_key_gemini)
         q = campo_con_ideas("Busca en internet:", "web_q", "temas de actualidad para buscar", modelo_seleccionado, api_key_gemini, placeholder="Ej: Últimas noticias de IA")
         
         if st.button("🔍 Buscar", key="btn_web", type="primary") and q:
@@ -1074,13 +1112,14 @@ elif macro_idx == 2:
 
         elif dep_idx == 1:
             st.markdown("##### ⚡ Resultados y Directo")
+            contexto_adjunto = cajita_adjuntar_archivo("dep_res_adj", modelo_seleccionado, api_key_gemini)
             evento_directo = campo_con_ideas("¿Qué resultados buscas?", "dep_results_q", "eventos deportivos", modelo_seleccionado, api_key_gemini, placeholder="Ej: Resultados de LaLiga hoy")
             
             if st.button("Buscar Resultados", type="primary", key="btn_res_directo") and evento_directo:
                 with st.spinner("Buscando marcadores..."):
                     res_web = buscar_en_internet(evento_directo)
                     contexto = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web])
-                    st.session_state.dep_resultados = llamar_ia(modelo_seleccionado, f"Dame los resultados de: '{evento_directo}'. Datos: {contexto}", api_key_gemini)
+                    st.session_state.dep_resultados = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nDame los resultados de: '{evento_directo}'. Datos: {contexto}", api_key_gemini)
                     st.info(st.session_state.dep_resultados)
                     if st.session_state.dep_resultados:
                         boton_superpoder(st.session_state.dep_resultados, "Haz un análisis táctico de élite", "tactico", modelo_seleccionado, api_key_gemini)
@@ -1088,12 +1127,13 @@ elif macro_idx == 2:
 
         elif dep_idx == 2:
             st.markdown("##### 📊 Análisis Táctico y Clasificaciones")
+            contexto_adjunto = cajita_adjuntar_archivo("dep_ana_adj", modelo_seleccionado, api_key_gemini)
             col_eq1, col_eq2 = st.columns(2)
             with col_eq1: equipo_local = st.text_input("Equipo Local:", placeholder="Ej: Real Madrid", key="dep_eq1")
             with col_eq2: equipo_visitante = st.text_input("Equipo Visitante:", placeholder="Ej: FC Barcelona", key="dep_eq2")
             if st.button("⚔️ Analizar Partido", key="btn_analisis_partido") and equipo_local and equipo_visitante:
                 with st.spinner("Analizando rachas..."):
-                    prompt_partido = f"Analiza el partido {equipo_local} vs {equipo_visitante}. Pronóstico final."
+                    prompt_partido = f"{contexto_adjunto}\n\nAnaliza el partido {equipo_local} vs {equipo_visitante}. Pronóstico final."
                     st.session_state.partido_analisis = llamar_ia(modelo_seleccionado, prompt_partido, api_key_gemini)
                     st.info(st.session_state.partido_analisis)
                     if st.session_state.partido_analisis:
@@ -1102,18 +1142,19 @@ elif macro_idx == 2:
             liga_tabla = st.selectbox("Consultar Clasificación:", ["LaLiga EA Sports", "Premier League", "NBA", "Euroliga", "Fórmula 1"], key="sel_tabla")
             if st.button("🏆 Ver Tabla", key="btn_ver_tabla"):
                 with st.spinner("Buscando clasificación..."):
-                    prompt_tabla = f"Dame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos)."
+                    prompt_tabla = f"{contexto_adjunto}\n\nDame la clasificación actual de {liga_tabla} (Posición, Equipo/Piloto, Puntos)."
                     st.info(llamar_ia(modelo_seleccionado, prompt_tabla, api_key_gemini))
             cajon_ideas_personalizado("Análisis Deportivo", modelo_seleccionado, api_key_gemini)
 
         elif dep_idx == 3:
             st.markdown("##### 🏋️ Entrenamiento y Nutrición")
+            contexto_adjunto = cajita_adjuntar_archivo("dep_train_adj", modelo_seleccionado, api_key_gemini)
             objetivo = campo_con_ideas("¿Qué necesitas?", "dep_train_q", "rutinas de entrenamiento", modelo_seleccionado, api_key_gemini, placeholder="Ej: Rutina para ganar masa muscular")
             
             deporte_pract = st.selectbox("Deporte principal:", ["Fútbol", "Running", "Gimnasio", "Ciclismo", "Baloncesto", "Tenis"], key="dep_train_s")
             if st.button("Generar Plan", key="btn_plan_deporte") and objetivo:
                 with st.spinner("Diseñando plan..."):
-                    st.session_state.plan_deporte = llamar_ia(modelo_seleccionado, f"Entrenador personal. Deporte: {deporte_pract}. Objetivo: '{objetivo}'. Dame un plan semanal.", api_key_gemini)
+                    st.session_state.plan_deporte = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nEntrenador personal. Deporte: {deporte_pract}. Objetivo: '{objetivo}'. Dame un plan semanal.", api_key_gemini)
                     st.info(st.session_state.plan_deporte)
                     if st.session_state.plan_deporte:
                         boton_superpoder(st.session_state.plan_deporte, "Añade suplementos y estiramientos preventivos", "entrenamiento", modelo_seleccionado, api_key_gemini)
@@ -1125,12 +1166,13 @@ elif macro_idx == 2:
         tv_idx = custom_tabs(tv_names, "tv_sub", 0)
         
         if tv_idx == 0:
+            contexto_adjunto = cajita_adjuntar_archivo("tv_cine_adj", modelo_seleccionado, api_key_gemini)
             estado_animo = campo_con_ideas("¿Qué te apetece ver?", "tv_animo", "estados de ánimo o géneros para películas", modelo_seleccionado, api_key_gemini, placeholder="Ej: Comedia familiar")
             
             plataformas = st.multiselect("Tus plataformas:", ["Netflix", "Prime Video", "Disney+", "HBO Max", "Movistar+", "Filmin"], key="tv_plat")
             if st.button("🍿 Recomendar", type="primary", key="btn_rec_cine") and estado_animo:
                 with st.spinner("Buscando películas..."):
-                    prompt_cine = f"Recomienda 3 películas o series. Busco: '{estado_animo}'. Plataformas: {', '.join(plataformas)}."
+                    prompt_cine = f"{contexto_adjunto}\n\nRecomienda 3 películas o series. Busco: '{estado_animo}'. Plataformas: {', '.join(plataformas)}."
                     st.session_state.cine_rec = llamar_ia(modelo_seleccionado, prompt_cine, api_key_gemini)
                     st.info(st.session_state.cine_rec)
                     if st.session_state.cine_rec:
@@ -1138,26 +1180,28 @@ elif macro_idx == 2:
             cajon_ideas_personalizado("Cine y Series", modelo_seleccionado, api_key_gemini)
 
         elif tv_idx == 1:
+            contexto_adjunto = cajita_adjuntar_archivo("tv_prog_adj", modelo_seleccionado, api_key_gemini)
             canal_tv = campo_con_ideas("¿Qué canal buscas?", "tv_chan", "programación de TV", modelo_seleccionado, api_key_gemini, placeholder="Ej: Programación de esta noche en Telecinco")
             
             if st.button("Buscar Programación", key="btn_tv_prog") and canal_tv:
                 with st.spinner("Buscando parrilla..."):
                     res_web_tv = buscar_en_internet(canal_tv)
                     contexto_tv = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_web_tv])
-                    st.session_state.tv_prog = llamar_ia(modelo_seleccionado, f"Programación de hoy para: '{canal_tv}'. Datos: {contexto_tv}", api_key_gemini)
+                    st.session_state.tv_prog = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nProgramación de hoy para: '{canal_tv}'. Datos: {contexto_tv}", api_key_gemini)
                     st.info(st.session_state.tv_prog)
                     if st.session_state.tv_prog:
                         boton_superpoder(st.session_state.tv_prog, "Dime el programa más recomendado", "tv", modelo_seleccionado, api_key_gemini)
             cajon_ideas_personalizado("Programación TV", modelo_seleccionado, api_key_gemini)
 
         elif tv_idx == 2:
+            contexto_adjunto = cajita_adjuntar_archivo("tv_ent_adj", modelo_seleccionado, api_key_gemini)
             evento_buscar = campo_con_ideas("¿Qué evento buscas?", "tv_event", "eventos y conciertos", modelo_seleccionado, api_key_gemini, placeholder="Ej: Concierto de Taylor Swift")
             ciudad = st.text_input("¿En qué ciudad?", placeholder="Ej: Madrid", key="tv_city")
             if st.button("Buscar Entradas", key="btn_entradas") and evento_buscar:
                 with st.spinner("Buscando disponibilidad..."):
                     res_entradas = buscar_en_internet(f"entradas {evento_buscar} {ciudad}")
                     contexto_entradas = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_entradas])
-                    st.session_state.entradas = llamar_ia(modelo_seleccionado, f"Info de: '{evento_buscar}' en {ciudad}. Datos: {contexto_entradas}", api_key_gemini)
+                    st.session_state.entradas = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nInfo de: '{evento_buscar}' en {ciudad}. Datos: {contexto_entradas}", api_key_gemini)
                     st.info(st.session_state.entradas)
                     if st.session_state.entradas:
                         boton_superpoder(st.session_state.entradas, "Plan de viaje de 24h alrededor del evento", "entradas", modelo_seleccionado, api_key_gemini)
@@ -1379,11 +1423,12 @@ elif macro_idx == 4:
             if st.button("Calcular Red", key="btn_net") and ip:
                 st.info(llamar_ia(modelo_seleccionado, f"Calcula máscara, rango, broadcast y hosts para: {ip}", api_key_gemini))
         with col_r2:
+            contexto_adjunto = cajita_adjuntar_archivo("net_adj", modelo_seleccionado, api_key_gemini)
             tarea = campo_con_ideas("¿Qué necesitas hacer?", "net_task", "comandos de red", modelo_seleccionado, api_key_gemini, placeholder="Ej: Ver mi IP, reiniciar DNS...")
             
             so = st.selectbox("Sistema:", ["Windows", "Linux", "Cisco"], key="net_os")
             if st.button("Buscar Comando", key="btn_net_cmd") and tarea:
-                st.info(llamar_ia(modelo_seleccionado, f"Comando para {so}: {tarea}. Explícalo.", api_key_gemini))
+                st.info(llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nComando para {so}: {tarea}. Explícalo.", api_key_gemini))
                 
         if st.button("Comenzar Entrevista (Nivel CCNA)", key="btn_net_interview"):
             st.info(llamar_ia(modelo_seleccionado, "Hazme 3 preguntas de nivel CCNA.", api_key_gemini))
@@ -1408,16 +1453,20 @@ elif macro_idx == 4:
 
     elif sub_idx == 2:
         st.markdown("#### 📚 Asistente de Deberes")
+        contexto_adjunto = cajita_adjuntar_archivo("home_adj", modelo_seleccionado, api_key_gemini)
+        
         nivel = st.selectbox("Nivel:", ["Primaria", "ESO", "Bachillerato", "Universidad"], key="home_nivel")
         materia = st.selectbox("Materia:", ["Matemáticas", "Lengua", "Ciencias", "Historia", "Idiomas"], key="home_materia")
         duda = campo_con_ideas("Duda:", "home_duda", "dudas de deberes", modelo_seleccionado, api_key_gemini, placeholder="Ej: Explícame la fotosíntesis")
         
         if st.button("Explicar Duda", key="btn_home") and duda:
-            st.info(llamar_ia(modelo_seleccionado, f"Profesor. Nivel: {nivel}. Materia: {materia}. Explica: {duda}", api_key_gemini))
+            st.info(llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nProfesor. Nivel: {nivel}. Materia: {materia}. Explica: {duda}", api_key_gemini))
         cajon_ideas_personalizado("Deberes", modelo_seleccionado, api_key_gemini)
 
     elif sub_idx == 3:
         st.markdown("#### 🦺 Asistente de Prevención de Riesgos Laborales")
+        contexto_adjunto = cajita_adjuntar_archivo("prl_adj", modelo_seleccionado, api_key_gemini)
+        
         tipo_prl = st.selectbox("¿Qué necesitas generar?", ["Charla de 5 Minutos", "Evaluación de Riesgos", "Recomendación de EPIs", "Consulta Legal / Normativa"], key="prl_tipo")
         contexto_prl = campo_con_ideas("Describe la tarea o duda:", "prl_contexto", "situaciones de riesgo laboral", modelo_seleccionado, api_key_gemini, placeholder="Ej: Trabajo en altura con escalera de tijera.")
         
@@ -1427,7 +1476,7 @@ elif macro_idx == 4:
             elif "EPIs" in tipo_prl: prompt_prl = f"EPIs obligatorios para: '{contexto_prl}'."
             else: prompt_prl = f"Consulta legal en PRL (España): '{contexto_prl}'."
             
-            st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, prompt_prl, api_key_gemini)
+            st.session_state.prl_resultado = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\n{prompt_prl}", api_key_gemini)
             st.text_area("Documento:", value=st.session_state.prl_resultado, height=400)
             botones_descarga(st.session_state.prl_resultado, "Documento_PRL")
         cajon_ideas_personalizado("PRL", modelo_seleccionado, api_key_gemini)
@@ -1441,13 +1490,15 @@ elif macro_idx == 5:
     
     if sub_idx == 0:
         st.markdown("#### 🌍 Planificador de Viajes")
+        contexto_adjunto = cajita_adjuntar_archivo("travel_adj", modelo_seleccionado, api_key_gemini)
+        
         destino = campo_con_ideas("Destino:", "travel_dest", "destinos de viaje", modelo_seleccionado, api_key_gemini, placeholder="Ej: Roma, Japón, Nueva York...")
         
         col_v1, col_v2 = st.columns(2)
         with col_v1: dias = st.number_input("Días:", min_value=1, value=3, key="travel_days")
         with col_v2: compania = st.selectbox("Compañía:", ["Pareja", "Familia", "Amigos", "Solo/a"], key="travel_comp")
         if st.button("✈️ Generar Itinerario", type="primary", key="btn_travel") and destino:
-            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"Itinerario {dias} días en {destino} con {compania}.", api_key_gemini)
+            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nItinerario {dias} días en {destino} con {compania}.", api_key_gemini)
             st.info(st.session_state.analisis_ia)
             botones_descarga(st.session_state.analisis_ia, f"Viaje_{destino}")
         cajon_ideas_personalizado("Viajes", modelo_seleccionado, api_key_gemini)
@@ -1476,11 +1527,13 @@ elif macro_idx == 5:
 
     elif sub_idx == 2:
         st.markdown("#### ✉️ Cartas y Mensajes")
+        contexto_adjunto = cajita_adjuntar_archivo("letter_adj", modelo_seleccionado, api_key_gemini)
+        
         tipo_mensaje = st.selectbox("Tipo:", ["Reyes Magos", "Papá Noel", "Discurso cumpleaños", "Carta formal de reclamación"], key="letter_type")
         detalles = campo_con_ideas("Detalles:", "letter_details", "cartas y discursos", modelo_seleccionado, api_key_gemini, placeholder="Ej: Una carta para mis padres agradeciendo...")
         
         if st.button("✍️ Redactar", type="primary", key="btn_letter") and detalles:
-            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"Escribe {tipo_mensaje} con estos datos: {detalles}.", api_key_gemini)
+            st.session_state.analisis_ia = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nEscribe {tipo_mensaje} con estos datos: {detalles}.", api_key_gemini)
             st.text_area("Resultado:", value=st.session_state.analisis_ia, height=300)
             botones_descarga(st.session_state.analisis_ia, "Mensaje")
         cajon_ideas_personalizado("Cartas y Mensajes", modelo_seleccionado, api_key_gemini)
@@ -1494,13 +1547,15 @@ elif macro_idx == 6:
     
     if sub_idx == 0:
         st.markdown("#### 🎵 Estudio de Creación Musical")
+        contexto_adjunto = cajita_adjuntar_archivo("music_adj", modelo_seleccionado, api_key_gemini)
+        
         col_m1, col_m2 = st.columns(2)
         with col_m1: tema_cancion = campo_con_ideas("¿De qué trata?", "song_theme", "temas para canciones", modelo_seleccionado, api_key_gemini, placeholder="Ej: Un amor de verano")
         with col_m2: genero = st.selectbox("Género:", ["Pop", "Rock", "Rap", "Balada"], key="song_genre")
         tono = st.select_slider("Tono:", options=["Triste", "Melancólico", "Alegre", "Épico"], key="song_tone")
         
         if st.button("🎼 Escribir Canción", type="primary", key="btn_song") and tema_cancion:
-            letra = llamar_ia(modelo_seleccionado, f"Canción {genero} sobre '{tema_cancion}', tono {tono}.", api_key_gemini)
+            letra = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nCanción {genero} sobre '{tema_cancion}', tono {tono}.", api_key_gemini)
             st.session_state.letra_cancion = letra
             titulo = llamar_ia(modelo_seleccionado, f"Título para esta letra:\n{letra[:500]}", api_key_gemini).strip()
             st.session_state.titulo_cancion = titulo
@@ -1528,11 +1583,13 @@ elif macro_idx == 6:
 
     elif sub_idx == 1:
         st.markdown("#### 🎨 Poesía y Rimas")
+        contexto_adjunto = cajita_adjuntar_archivo("poem_adj", modelo_seleccionado, api_key_gemini)
+        
         tema_poema = campo_con_ideas("¿Sobre qué quieres el poema?", "poem_theme", "temas para poemas", modelo_seleccionado, api_key_gemini, placeholder="Ej: La soledad en la ciudad")
         
         estilo_poema = st.selectbox("Estilo:", ["Romántico", "Divertido", "Épico", "Haiku"], key="poem_style")
         if st.button("✒️ Escribir Poema", type="primary", key="btn_poem") and tema_poema:
-            poema = llamar_ia(modelo_seleccionado, f"Poema {estilo_poema} sobre: '{tema_poema}'.", api_key_gemini)
+            poema = llamar_ia(modelo_seleccionado, f"{contexto_adjunto}\n\nPoema {estilo_poema} sobre: '{tema_poema}'.", api_key_gemini)
             st.text_area("Poema:", value=poema, height=300)
             botones_descarga(poema, "Poema")
             if st.button("🔊 Recitar Poema", key="btn_poem_audio"):
