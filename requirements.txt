@@ -15,12 +15,9 @@ openai
 anthropic
 qrcode
 opencv-python-headless
-yt-dlp
-curl_cffi
 pandas
 requests
 numpy
 groq
 python-dotenv
 yt-dlp[default,curl-cffi]
-curl_cffi
