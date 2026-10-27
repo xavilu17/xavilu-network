@@ -5,7 +5,6 @@ from groq import Groq
 st.set_page_config(page_title="CreatorFlow Demo", page_icon="✨", layout="wide")
 
 # --- CONEXIÓN CON GROQ ---
-# Lee la clave de forma segura desde los Secrets de Streamlit
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
@@ -13,7 +12,6 @@ except Exception as e:
     st.stop()
 
 # --- DATOS FALSOS (MOCK) ---
-# Simulamos comentarios de Instagram y X
 comentarios = [
     {"red": "Instagram", "usuario": "@maria_fit", "texto": "¡Increíble el video de hoy! ¿Qué rutina de ejercicios sigues?"},
     {"red": "X", "usuario": "@tech_lover", "texto": "Oye, ¿el nuevo producto del que hablaste sale a la venta pronto?"},
@@ -25,33 +23,26 @@ st.title("✨ CreatorFlow - Panel de Influencer")
 st.markdown("Bienvenido a tu centro de control. Gestiona tus redes sin estrés.")
 st.divider()
 
-# Dividimos la pantalla en dos columnas
 col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("📥 Bandeja de Entrada")
     st.info("Estos son comentarios simulados de tus redes.")
-    
-    # Selector de comentarios
     opciones = [f"[{c['red']}] {c['usuario']}: {c['texto']}" for c in comentarios]
     seleccion = st.radio("Selecciona un mensaje para responder:", opciones)
 
 with col2:
     st.subheader("🤖 Asistente de IA")
-    
     if seleccion:
-        # Extraemos el texto del comentario seleccionado para pasárselo a la IA
         index = opciones.index(seleccion)
         comentario_elegido = comentarios[index]["texto"]
         red_social = comentarios[index]["red"]
         
         st.write(f"**Respondiendo a:** *{comentario_elegido}*")
         
-        # Botón para generar la respuesta
         if st.button("Generar respuesta con IA", type="primary"):
             with st.spinner("Pensando la mejor respuesta..."):
                 try:
-                    # Llamada a la IA de Groq (CON EL MODELO ACTUALIZADO)
                     chat_completion = client.chat.completions.create(
                         messages=[
                             {
@@ -63,16 +54,13 @@ with col2:
                                 "content": f"Genera una respuesta para este comentario: {comentario_elegido}"
                             }
                         ],
-                        model="llama-3.1-8b-instant", # <--- MODELO ACTUALIZADO AQUÍ
+                        model="llama-3.3-70b-versatile",  # <--- MODELO ACTUALIZADO Y ESTABLE
                     )
                     
                     respuesta = chat_completion.choices[0].message.content
-                    
-                    # Mostramos la respuesta en un cuadro de texto para que el influencer pueda editarla
                     st.success("¡Respuesta generada!")
                     st.text_area("Revisa y edita tu respuesta:", value=respuesta, height=150)
-                    
-                    st.button("Publicar en " + red_social) # Botón falso para la demo
+                    st.button("Publicar en " + red_social)
                     
                 except Exception as e:
                     st.error(f"Error al conectar con la IA: {e}")
