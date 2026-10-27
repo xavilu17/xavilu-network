@@ -185,7 +185,7 @@ def buscar_noticias_deportivas(deporte, liga):
         return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in res]
     except: return []
 
-# NUEVO: helper para extraer ID de YouTube de cualquier formato de URL
+# Helper para extraer ID de YouTube de cualquier formato de URL
 def extraer_youtube_id(url):
     if not url: return None
     m = re.search(r"(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})", url)
@@ -193,7 +193,7 @@ def extraer_youtube_id(url):
     if len(url.strip()) == 11: return url.strip()
     return None
 
-# NUEVO: transcribe el audio de un vídeo de YouTube usando Whisper de Groq (vía URL)
+# Transcribe el audio de un vídeo de YouTube usando Whisper de Groq (vía URL)
 def transcribir_audio_youtube(url, api_key_groq):
     if not HAS_YTDLP or not HAS_OPENAI:
         return "[ERROR] Faltan yt-dlp u openai instalados."
@@ -253,14 +253,15 @@ def transcribir_audio_youtube(url, api_key_groq):
         try: os.rmdir(tmp)
         except: pass
 
-# NUEVO: transcribe un archivo local (audio/vídeo) usando Whisper de Groq
+# Transcribe un archivo local (audio/vídeo) usando Whisper de Groq
 def transcribir_archivo_local(archivo_bytes, nombre_archivo, api_key_groq):
     if not HAS_OPENAI:
         return "[ERROR] Falta openai instalado."
     if not api_key_groq:
         return "[ERROR] No hay Groq API Key. Configúrala en la barra lateral."
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(nombre_archivo)[1])
+    ext = os.path.splitext(nombre_archivo)[1]
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     tmp.write(archivo_bytes)
     tmp.close()
     audio_path = tmp.name
@@ -306,16 +307,55 @@ def cajita_adjuntar_archivo(key_suffix, modelo, api_key):
 @st.cache_resource
 def get_gemini_client(api_key): return genai.Client(api_key=api_key)
 
+# NUEVO: Manejo de archivos grandes con Gemini File API y captura de errores
 def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
     if not HAS_GEMINI: return "[ERROR] Falta google-genai."
-    for i in range(3):
-        try:
-            client = get_gemini_client(api_key_gemini)
+    
+    size_mb = len(archivo_bytes) / (1024 * 1024)
+    tmp_path = None
+    
+    try:
+        client = get_gemini_client(api_key_gemini)
+        
+        # Si el archivo es mayor a 15MB, usamos la File API (soporta hasta 2GB)
+        if size_mb > 15:
+            ext = mime_type.split('/')[-1]
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            tmp.write(archivo_bytes)
+            tmp.close()
+            tmp_path = tmp.name
+            
+            with st.spinner(f"Subiendo archivo grande ({size_mb:.1f} MB) a Gemini..."):
+                uploaded_file = client.files.upload(file=tmp_path)
+                
+                # Esperar a que Gemini procese el archivo
+                while uploaded_file.state.name == "PROCESSING":
+                    time.sleep(3)
+                    uploaded_file = client.files.get(name=uploaded_file.name)
+                
+                if uploaded_file.state.name == "FAILED":
+                    return "[ERROR] Gemini no pudo procesar el archivo. Puede estar corrupto o ser demasiado largo."
+                
+                with st.spinner("Generando respuesta con IA..."):
+                    res = client.models.generate_content(
+                        model=GEMINI_MODEL,
+                        contents=[prompt, uploaded_file]
+                    ).text
+                
+                # Limpiamos el archivo de los servidores de Gemini
+                client.files.delete(name=uploaded_file.name)
+                return res
+        else:
+            # Archivos pequeños (inline)
             parte = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
             return client.models.generate_content(model=GEMINI_MODEL, contents=[prompt, parte]).text
-        except Exception as e:
-            if "503" in str(e) and i < 2: time.sleep(3); continue
-            else: return f"[ERROR GEMINI] {e}"
+            
+    except Exception as e:
+        return f"[ERROR GEMINI] {str(e)}"
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except: pass
 
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_openai="", api_key_anthropic=""):
     prompt_final = prompt[:MAX_TEXTO_IA]
@@ -325,7 +365,6 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
-    # Lógica: 1º busca en las cajas de texto de la app, 2º busca en secrets.toml, 3º vacío.
     try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
     except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
     
@@ -581,9 +620,7 @@ def custom_tabs(tab_names, key_name, default_idx=0):
 # INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
-    # Ocultamos las flechitas nativas de Streamlit para que no abran un menú vacío
     st.markdown("""<style>[data-testid="collapsedControl"] {display: none !important;}</style>""", unsafe_allow_html=True)
-    # Botón de rescate en la parte superior central
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
@@ -604,7 +641,6 @@ if st.session_state.sidebar_visible:
         st.markdown("---")
         modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
         
-        # SECCIÓN DE KEYS
         st.markdown("#### 🔑 Estado de Conexiones")
         try:
             if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
@@ -979,7 +1015,6 @@ elif macro_idx == 2:
                 out = BytesIO(); df.to_excel(out); st.download_button("📥 Excel", out.getvalue(), "tabla.xlsx")
             except: st.error("Fallo al leer.")
 
-    # REEMPLAZADO: subtab YouTube con opción de enlace o subida de archivo
     elif sub_idx == 4:
         st.markdown("#### 🎥 YouTube / Audio")
         
@@ -989,7 +1024,7 @@ elif macro_idx == 2:
         url = ""
         
         if fuente_tipo == "Subir archivo (Recomendado)":
-            archivo_subido = st.file_uploader("Sube un audio (.mp3) o vídeo (.mp4):", type=["mp3", "wav", "m4a", "mp4"])
+            archivo_subido = st.file_uploader("Sube un audio (.mp3) o vídeo (.mp4):", type=["mp3", "wav", "m4a", "mp4", "mov"])
         else:
             url = st.text_input("URL del vídeo:", placeholder="https://www.youtube.com/watch?v=...")
             
@@ -1074,25 +1109,58 @@ elif macro_idx == 2:
 elif macro_idx == 3:
     sub_names = ["🖼️ ANÁLISIS", "🎨 VISUAL", "🛡️ LOGOS", "📥 DESCARGADOR"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    
     if sub_idx == 0:
-        a = st.file_uploader("Sube archivo:", type=["png", "jpg", "mp3", "wav", "mp4"])
+        a = st.file_uploader("Sube archivo (Imagen, Audio o Vídeo):", type=["png", "jpg", "jpeg", "webp", "mp3", "wav", "m4a", "mp4", "mov", "avi"])
         if a:
             n = a.name.lower()
-            if n.endswith((".png", ".jpg")):
-                st.image(a); op = st.radio("Opción:", ["Describir", "OCR", "Prompt", "¿Es IA?"])
-                if st.button("Ejecutar"):
-                    p = "Describe" if "Describir" in op else "OCR" if "OCR" in op else "Prompt Midjourney" if "Prompt" in op else "¿Es IA?"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, st.session_state.api_key_gemini_manual))
-            elif n.endswith((".mp3", ".wav")):
-                st.audio(a); op = st.radio("Opción:", ["Transcribir", "Resumen", "Traducir"])
-                if st.button("Ejecutar"):
-                    p = "Transcribe" if "Transcribir" in op else "Resume" if "Resumen" in op else "Traduce"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, st.session_state.api_key_gemini_manual))
-            elif n.endswith((".mp4")):
-                st.video(a); op = st.radio("Opción:", ["Resumir", "Escenas"])
-                if st.button("Ejecutar"):
-                    p = "Resume" if "Resumir" in op else "Escenas"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, st.session_state.api_key_gemini_manual))
+            
+            if n.endswith((".png", ".jpg", ".jpeg", ".webp")):
+                st.image(a)
+                op = st.radio("Opción de imagen:", ["Describir", "OCR", "Prompt", "¿Es IA?"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Analizando imagen con Gemini..."):
+                        p = "Describe detalladamente" if "Describir" in op else "Extrae el texto (OCR)" if "OCR" in op else "Genera un prompt" if "Prompt" in op else "¿Es IA?"
+                        try:
+                            res = analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, st.session_state.api_key_gemini_manual)
+                            if "[ERROR" in res: st.error(res)
+                            else: st.info(res)
+                        except Exception as ex:
+                            st.error(f"Error inesperado: {ex}")
+            
+            elif n.endswith((".mp3", ".wav", ".m4a")):
+                st.audio(a)
+                op = st.radio("Opción de audio:", ["Transcribir (Whisper)", "Resumen", "Traducir al español"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Procesando audio..."):
+                        if "Transcribir" in op:
+                            key_groq = st.session_state.api_key_groq_manual or st.secrets.get("GROQ_API_KEY", "")
+                            res = transcribir_archivo_local(a.getvalue(), a.name, key_groq)
+                        else:
+                            p = "Resume este audio" if "Resumen" in op else "Traduce al español este audio"
+                            res = analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, st.session_state.api_key_gemini_manual)
+                        
+                        if "[ERROR" in res: st.error(res)
+                        else: st.info(res)
+            
+            elif n.endswith((".mp4", ".mov", ".avi", ".mkv")):
+                st.video(a)
+                op = st.radio("Opción de vídeo:", ["Transcribir audio (Whisper)", "Resumir (Gemini)", "Describir escenas (Gemini)"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Procesando vídeo (esto puede tardar)..."):
+                        if "Transcribir" in op:
+                            key_groq = st.session_state.api_key_groq_manual or st.secrets.get("GROQ_API_KEY", "")
+                            res = transcribir_archivo_local(a.getvalue(), a.name, key_groq)
+                        else:
+                            p = "Resume el contenido de este vídeo" if "Resumir" in op else "Describe las escenas de este vídeo"
+                            # La función analizar_archivo_con_gemini ya maneja archivos grandes automáticamente
+                            try:
+                                res = analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, st.session_state.api_key_gemini_manual)
+                                if "[ERROR" in res: st.error(res)
+                                else: st.info(res)
+                            except Exception as ex:
+                                st.error(f"Error inesperado al procesar el vídeo: {ex}")
+
     elif sub_idx == 1:
         p = campo_con_ideas("Describe imagen:", "img", "imágenes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Gato astronauta", "", "")
         if st.button("Generar") and p:
