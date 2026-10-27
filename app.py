@@ -122,7 +122,9 @@ _defaults = {
     "whatsapp_number": "",
     "office_borrador": "", "pdf_borrador": "",
     "plant_borrador": "",
-    "pod_tema_input": "", "pod_sugs": []
+    "pod_tema_input": "", "pod_sugs": [],
+    "api_key_gemini_manual": "", "api_key_groq_manual": "", "api_key_silicon_manual": "", 
+    "api_key_mistral_manual": "", "api_key_openrouter_manual": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -227,16 +229,21 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
-    try: key_gemini = st.secrets.get("GEMINI_API_KEY", api_key_gemini)
-    except: key_gemini = api_key_gemini
-    try: key_groq = st.secrets.get("GROQ_API_KEY", "")
-    except: key_groq = ""
-    try: key_silicon = st.secrets.get("SILICONFLOW_API_KEY", "")
-    except: key_silicon = ""
-    try: key_mistral = st.secrets.get("MISTRAL_API_KEY", "")
-    except: key_mistral = ""
-    try: key_openrouter = st.secrets.get("OPENROUTER_API_KEY", "")
-    except: key_openrouter = ""
+    # Lógica: 1º busca en las cajas de texto de la app, 2º busca en secrets.toml, 3º vacío.
+    try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
+    except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
+    
+    try: key_groq = st.session_state.api_key_groq_manual or st.secrets.get("GROQ_API_KEY", "")
+    except: key_groq = st.session_state.api_key_groq_manual or ""
+    
+    try: key_silicon = st.session_state.api_key_silicon_manual or st.secrets.get("SILICONFLOW_API_KEY", "")
+    except: key_silicon = st.session_state.api_key_silicon_manual or ""
+    
+    try: key_mistral = st.session_state.api_key_mistral_manual or st.secrets.get("MISTRAL_API_KEY", "")
+    except: key_mistral = st.session_state.api_key_mistral_manual or ""
+    
+    try: key_openrouter = st.session_state.api_key_openrouter_manual or st.secrets.get("OPENROUTER_API_KEY", "")
+    except: key_openrouter = st.session_state.api_key_openrouter_manual or ""
 
     res_exitosa = False
     res = None
@@ -475,33 +482,42 @@ def custom_tabs(tab_names, key_name, default_idx=0):
     return st.session_state[s_key]
 
 # ==========================================
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
-    c1, c2 = st.columns([1, 5])
-    with c1:
-        if st.button("⛶ Mostrar Menú", use_container_width=True): st.session_state.sidebar_visible = True; st.rerun()
-    with c2: st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
-    components.html("<script>window.parent.document.querySelector('[data-testid=\"stSidebar\"]').style.display = 'none';</script>", height=0)
-else:
-    st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
+    st.markdown("""<style>[data-testid="stSidebar"] {display: none !important;}</style>""", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
+            st.session_state.sidebar_visible = True
+            st.rerun()
+
+st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.markdown("### 🪐 PANEL DE CONTROL")
-    if st.button("⛶ Pantalla Completa", use_container_width=True): st.session_state.sidebar_visible = False; st.rerun()
+    
+    if st.button("⛶ Ocultar Menú (Pantalla Completa)", use_container_width=True): 
+        st.session_state.sidebar_visible = False
+        st.rerun()
+        
     st.markdown("---")
     modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
     
+    # SECCIÓN DE KEYS
     st.markdown("#### 🔑 Estado de Conexiones")
     try:
-        if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado")
-        if st.secrets.get("GROQ_API_KEY"): st.success("✅ Groq Conectado")
-        if st.secrets.get("SILICONFLOW_API_KEY"): st.success("✅ SiliconFlow Conectado")
-        if st.secrets.get("MISTRAL_API_KEY"): st.success("✅ Mistral Conectado")
-        if st.secrets.get("OPENROUTER_API_KEY"): st.success("✅ OpenRouter Conectado")
-    except Exception:
-        st.warning("⚠️ No se encontró el archivo secrets.toml")
+        if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
+    except: pass
+    
+    with st.expander("⚙️ Configurar Keys Manualmente"):
+        st.caption("Si no usas secrets.toml, pega aquí tus claves para esta sesión:")
+        st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
+        st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
+        st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
+        st.session_state.api_key_mistral_manual = st.text_input("Mistral API Key", type="password", value=st.session_state.api_key_mistral_manual)
+        st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter API Key", type="password", value=st.session_state.api_key_openrouter_manual)
 
     st.markdown("---")
     st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
@@ -531,7 +547,7 @@ if macro_idx == 0:
     
     if sub_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts")
-        contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, api_key_gemini)
+        contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
         tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
         
@@ -543,7 +559,7 @@ if macro_idx == 0:
         if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema, estilo y duración)", use_container_width=True, key="pod_btn_ideas"):
             with st.spinner("Pensando ideas..."):
                 prompt_ideas = f"Dame 3 ideas creativas y concisas para un podcast de {dur} minutos, estilo {estilo}, sobre el tema: '{tema}'. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
-                res = llamar_ia(modelo_seleccionado, prompt_ideas, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, prompt_ideas, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 st.session_state["pod_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
         def aplicar_idea_podcast(idea_seleccionada):
@@ -572,7 +588,7 @@ if macro_idx == 0:
         if st.button("✨ Crear Guion", type="primary", key="btn_pod") and st.session_state["pod_tema_input"]:
             with st.spinner("Escribiendo..."):
                 prompt = f"{contexto}\n\nGuion podcast {dur} min. Tema: '{st.session_state['pod_tema_input']}'. Estilo: {estilo}. 3 locutores. REGLA ESTRICTA: Escribe de forma muy natural y coloquial. NO uses acotaciones como (risas) o (pausa). Si quieres que se rían, escribe 'jajaja'. Si quieres que piensen, escribe 'mmm'. Usa SOLO el formato exacto: 'Locutor 1: [texto]', 'Locutor 2: [texto]', 'Locutor 3: [texto]'."
-                res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else:
                     st.session_state.podcast_script = res
@@ -609,12 +625,12 @@ if macro_idx == 0:
                 if st.button("🔊 Leer"):
                     aud = generar_audio_sincrono(st.session_state.chat_history[-1]["content"], "es-ES-ElviraNeural")
                     if aud: st.audio(aud, format="audio/mp3")
-        ctx = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, api_key_gemini)
+        ctx = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         p = chat_input_pro("main")
         if p:
             st.session_state.chat_history.append({"role": "user", "content": p}); st.chat_message("user").write(p)
             with st.spinner("Pensando..."):
-                res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{p}", api_key_gemini, st.session_state.chat_history, api_key_openai, api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{p}", st.session_state.api_key_gemini_manual, st.session_state.chat_history, "", "")
                 if "[ERROR" in res: st.error(res)
                 else:
                     st.session_state.chat_history.append({"role": "assistant", "content": res}); st.chat_message("assistant").write(res); guardar_en_db("Chat", res)
@@ -639,7 +655,7 @@ if macro_idx == 0:
             if p:
                 st.session_state.pdf_chat_history.append({"role": "user", "content": p})
                 with st.spinner("Buscando..."):
-                    res = llamar_ia(modelo_seleccionado, f"Contexto:\n{texto}\n\nPregunta: {p}", api_key_gemini, st.session_state.pdf_chat_history, api_key_openai, api_key_anthropic)
+                    res = llamar_ia(modelo_seleccionado, f"Contexto:\n{texto}\n\nPregunta: {p}", st.session_state.api_key_gemini_manual, st.session_state.pdf_chat_history, "", "")
                     if "[ERROR" in res: st.error(res)
                     else: st.session_state.pdf_chat_history.append({"role": "assistant", "content": res}); st.rerun()
 
@@ -655,40 +671,40 @@ if macro_idx == 0:
             if p:
                 st.session_state.agente_chat_history.append({"role": "user", "content": p})
                 with st.spinner("Pensando..."):
-                    res = llamar_ia(modelo_seleccionado, f"ERES: {ag['rol']}\nUsuario: {p}", api_key_gemini, st.session_state.agente_chat_history, api_key_openai, api_key_anthropic)
+                    res = llamar_ia(modelo_seleccionado, f"ERES: {ag['rol']}\nUsuario: {p}", st.session_state.api_key_gemini_manual, st.session_state.agente_chat_history, "", "")
                     if "[ERROR" in res: st.error(res)
                     else: st.session_state.agente_chat_history.append({"role": "assistant", "content": res}); st.rerun()
 
     elif sub_idx == 5:
         st.markdown("#### Debate")
-        t = campo_con_ideas("Tema:", "deb", "temas de debate", modelo_seleccionado, api_key_gemini, "Ej: Coche eléctrico", api_key_openai, api_key_anthropic)
+        t = campo_con_ideas("Tema:", "deb", "temas de debate", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Coche eléctrico", "", "")
         if st.button("Iniciar") and t:
-            res = llamar_ia(modelo_seleccionado, f"Debate {t}: 3 a favor, 3 en contra, conclusión.", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Debate {t}: 3 a favor, 3 en contra, conclusión.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.markdown(res); botones_descarga(res, "Debate")
 
     elif sub_idx == 6:
         st.markdown("#### Cocina")
-        ing = campo_con_ideas("Ingredientes:", "chef1", "recetas", modelo_seleccionado, api_key_gemini, "Ej: Pollo", api_key_openai, api_key_anthropic)
-        pref = campo_con_ideas("Menú:", "chef2", "menús", modelo_seleccionado, api_key_gemini, "Ej: Vegetariano", api_key_openai, api_key_anthropic)
+        ing = campo_con_ideas("Ingredientes:", "chef1", "recetas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Pollo", "", "")
+        pref = campo_con_ideas("Menú:", "chef2", "menús", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Vegetariano", "", "")
         c1, c2 = st.columns(2)
         with c1:
             if st.button("Receta") and ing: 
-                res = llamar_ia(modelo_seleccionado, f"Receta con {ing}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"Receta con {ing}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.info(res)
         with c2:
             if st.button("Menú") and pref: 
-                res = llamar_ia(modelo_seleccionado, f"Menú semanal {pref}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"Menú semanal {pref}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.info(res)
 
     elif sub_idx == 7:
         st.markdown("#### Cuentos")
-        p = campo_con_ideas("Protagonista:", "c1", "protagonistas", modelo_seleccionado, api_key_gemini, "Ej: Dragón", api_key_openai, api_key_anthropic)
-        l = campo_con_ideas("Lugar:", "c2", "lugares mágicos", modelo_seleccionado, api_key_gemini, "Ej: Bosque", api_key_openai, api_key_anthropic)
+        p = campo_con_ideas("Protagonista:", "c1", "protagonistas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Dragón", "", "")
+        l = campo_con_ideas("Lugar:", "c2", "lugares mágicos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Bosque", "", "")
         if st.button("Crear") and p and l:
-            res = llamar_ia(modelo_seleccionado, f"Cuento sobre {p} en {l}.", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Cuento sobre {p} en {l}.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else:
                 st.text_area("Cuento:", res, height=300); botones_descarga(res, "Cuento")
@@ -698,20 +714,20 @@ if macro_idx == 0:
 
     elif sub_idx == 8:
         st.markdown("#### Código")
-        req = campo_con_ideas("Código:", "code", "scripts", modelo_seleccionado, api_key_gemini, "Ej: Renombrar archivos", api_key_openai, api_key_anthropic)
+        req = campo_con_ideas("Código:", "code", "scripts", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Renombrar archivos", "", "")
         if st.button("Procesar") and req:
-            res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.code(res, language="python")
 
     elif sub_idx == 9:
         st.markdown("#### Traductor")
-        txt = campo_con_ideas("Texto:", "trad", "frases", modelo_seleccionado, api_key_gemini, "Texto...", api_key_openai, api_key_anthropic)
+        txt = campo_con_ideas("Texto:", "trad", "frases", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Texto...", "", "")
         c1, c2 = st.columns(2)
         with c1: o = st.selectbox("Origen:", ["Auto", "Español", "Inglés"], key="o")
         with c2: d = st.selectbox("Destino:", ["Español", "Inglés", "Francés"], key="d")
         if st.button("Traducir") and txt:
-            res = llamar_ia(modelo_seleccionado, f"Traduce del {o} al {d}:\n{txt}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Traduce del {o} al {d}:\n{txt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.info(res); botones_descarga(res, "Traduccion")
 
@@ -730,7 +746,7 @@ elif macro_idx == 1:
             with st.spinner("Analizando..."):
                 texto = leer_archivo_universal(arch, modelo_seleccionado)
                 prompt = f"Resumen:\n{texto}" if opc == "Resumen Ejecutivo" else f"Extrae fechas:\n{texto}" if opc == "Extraer Fechas y Cifras" else f"Errores:\n{texto}" if opc == "Buscar Errores" else f"Test 5 preguntas:\n{texto}" if opc == "Crear Test" else f"Traduce al inglés:\n{texto}"
-                res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Resultado:", res, height=400); botones_descarga(res, "Analisis")
 
@@ -740,14 +756,14 @@ elif macro_idx == 1:
         if a and b and st.button("Comparar"):
             with st.spinner("Buscando..."):
                 ta = leer_archivo_universal(a, modelo_seleccionado); tb = leer_archivo_universal(b, modelo_seleccionado)
-                res = llamar_ia(modelo_seleccionado, f"Diferencias:\nA:\n{ta[:10000]}\nB:\n{tb[:10000]}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"Diferencias:\nA:\n{ta[:10000]}\nB:\n{tb[:10000]}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Diferencias:", res, height=400); botones_descarga(res, "Comparativa")
 
     elif sub_idx == 2:
         st.markdown("#### Creación de Documentos (Flujo Borrador)")
-        contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, api_key_gemini)
-        prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, api_key_gemini, "Ej: Presupuesto para cliente", api_key_openai, api_key_anthropic)
+        contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Presupuesto para cliente", "", "")
         formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_fmt", horizontal=True)
         
         if st.button("✨ Generar Borrador de Texto", type="primary", key="btn_office_gen"):
@@ -756,7 +772,7 @@ elif macro_idx == 1:
                     prompt_ia = f"{contexto}\n\n{prompt_office}"
                     if formato == "PowerPoint": prompt_ia += "\n\nIMPORTANTE: Formatea para diapositivas. Título, salto de línea, guiones para los puntos. Doble salto de línea entre diapositivas."
                     elif formato == "Excel": prompt_ia += "\n\nIMPORTANTE: Devuelve los datos en formato CSV separados por comas."
-                    res = llamar_ia(modelo_seleccionado, prompt_ia, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                    res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                     if "[ERROR" in res: st.error(res)
                     else: st.session_state.office_borrador = res
             else: st.warning("Escribe un prompt primero.")
@@ -767,9 +783,9 @@ elif macro_idx == 1:
             st.session_state.office_borrador = texto_editado
             
             c1, c2, c3 = st.columns(3)
-            with c1: boton_superpoder_borrador(texto_editado, "Hazlo más profesional", "of_sup1", modelo_seleccionado, api_key_gemini, "office_borrador", api_key_openai, api_key_anthropic)
-            with c2: boton_superpoder_borrador(texto_editado, "Resúmelo", "of_sup2", modelo_seleccionado, api_key_gemini, "office_borrador", api_key_openai, api_key_anthropic)
-            with c3: boton_superpoder_borrador(texto_editado, "Añade más detalles", "of_sup3", modelo_seleccionado, api_key_gemini, "office_borrador", api_key_openai, api_key_anthropic)
+            with c1: boton_superpoder_borrador(texto_editado, "Hazlo más profesional", "of_sup1", modelo_seleccionado, st.session_state.api_key_gemini_manual, "office_borrador", "", "")
+            with c2: boton_superpoder_borrador(texto_editado, "Resúmelo", "of_sup2", modelo_seleccionado, st.session_state.api_key_gemini_manual, "office_borrador", "", "")
+            with c3: boton_superpoder_borrador(texto_editado, "Añade más detalles", "of_sup3", modelo_seleccionado, st.session_state.api_key_gemini_manual, "office_borrador", "", "")
 
             st.markdown("---")
             if formato == "Word": st.download_button("📥 Descargar Word", generar_word(texto_editado), "doc.docx")
@@ -778,13 +794,13 @@ elif macro_idx == 1:
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro (Flujo Borrador)")
-        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, api_key_gemini)
+        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         titulo = st.text_input("Título del PDF:")
-        contenido = campo_con_ideas("Contenido:", "pdf_c", "contenido PDF", modelo_seleccionado, api_key_gemini, "Escribe el contenido...", api_key_openai, api_key_anthropic)
+        contenido = campo_con_ideas("Contenido:", "pdf_c", "contenido PDF", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Escribe el contenido...", "", "")
         
         if st.button("✨ Generar Borrador PDF", type="primary", key="btn_pdf_gen") and titulo and contenido:
             with st.spinner("Generando..."):
-                res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{contenido}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{contenido}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.session_state.pdf_borrador = res
 
@@ -794,17 +810,17 @@ elif macro_idx == 1:
             st.session_state.pdf_borrador = texto_editado
             
             c1, c2 = st.columns(2)
-            with c1: boton_superpoder_borrador(texto_editado, "Hazlo más técnico", "pdf_sup1", modelo_seleccionado, api_key_gemini, "pdf_borrador", api_key_openai, api_key_anthropic)
-            with c2: boton_superpoder_borrador(texto_editado, "Añade conclusiones", "pdf_sup2", modelo_seleccionado, api_key_gemini, "pdf_borrador", api_key_openai, api_key_anthropic)
+            with c1: boton_superpoder_borrador(texto_editado, "Hazlo más técnico", "pdf_sup1", modelo_seleccionado, st.session_state.api_key_gemini_manual, "pdf_borrador", "", "")
+            with c2: boton_superpoder_borrador(texto_editado, "Añade conclusiones", "pdf_sup2", modelo_seleccionado, st.session_state.api_key_gemini_manual, "pdf_borrador", "", "")
 
             st.markdown("---")
             st.download_button("📥 Descargar PDF (con portada)", generar_pdf_pro(titulo, texto_editado), f"{titulo}.pdf")
 
     elif sub_idx == 4:
         st.markdown("#### Mapas Mentales")
-        t = campo_con_ideas("Tema:", "map", "mapas", modelo_seleccionado, api_key_gemini, "Ej: Redes", api_key_openai, api_key_anthropic)
+        t = campo_con_ideas("Tema:", "map", "mapas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Redes", "", "")
         if st.button("Trazar") and t:
-            res = llamar_ia(modelo_seleccionado, f"Genera código Mermaid para mapa mental de '{t}'.", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Genera código Mermaid para mapa mental de '{t}'.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else:
                 st.session_state.mermaid_code = html.escape(res.replace("```mermaid", "").replace("```", "").strip())
@@ -826,9 +842,9 @@ elif macro_idx == 1:
     elif sub_idx == 6:
         st.markdown("#### Portapapeles")
         txt = st.text_area("Pega texto:")
-        inst = campo_con_ideas("¿Qué hago?", "clip", "instrucciones", modelo_seleccionado, api_key_gemini, "Ej: Resume", api_key_openai, api_key_anthropic)
+        inst = campo_con_ideas("¿Qué hago?", "clip", "instrucciones", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Resume", "", "")
         if st.button("Procesar") and txt and inst:
-            res = llamar_ia(modelo_seleccionado, f"{inst}:\n{txt}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"{inst}:\n{txt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.info(res)
 
@@ -839,7 +855,7 @@ elif macro_idx == 2:
     sub_names = ["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR"]
     sub_idx = custom_tabs(sub_names, "web_sub", 0)
     if sub_idx == 0:
-        q = campo_con_ideas("Buscar:", "web", "búsquedas", modelo_seleccionado, api_key_gemini, "Ej: Noticias IA", api_key_openai, api_key_anthropic)
+        q = campo_con_ideas("Buscar:", "web", "búsquedas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Noticias IA", "", "")
         if st.button("🔍 Buscar") and q:
             for r in buscar_en_internet(q): st.markdown(f"**[{r['titulo']}]({r['url']})**"); st.caption(r['resumen'])
     elif sub_idx == 1:
@@ -847,10 +863,10 @@ elif macro_idx == 2:
         if st.button("Noticias"):
             for n in buscar_noticias_deportivas(d, "Todas"): st.markdown(f"**{n['titulo']}** - {n['resumen']}")
     elif sub_idx == 2:
-        c = campo_con_ideas("Canal:", "tv", "TV", modelo_seleccionado, api_key_gemini, "Ej: Telecinco", api_key_openai, api_key_anthropic)
+        c = campo_con_ideas("Canal:", "tv", "TV", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Telecinco", "", "")
         if st.button("Programación") and c:
             res = buscar_en_internet(c)
-            r_ia = llamar_ia(modelo_seleccionado, f"Programación {c}: {res}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            r_ia = llamar_ia(modelo_seleccionado, f"Programación {c}: {res}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in r_ia: st.error(r_ia)
             else: st.info(r_ia)
     elif sub_idx == 3:
@@ -865,7 +881,7 @@ elif macro_idx == 2:
         if st.button("Resumir") and url:
             try:
                 id = url.split("v=")[-1].split("&")[0]; tr = YouTubeTranscriptApi.get_transcript(id, languages=['es', 'en'])
-                res = llamar_ia(modelo_seleccionado, f"Resume: {' '.join([t['text'] for t in tr])[:5000]}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"Resume: {' '.join([t['text'] for t in tr])[:5000]}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Resumen:", res, height=200)
             except: st.error("Error.")
@@ -874,7 +890,7 @@ elif macro_idx == 2:
         if st.button("Leer") and url:
             try:
                 txt = " ".join(re.sub('<[^<]+?>', ' ', requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text).split())[:5000]
-                res = llamar_ia(modelo_seleccionado, f"Resume: {txt}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"Resume: {txt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Resumen:", res, height=200)
             except: st.error("Error.")
@@ -893,22 +909,22 @@ elif macro_idx == 3:
                 st.image(a); op = st.radio("Opción:", ["Describir", "OCR", "Prompt", "¿Es IA?"])
                 if st.button("Ejecutar"):
                     p = "Describe" if "Describir" in op else "OCR" if "OCR" in op else "Prompt Midjourney" if "Prompt" in op else "¿Es IA?"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, api_key_gemini))
+                    st.info(analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, st.session_state.api_key_gemini_manual))
             elif n.endswith((".mp3", ".wav")):
                 st.audio(a); op = st.radio("Opción:", ["Transcribir", "Resumen", "Traducir"])
                 if st.button("Ejecutar"):
                     p = "Transcribe" if "Transcribir" in op else "Resume" if "Resumen" in op else "Traduce"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, api_key_gemini))
+                    st.info(analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, st.session_state.api_key_gemini_manual))
             elif n.endswith((".mp4")):
                 st.video(a); op = st.radio("Opción:", ["Resumir", "Escenas"])
                 if st.button("Ejecutar"):
                     p = "Resume" if "Resumir" in op else "Escenas"
-                    st.info(analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, api_key_gemini))
+                    st.info(analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, st.session_state.api_key_gemini_manual))
     elif sub_idx == 1:
-        p = campo_con_ideas("Describe imagen:", "img", "imágenes", modelo_seleccionado, api_key_gemini, "Ej: Gato astronauta", api_key_openai, api_key_anthropic)
+        p = campo_con_ideas("Describe imagen:", "img", "imágenes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Gato astronauta", "", "")
         if st.button("Generar") and p:
             with st.spinner("Traduciendo..."):
-                en = llamar_ia(modelo_seleccionado, f"Traduce: '{p}'", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic).replace('"', '').replace("'", "").strip()
+                en = llamar_ia(modelo_seleccionado, f"Traduce: '{p}'", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="").replace('"', '').replace("'", "").strip()
                 st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(en)}?width=1024&height=1024&nologo=true")
     elif sub_idx == 2:
         m = st.text_input("Marca:")
@@ -940,20 +956,20 @@ elif macro_idx == 4:
         c1, c2 = st.columns(2)
         with c1:
             ip = st.text_input("IP/CIDR:")
-            if st.button("Calcular") and ip: st.info(llamar_ia(modelo_seleccionado, f"Red {ip}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic))
+            if st.button("Calcular") and ip: st.info(llamar_ia(modelo_seleccionado, f"Red {ip}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
         with c2:
-            t = campo_con_ideas("Tarea:", "net", "redes", modelo_seleccionado, api_key_gemini, "Ej: Ver IP", api_key_openai, api_key_anthropic)
-            if st.button("Comando") and t: st.info(llamar_ia(modelo_seleccionado, f"Comando: {t}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic))
+            t = campo_con_ideas("Tarea:", "net", "redes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Ver IP", "", "")
+            if st.button("Comando") and t: st.info(llamar_ia(modelo_seleccionado, f"Comando: {t}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
     elif sub_idx == 1:
         a = st.text_input("Actual:"); d = st.text_input("Deseado:")
-        if st.button("Fórmula") and a and d: st.info(llamar_ia(modelo_seleccionado, f"De {a} a {d}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic))
+        if st.button("Fórmula") and a and d: st.info(llamar_ia(modelo_seleccionado, f"De {a} a {d}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
     elif sub_idx == 2:
-        d = campo_con_ideas("Duda:", "home", "deberes", modelo_seleccionado, api_key_gemini, "Ej: Fotosíntesis", api_key_openai, api_key_anthropic)
-        if st.button("Explicar") and d: st.info(llamar_ia(modelo_seleccionado, d, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic))
+        d = campo_con_ideas("Duda:", "home", "deberes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Fotosíntesis", "", "")
+        if st.button("Explicar") and d: st.info(llamar_ia(modelo_seleccionado, d, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
     elif sub_idx == 3:
-        t = st.selectbox("Tipo:", ["Charla", "Evaluación", "EPIs", "Legal"]); c = campo_con_ideas("Contexto:", "prl", "riesgos", modelo_seleccionado, api_key_gemini, "Ej: Altura", api_key_openai, api_key_anthropic)
+        t = st.selectbox("Tipo:", ["Charla", "Evaluación", "EPIs", "Legal"]); c = campo_con_ideas("Contexto:", "prl", "riesgos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Altura", "", "")
         if st.button("Generar") and c:
-            res = llamar_ia(modelo_seleccionado, f"PRL {t}: {c}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"PRL {t}: {c}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "PRL")
 
@@ -964,18 +980,18 @@ elif macro_idx == 5:
     sub_names = ["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS"]
     sub_idx = custom_tabs(sub_names, "travel_sub", 0)
     if sub_idx == 0:
-        d = campo_con_ideas("Destino:", "travel", "viajes", modelo_seleccionado, api_key_gemini, "Ej: Roma", api_key_openai, api_key_anthropic)
+        d = campo_con_ideas("Destino:", "travel", "viajes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Roma", "", "")
         if st.button("Itinerario") and d:
-            res = llamar_ia(modelo_seleccionado, f"Itinerario {d} 3 días", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Itinerario {d} 3 días", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.info(res); botones_descarga(res, f"Viaje_{d}")
     elif sub_idx == 1:
         i = st.number_input("Ingresos:"); g = st.number_input("Gastos:")
         if st.button("Ahorro"): st.success(f"Ahorras {i-g}€") if i > g else st.error(f"Faltan {g-i}€")
     elif sub_idx == 2:
-        t = st.selectbox("Tipo:", ["Reyes", "Discurso", "Reclamación"]); d = campo_con_ideas("Detalles:", "letter", "cartas", modelo_seleccionado, api_key_gemini, "Ej: Carta a padres", api_key_openai, api_key_anthropic)
+        t = st.selectbox("Tipo:", ["Reyes", "Discurso", "Reclamación"]); d = campo_con_ideas("Detalles:", "letter", "cartas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Carta a padres", "", "")
         if st.button("Redactar") and d:
-            res = llamar_ia(modelo_seleccionado, f"{t}: {d}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"{t}: {d}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "Carta")
 
@@ -1108,11 +1124,11 @@ elif macro_idx == 6:
         c1, c2 = st.columns(2)
         with c1: residuo = st.selectbox("Tipo de Residuo:", ["RSU (Mezcla)", "Envases Ligeros", "Orgánico", "Escombro", "Peligroso", "Madera", "Chatarra"])
         with c2: capacidad = st.number_input("Toneladas/día:", min_value=10, value=100)
-        contexto = cajita_adjuntar_archivo("plant_proc_adj", modelo_seleccionado, api_key_gemini)
+        contexto = cajita_adjuntar_archivo("plant_proc_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         if st.button("🔎 Generar Diagrama y Maquinaria", type="primary", key="btn_plant_proc"):
             with st.spinner("Diseñando línea de producción..."):
                 prompt = f"Actúa como ingeniero de plantas de reciclaje. Diseña la línea de proceso para {capacidad} t/día de {residuo}. Genera un diagrama Mermaid de flujo (graph TD) y una lista de la maquinaria necesaria (trituradoras, separadores, etc.) explicando brevemente su función."
-                res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{prompt}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{prompt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
                 else: st.session_state.plant_borrador = res
         if st.session_state.get("plant_borrador"):
@@ -1131,10 +1147,10 @@ elif macro_idx == 7:
     sub_names = ["🎵 CANCIONES", "🎨 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
     if sub_idx == 0:
-        t = campo_con_ideas("Tema:", "song", "canciones", modelo_seleccionado, api_key_gemini, "Ej: Amor", api_key_openai, api_key_anthropic)
+        t = campo_con_ideas("Tema:", "song", "canciones", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Amor", "", "")
         g = st.selectbox("Género:", ["Pop", "Rock", "Rap"]); to = st.select_slider("Tono:", ["Triste", "Alegre", "Épico"])
         if st.button("Escribir") and t:
-            letra = llamar_ia(modelo_seleccionado, f"Canción {g} sobre {t}, tono {to}.", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            letra = llamar_ia(modelo_seleccionado, f"Canción {g} sobre {t}, tono {to}.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in letra: st.error(letra)
             else:
                 st.text_area("Letra:", letra, height=300); botones_descarga(letra, "Cancion")
@@ -1142,8 +1158,8 @@ elif macro_idx == 7:
                     aud = generar_audio_sincrono(letra, "es-ES-ElviraNeural")
                     if aud: st.audio(aud, format="audio/mp3")
     elif sub_idx == 1:
-        t = campo_con_ideas("Tema:", "poem", "poemas", modelo_seleccionado, api_key_gemini, "Ej: Mar", api_key_openai, api_key_anthropic)
+        t = campo_con_ideas("Tema:", "poem", "poemas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Mar", "", "")
         if st.button("Escribir") and t:
-            res = llamar_ia(modelo_seleccionado, f"Poema sobre {t}.", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+            res = llamar_ia(modelo_seleccionado, f"Poema sobre {t}.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
             else: st.text_area("Poema:", res, height=300); botones_descarga(res, "Poema")
