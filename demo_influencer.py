@@ -54,7 +54,7 @@ with col2:
                                 "content": f"Genera una respuesta para este comentario: {comentario_elegido}"
                             }
                         ],
-                        model="llama-3.3-70b-versatile",  # <--- MODELO ACTUALIZADO Y ESTABLE
+                        model="openai/gpt-oss-20b",  # <--- MODELO ACTUALIZADO Y COMPATIBLE
                     )
                     
                     respuesta = chat_completion.choices[0].message.content
