@@ -58,6 +58,35 @@ GEMINI_MODEL = "gemini-3.8-flash"
 if os.name == 'nt':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+# 🔥 SISTEMA DE CONTRASEÑA 🔥
+def check_password():
+    def password_entered():
+        try:
+            pwd_correcta = st.secrets.get("PASSWORD", "xavilu2026")
+        except:
+            pwd_correcta = "xavilu2026"
+            
+        if st.session_state["password"] == pwd_correcta:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"] 
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.markdown("<h1 style='text-align: center; color: #00f0ff; margin-top: 20vh;'>🔒 XAVILU NETWORK</h1>", unsafe_allow_html=True)
+        st.text_input("Introduce la contraseña para acceder:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.markdown("<h1 style='text-align: center; color: #00f0ff; margin-top: 20vh;'>🔒 XAVILU NETWORK</h1>", unsafe_allow_html=True)
+        st.text_input("Introduce la contraseña para acceder:", type="password", on_change=password_entered, key="password")
+        st.error("😕 Contraseña incorrecta. Inténtalo de nuevo.")
+        return False
+    else:
+        return True
+
+if not check_password():
+    st.stop()
+
 # --- BASE DE DATOS PLANTAS (CON TIMEOUT Y LISTA BLANCA) ---
 def init_plant_db():
     conn = sqlite3.connect('xavilu_planta.db', timeout=20)
@@ -261,7 +290,6 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
-    # Lógica: 1º busca en las cajas de texto de la app, 2º busca en secrets.toml, 3º vacío.
     try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
     except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
     
@@ -455,6 +483,7 @@ def generar_podcast_3_voces(guion, v1, v2, v3):
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
+# 🔥 FUNCIÓN MODIFICADA: CAJÓN -> BOTÓN -> SUGERENCIAS 🔥
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
@@ -468,12 +497,17 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
         if f"{key_prefix}_sugs" in st.session_state:
             del st.session_state[f"{key_prefix}_sugs"]
 
+    # 1. PRIMERO EL CAJÓN DE TEXTO
+    texto_final = st.text_area(label, key=input_key, placeholder=placeholder, height=100)
+
+    # 2. LUEGO EL BOTÓN DE IDEAS
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
             prompt = f"Dame 3 ideas creativas para {contexto_ia}. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
+    # 3. LAS SUGERENCIAS
     if st.session_state.get(f"{key_prefix}_sugs"):
         st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
@@ -487,7 +521,7 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
                     args=(idea,)
                 )
                 
-    return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
+    return texto_final
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic=""):
     if st.button(f"🚀 Superpoder: {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
@@ -590,14 +624,18 @@ if macro_idx == 0:
     
     if sub_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts")
-        contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
+        # 1. EL CAJÓN ARRIBA
         tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
+        
+        # 2. ADJUNTAR
+        contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
         c1, c2 = st.columns(2)
         with c1: estilo = st.selectbox("Estilo:", ["Entrevista", "Debate", "Educativo", "Narrativo"], key="p_est")
         with c2: dur = st.slider("Duración:", 1, 10, 3, key="p_dur")
         
+        # 3. BOTÓN DE IDEAS
         st.markdown("---")
         if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema, estilo y duración)", use_container_width=True, key="pod_btn_ideas"):
             with st.spinner("Pensando ideas..."):
@@ -805,8 +843,13 @@ elif macro_idx == 1:
 
     elif sub_idx == 2:
         st.markdown("#### Creación de Documentos (Flujo Borrador)")
-        contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        
+        # 1. EL CAJÓN ARRIBA
         prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Presupuesto para cliente", "", "")
+        
+        # 2. ADJUNTAR
+        contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        
         formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_fmt", horizontal=True)
         
         if st.button("✨ Generar Borrador de Texto", type="primary", key="btn_office_gen"):
@@ -837,9 +880,9 @@ elif macro_idx == 1:
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro (Flujo Borrador)")
-        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         titulo = st.text_input("Título del PDF:")
         contenido = campo_con_ideas("Contenido:", "pdf_c", "contenido PDF", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Escribe el contenido...", "", "")
+        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
         if st.button("✨ Generar Borrador PDF", type="primary", key="btn_pdf_gen") and titulo and contenido:
             with st.spinner("Generando..."):
