@@ -51,7 +51,7 @@ with col2:
         if st.button("Generar respuesta con IA", type="primary"):
             with st.spinner("Pensando la mejor respuesta..."):
                 try:
-                    # Llamada a la IA de Groq
+                    # Llamada a la IA de Groq (CON EL MODELO ACTUALIZADO)
                     chat_completion = client.chat.completions.create(
                         messages=[
                             {
@@ -63,7 +63,7 @@ with col2:
                                 "content": f"Genera una respuesta para este comentario: {comentario_elegido}"
                             }
                         ],
-                        model="llama3-8b-8192", # Modelo rápido y gratis de Groq
+                        model="llama-3.1-8b-instant", # <--- MODELO ACTUALIZADO AQUÍ
                     )
                     
                     respuesta = chat_completion.choices[0].message.content
