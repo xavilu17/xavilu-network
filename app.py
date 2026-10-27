@@ -208,9 +208,9 @@ def transcribir_audio_youtube(url, api_key_groq):
             "outtmpl": os.path.join(tmp, "audio.%(ext)s"),
             "quiet": True,
             "noplaylist": True,
-            # Intento evitar el bloqueo 403 usando impersonate y cliente iOS
-            "impersonate": True,
-            "extractor_args": {"youtube": ["player_client=ios"]},
+            # CORREGIDO: Usamos un target válido para impersonate y el cliente android
+            "impersonate": "chrome", 
+            "extractor_args": {"youtube": ["player_client=android"]},
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
