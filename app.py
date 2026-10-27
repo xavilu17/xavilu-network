@@ -58,38 +58,9 @@ GEMINI_MODEL = "gemini-3.8-flash"
 if os.name == 'nt':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# 🔥 SISTEMA DE CONTRASEÑA 🔥
-def check_password():
-    def password_entered():
-        try:
-            pwd_correcta = st.secrets.get("PASSWORD", "xavilu2026")
-        except:
-            pwd_correcta = "xavilu2026"
-            
-        if st.session_state["password"] == pwd_correcta:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"] 
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        st.markdown("<h1 style='text-align: center; color: #00f0ff; margin-top: 20vh;'>🔒 XAVILU NETWORK</h1>", unsafe_allow_html=True)
-        st.text_input("Introduce la contraseña para acceder:", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("<h1 style='text-align: center; color: #00f0ff; margin-top: 20vh;'>🔒 XAVILU NETWORK</h1>", unsafe_allow_html=True)
-        st.text_input("Introduce la contraseña para acceder:", type="password", on_change=password_entered, key="password")
-        st.error("😕 Contraseña incorrecta. Inténtalo de nuevo.")
-        return False
-    else:
-        return True
-
-if not check_password():
-    st.stop()
-
-# --- BASE DE DATOS PLANTAS (CON TIMEOUT Y LISTA BLANCA) ---
+# --- BASE DE DATOS PLANTAS ---
 def init_plant_db():
-    conn = sqlite3.connect('xavilu_planta.db', timeout=20)
+    conn = sqlite3.connect('xavilu_planta.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS bascula (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, matricula TEXT, residuo TEXT, peso REAL, operacion TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS lotes (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, residuo TEXT, peso_in REAL, estado TEXT, peso_out REAL)''')
@@ -98,36 +69,33 @@ def init_plant_db():
 init_plant_db()
 
 def get_db_data(table):
-    tablas_permitidas = ["bascula", "lotes", "mantenimiento"]
-    if table not in tablas_permitidas:
-        return pd.DataFrame()
     try:
-        conn = sqlite3.connect('xavilu_planta.db', timeout=20)
+        conn = sqlite3.connect('xavilu_planta.db')
         df = pd.read_sql_query(f"SELECT * FROM {table}", conn)
         conn.close(); return df
     except: return pd.DataFrame()
 
 def insert_db(query, params):
     try:
-        conn = sqlite3.connect('xavilu_planta.db', timeout=20)
+        conn = sqlite3.connect('xavilu_planta.db')
         conn.execute(query, params)
         conn.commit(); conn.close()
     except Exception as e: st.error(f"Error DB: {e}")
 
 # --- BASE DE DATOS HISTORIAL ---
 def init_db():
-    conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
+    conn = sqlite3.connect('xavilu_memoria.db')
     conn.execute('CREATE TABLE IF NOT EXISTS historial (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)')
     conn.commit(); conn.close()
 def guardar_en_db(tipo, contenido):
     try:
-        conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
+        conn = sqlite3.connect('xavilu_memoria.db')
         conn.execute("INSERT INTO historial (fecha, tipo, contenido) VALUES (?, ?, ?)", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tipo, contenido))
         conn.commit(); conn.close()
     except: pass
 def obtener_de_db():
     try:
-        conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
+        conn = sqlite3.connect('xavilu_memoria.db')
         rows = conn.execute("SELECT fecha, tipo, contenido FROM historial ORDER BY id DESC LIMIT 5").fetchall()
         conn.close(); return rows
     except: return []
@@ -165,35 +133,6 @@ for _k, _v in _defaults.items():
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-
-/* ARREGLO DE LAS FLECHITAS DEL MENÚ LATERAL */
-[data-testid="collapsedControl"] {
-    color: #00f0ff !important;
-    background-color: #0a0a0a !important;
-    border: 2px solid #00f0ff !important;
-    border-radius: 50% !important;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.8) !important;
-    width: 45px !important;
-    height: 45px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    top: 15px !important;
-    left: 15px !important;
-}
-[data-testid="collapsedControl"] svg {
-    fill: #00f0ff !important;
-    width: 30px !important;
-    height: 30px !important;
-}
-[data-testid="collapsedControl"]:hover {
-    background-color: #00f0ff !important;
-    color: #000000 !important;
-}
-[data-testid="collapsedControl"]:hover svg {
-    fill: #000000 !important;
-}
-
 .stApp { background-color: #000000 !important; background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
 header[data-testid="stHeader"] { background-color: #000000 !important; background: #000000 !important; }
 [data-testid="stAppDeployButton"] { display: none !important; }
@@ -246,6 +185,55 @@ def buscar_noticias_deportivas(deporte, liga):
         return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in res]
     except: return []
 
+# NUEVO: helper para extraer ID de YouTube de cualquier formato de URL
+def extraer_youtube_id(url):
+    if not url: return None
+    m = re.search(r"(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})", url)
+    if m: return m.group(1)
+    if len(url.strip()) == 11: return url.strip()
+    return None
+
+# NUEVO: transcribe el audio de un vídeo de YouTube usando Whisper de Groq
+def transcribir_audio_youtube(url, api_key_groq):
+    if not HAS_YTDLP or not HAS_OPENAI:
+        return "[ERROR] Faltan yt-dlp u openai instalados."
+    if not api_key_groq:
+        return "[ERROR] No hay Groq API Key. Configúrala en la barra lateral."
+
+    tmp = tempfile.mkdtemp()
+    audio_path = None
+    try:
+        ydl_opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "outtmpl": os.path.join(tmp, "audio.%(ext)s"),
+            "quiet": True,
+            "noplaylist": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            audio_path = ydl.prepare_filename(info)
+
+        size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+        if size_mb > 24:
+            return f"[ERROR] Audio de {size_mb:.1f} MB, supera el límite de 25 MB de Groq."
+
+        client = openai.OpenAI(api_key=api_key_groq, base_url="https://api.groq.com/openai/v1")
+        with open(audio_path, "rb") as f:
+            resp = client.audio.transcriptions.create(
+                model="whisper-large-v3-turbo",
+                file=f,
+                response_format="text",
+            )
+        return resp if isinstance(resp, str) else resp.text
+    except Exception as e:
+        return f"[ERROR] {e}"
+    finally:
+        if audio_path and os.path.exists(audio_path):
+            try: os.remove(audio_path)
+            except: pass
+        try: os.rmdir(tmp)
+        except: pass
+
 def leer_archivo_universal(upload, modelo_ia):
     if upload.size > MAX_FILE_MB * 1024 * 1024: return ""
     nombre = upload.name.lower()
@@ -290,6 +278,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
+    # Lógica: 1º busca en las cajas de texto de la app, 2º busca en secrets.toml, 3º vacío.
     try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
     except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
     
@@ -362,21 +351,13 @@ def obtener_ruta_fuente():
 
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
-    temp_img_path = "temp_cover.jpg"
-    
     try:
         url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Book cover for ' + titulo + ', cyberpunk')}?width=512&height=512&nologo=true"
         req = urllib.request.Request(url_img, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response: img_data = response.read()
-        with open(temp_img_path, "wb") as f: f.write(img_data)
-        pdf.image(temp_img_path, x=40, y=50, w=130); pdf.ln(150)
-    except Exception: 
-        pass
-    finally:
-        if os.path.exists(temp_img_path):
-            try: os.remove(temp_img_path)
-            except: pass
-
+        with open("temp_cover.jpg", "wb") as f: f.write(img_data)
+        pdf.image("temp_cover.jpg", x=40, y=50, w=130); pdf.ln(150); os.remove("temp_cover.jpg")
+    except: pass
     if font_path: pdf.add_font("Arial", "", font_path, uni=True); pdf.set_font("Arial", size=11)
     else: pdf.set_font("Helvetica", size=11); contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
     pdf.set_font("Helvetica", "B", 24); pdf.multi_cell(0, 10, txt=titulo, align='C')
@@ -483,7 +464,6 @@ def generar_podcast_3_voces(guion, v1, v2, v3):
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
-# 🔥 FUNCIÓN MODIFICADA: CAJÓN -> BOTÓN -> SUGERENCIAS 🔥
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
@@ -497,17 +477,12 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
         if f"{key_prefix}_sugs" in st.session_state:
             del st.session_state[f"{key_prefix}_sugs"]
 
-    # 1. PRIMERO EL CAJÓN DE TEXTO
-    texto_final = st.text_area(label, key=input_key, placeholder=placeholder, height=100)
-
-    # 2. LUEGO EL BOTÓN DE IDEAS
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
             prompt = f"Dame 3 ideas creativas para {contexto_ia}. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
-    # 3. LAS SUGERENCIAS
     if st.session_state.get(f"{key_prefix}_sugs"):
         st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
@@ -521,7 +496,7 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
                     args=(idea,)
                 )
                 
-    return texto_final
+    return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic=""):
     if st.button(f"🚀 Superpoder: {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
@@ -559,6 +534,9 @@ def custom_tabs(tab_names, key_name, default_idx=0):
 # INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
+    # Ocultamos las flechitas nativas de Streamlit para que no abran un menú vacío
+    st.markdown("""<style>[data-testid="collapsedControl"] {display: none !important;}</style>""", unsafe_allow_html=True)
+    # Botón de rescate en la parte superior central
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
@@ -624,18 +602,14 @@ if macro_idx == 0:
     
     if sub_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts")
-        
-        # 1. EL CAJÓN ARRIBA
-        tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
-        
-        # 2. ADJUNTAR
         contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        
+        tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
         
         c1, c2 = st.columns(2)
         with c1: estilo = st.selectbox("Estilo:", ["Entrevista", "Debate", "Educativo", "Narrativo"], key="p_est")
         with c2: dur = st.slider("Duración:", 1, 10, 3, key="p_dur")
         
-        # 3. BOTÓN DE IDEAS
         st.markdown("---")
         if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema, estilo y duración)", use_container_width=True, key="pod_btn_ideas"):
             with st.spinner("Pensando ideas..."):
@@ -843,13 +817,8 @@ elif macro_idx == 1:
 
     elif sub_idx == 2:
         st.markdown("#### Creación de Documentos (Flujo Borrador)")
-        
-        # 1. EL CAJÓN ARRIBA
-        prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Presupuesto para cliente", "", "")
-        
-        # 2. ADJUNTAR
         contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
-        
+        prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Presupuesto para cliente", "", "")
         formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_fmt", horizontal=True)
         
         if st.button("✨ Generar Borrador de Texto", type="primary", key="btn_office_gen"):
@@ -880,9 +849,9 @@ elif macro_idx == 1:
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro (Flujo Borrador)")
+        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         titulo = st.text_input("Título del PDF:")
         contenido = campo_con_ideas("Contenido:", "pdf_c", "contenido PDF", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Escribe el contenido...", "", "")
-        contexto = cajita_adjuntar_archivo("pdf_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
         if st.button("✨ Generar Borrador PDF", type="primary", key="btn_pdf_gen") and titulo and contenido:
             with st.spinner("Generando..."):
@@ -962,15 +931,71 @@ elif macro_idx == 2:
                 df = pd.read_html(url)[0]; st.dataframe(df)
                 out = BytesIO(); df.to_excel(out); st.download_button("📥 Excel", out.getvalue(), "tabla.xlsx")
             except: st.error("Fallo al leer.")
+
+    # REEMPLAZADO: subtab YouTube con subtítulos -> Whisper fallback -> traducción/resumen en español
     elif sub_idx == 4:
-        url = st.text_input("URL YouTube:")
-        if st.button("Resumir") and url:
-            try:
-                id = url.split("v=")[-1].split("&")[0]; tr = YouTubeTranscriptApi.get_transcript(id, languages=['es', 'en'])
-                res = llamar_ia(modelo_seleccionado, f"Resume: {' '.join([t['text'] for t in tr])[:5000]}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
-                if "[ERROR" in res: st.error(res)
-                else: st.text_area("Resumen:", res, height=200)
-            except: st.error("Error.")
+        st.markdown("#### 🎥 YouTube")
+        url = st.text_input("URL del vídeo:", placeholder="https://www.youtube.com/watch?v=...")
+        modo = st.radio("¿Qué quieres hacer?", ["Resumir", "Traducir al español"], horizontal=True)
+
+        if st.button("Ejecutar", type="primary") and url:
+            vid = extraer_youtube_id(url)
+            if not vid:
+                st.error("No he podido extraer el ID del vídeo. Revisa el enlace.")
+            else:
+                texto_original = ""
+                fuente = ""
+
+                # Intento 1: subtítulos
+                try:
+                    with st.spinner("Buscando subtítulos..."):
+                        tr = YouTubeTranscriptApi.get_transcript(vid, languages=['es', 'en'])
+                    texto_original = " ".join([t['text'] for t in tr])
+                    fuente = "subtítulos"
+                except Exception:
+                    # Intento 2: transcripción de audio con Whisper (Groq)
+                    st.info("Este vídeo no tiene subtítulos. Transcribiendo el audio con Whisper...")
+                    key_groq = st.session_state.api_key_groq_manual
+                    if not key_groq:
+                        try: key_groq = st.secrets.get("GROQ_API_KEY", "")
+                        except: pass
+                    with st.spinner("Descargando audio y transcribiendo..."):
+                        texto_original = transcribir_audio_youtube(url, key_groq)
+                    fuente = "whisper"
+
+                if texto_original.startswith("[ERROR]"):
+                    st.error(texto_original)
+                else:
+                    st.caption(f"Fuente: {fuente} · {len(texto_original)} caracteres")
+                    with st.expander("Ver transcripción original"):
+                        st.text_area("Texto detectado:", value=texto_original, height=150, key=f"yt_orig_{vid}")
+
+                    if modo == "Resumir":
+                        prompt = (
+                            "Resume este vídeo de YouTube en español, con tono claro y directo:\n"
+                            f"{texto_original[:8000]}"
+                        )
+                    else:
+                        prompt = (
+                            "Traduce al español el siguiente texto manteniendo el tono natural "
+                            "del original, sin añadir ni quitar contenido. Si el texto ya está en "
+                            "español, devuélvelo tal cual. Devuelve solo la traducción:\n"
+                            f"{texto_original[:8000]}"
+                        )
+
+                    with st.spinner("Procesando con IA..."):
+                        res = llamar_ia(
+                            modelo_seleccionado, prompt,
+                            st.session_state.api_key_gemini_manual,
+                            api_key_openai="", api_key_anthropic=""
+                        )
+
+                    if "[ERROR" in res:
+                        st.error(res)
+                    else:
+                        st.text_area("Resultado:", res, height=300)
+                        botones_descarga(res, f"YT_{vid}")
+
     elif sub_idx == 5:
         url = st.text_input("URL Web:")
         if st.button("Leer") and url:
