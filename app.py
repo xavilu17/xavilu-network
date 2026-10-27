@@ -307,7 +307,7 @@ def cajita_adjuntar_archivo(key_suffix, modelo, api_key):
 @st.cache_resource
 def get_gemini_client(api_key): return genai.Client(api_key=api_key)
 
-# Manejo de archivos grandes con Gemini File API
+# Manejo de archivos grandes con Gemini File API y límite de espera
 def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini):
     if not HAS_GEMINI: return "[ERROR] Falta google-genai."
     
@@ -317,7 +317,6 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
     try:
         client = get_gemini_client(api_key_gemini)
         
-        # Si el archivo es mayor a 15MB, usamos la File API
         if size_mb > 15:
             ext = mime_type.split('/')[-1]
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
@@ -327,12 +326,15 @@ def analizar_archivo_con_gemini(archivo_bytes, mime_type, prompt, api_key_gemini
             
             uploaded_file = client.files.upload(file=tmp_path)
             
-            while uploaded_file.state.name == "PROCESSING":
-                time.sleep(3)
+            # Límite de espera: máximo 5 minutos (60 iteraciones x 5s)
+            intentos = 0
+            while uploaded_file.state.name == "PROCESSING" and intentos < 60:
+                time.sleep(5)
                 uploaded_file = client.files.get(name=uploaded_file.name)
+                intentos += 1
             
-            if uploaded_file.state.name == "FAILED":
-                return "[ERROR] Gemini no pudo procesar el archivo."
+            if uploaded_file.state.name == "FAILED" or intentos >= 60:
+                return "[ERROR] Gemini ha tardado demasiado o no ha podido procesar el archivo."
             
             res = client.models.generate_content(
                 model=GEMINI_MODEL,
@@ -1101,4 +1103,302 @@ elif macro_idx == 2:
 # ==========================================
 # CATEGORÍA 3: MULTIMEDIA
 # ==========================================
-elif macro
+elif macro_idx == 3:
+    sub_names = ["🖼️ ANÁLISIS", "🎨 VISUAL", "🛡️ LOGOS", "📥 DESCARGADOR"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    
+    if sub_idx == 0:
+        st.info("💡 Consejo: Si subes un vídeo grande, espera a que la barra de progreso desaparezca del todo antes de pulsar 'Ejecutar'.")
+        a = st.file_uploader("Sube archivo (Imagen, Audio o Vídeo):", type=["png", "jpg", "jpeg", "webp", "mp3", "wav", "m4a", "mp4", "mov", "avi"])
+        if a:
+            n = a.name.lower()
+            
+            if n.endswith((".png", ".jpg", ".jpeg", ".webp")):
+                st.image(a)
+                op = st.radio("Opción de imagen:", ["Describir", "OCR", "Prompt", "¿Es IA?"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Analizando imagen con Gemini..."):
+                        p = "Describe detalladamente" if "Describir" in op else "Extrae el texto (OCR)" if "OCR" in op else "Genera un prompt" if "Prompt" in op else "¿Es IA?"
+                        try:
+                            res = analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, st.session_state.api_key_gemini_manual)
+                            if "[ERROR" in res: st.error(res)
+                            else: st.info(res)
+                        except Exception as ex:
+                            st.error(f"Error inesperado: {ex}")
+            
+            elif n.endswith((".mp3", ".wav", ".m4a")):
+                st.audio(a)
+                op = st.radio("Opción de audio:", ["Transcribir (Whisper)", "Resumen", "Traducir al español"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Procesando audio..."):
+                        if "Transcribir" in op:
+                            key_groq = st.session_state.api_key_groq_manual or st.secrets.get("GROQ_API_KEY", "")
+                            res = transcribir_archivo_local(a.getvalue(), a.name, key_groq)
+                        else:
+                            p = "Resume este audio" if "Resumen" in op else "Traduce al español este audio"
+                            res = analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, st.session_state.api_key_gemini_manual)
+                        
+                        if "[ERROR" in res: st.error(res)
+                        else: st.info(res)
+            
+            elif n.endswith((".mp4", ".mov", ".avi", ".mkv")):
+                st.video(a)
+                op = st.radio("Opción de vídeo:", ["Transcribir audio (Whisper)", "Resumir (Gemini)", "Describir escenas (Gemini)"])
+                if st.button("Ejecutar", type="primary"):
+                    with st.spinner("Procesando vídeo (esto puede tardar varios minutos, por favor espera)..."):
+                        try:
+                            if "Transcribir" in op:
+                                key_groq = st.session_state.api_key_groq_manual or st.secrets.get("GROQ_API_KEY", "")
+                                res = transcribir_archivo_local(a.getvalue(), a.name, key_groq)
+                            else:
+                                p = "Resume el contenido de este vídeo" if "Resumir" in op else "Describe las escenas de este vídeo"
+                                res = analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, st.session_state.api_key_gemini_manual)
+                            
+                            if "[ERROR" in res: st.error(res)
+                            else: st.info(res)
+                        except Exception as ex:
+                            st.error(f"Error inesperado al procesar el vídeo: {ex}")
+
+    elif sub_idx == 1:
+        p = campo_con_ideas("Describe imagen:", "img", "imágenes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Gato astronauta", "", "")
+        if st.button("Generar") and p:
+            with st.spinner("Traduciendo..."):
+                en = llamar_ia(modelo_seleccionado, f"Traduce: '{p}'", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="").replace('"', '').replace("'", "").strip()
+                st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(en)}?width=1024&height=1024&nologo=true")
+    elif sub_idx == 2:
+        m = st.text_input("Marca:")
+        if st.button("Logo") and m:
+            st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(f'logo {m}, minimalist, white background')}?width=1024&height=1024&nologo=true")
+    elif sub_idx == 3:
+        u = st.text_input("URL YouTube/TikTok:")
+        if st.button("⬇️ Descargar") and u and HAS_YTDLP:
+            with st.spinner("Descargando..."):
+                t = tempfile.mkdtemp(); y = {'outtmpl': os.path.join(t, "%(title)s.%(ext)s"), 'quiet': True, 'format': 'bestvideo[height<=720]+bestaudio/best'}
+                try:
+                    with yt_dlp.YoutubeDL(y) as ydl:
+                        i = ydl.extract_info(u, download=True); f = ydl.prepare_filename(i)
+                        with open(f, "rb") as file: st.session_state.dl_bytes = file.read()
+                        st.session_state.dl_filename = os.path.basename(f); st.success("✅ Descargado.")
+                except Exception as e: st.error(e)
+                finally:
+                    for f in os.listdir(t): os.remove(os.path.join(t, f))
+                    os.rmdir(t)
+        if st.session_state.dl_bytes: st.download_button("💾 Guardar", st.session_state.dl_bytes, st.session_state.dl_filename)
+
+# ==========================================
+# CATEGORÍA 4: ESTUDIO Y OFICIOS
+# ==========================================
+elif macro_idx == 4:
+    sub_names = ["🌐 REDES", "💇‍♀️ PELUQUERÍA", "📚 DEBERES", "🦺 PRL"]
+    sub_idx = custom_tabs(sub_names, "study_sub", 0)
+    if sub_idx == 0:
+        c1, c2 = st.columns(2)
+        with c1:
+            ip = st.text_input("IP/CIDR:")
+            if st.button("Calcular") and ip: st.info(llamar_ia(modelo_seleccionado, f"Red {ip}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
+        with c2:
+            t = campo_con_ideas("Tarea:", "net", "redes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Ver IP", "", "")
+            if st.button("Comando") and t: st.info(llamar_ia(modelo_seleccionado, f"Comando: {t}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
+    elif sub_idx == 1:
+        a = st.text_input("Actual:"); d = st.text_input("Deseado:")
+        if st.button("Fórmula") and a and d: st.info(llamar_ia(modelo_seleccionado, f"De {a} a {d}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
+    elif sub_idx == 2:
+        d = campo_con_ideas("Duda:", "home", "deberes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Fotosíntesis", "", "")
+        if st.button("Explicar") and d: st.info(llamar_ia(modelo_seleccionado, d, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic=""))
+    elif sub_idx == 3:
+        t = st.selectbox("Tipo:", ["Charla", "Evaluación", "EPIs", "Legal"]); c = campo_con_ideas("Contexto:", "prl", "riesgos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Altura", "", "")
+        if st.button("Generar") and c:
+            res = llamar_ia(modelo_seleccionado, f"PRL {t}: {c}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+            if "[ERROR" in res: st.error(res)
+            else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "PRL")
+
+# ==========================================
+# CATEGORÍA 5: VIAJES Y HOGAR
+# ==========================================
+elif macro_idx == 5:
+    sub_names = ["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS"]
+    sub_idx = custom_tabs(sub_names, "travel_sub", 0)
+    if sub_idx == 0:
+        d = campo_con_ideas("Destino:", "travel", "viajes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Roma", "", "")
+        if st.button("Itinerario") and d:
+            res = llamar_ia(modelo_seleccionado, f"Itinerario {d} 3 días", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+            if "[ERROR" in res: st.error(res)
+            else: st.info(res); botones_descarga(res, f"Viaje_{d}")
+    elif sub_idx == 1:
+        i = st.number_input("Ingresos:"); g = st.number_input("Gastos:")
+        if st.button("Ahorro"): st.success(f"Ahorras {i-g}€") if i > g else st.error(f"Faltan {g-i}€")
+    elif sub_idx == 2:
+        t = st.selectbox("Tipo:", ["Reyes", "Discurso", "Reclamación"]); d = campo_con_ideas("Detalles:", "letter", "cartas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Carta a padres", "", "")
+        if st.button("Redactar") and d:
+            res = llamar_ia(modelo_seleccionado, f"{t}: {d}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+            if "[ERROR" in res: st.error(res)
+            else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "Carta")
+
+# ==========================================
+# CATEGORÍA 6: GESTIÓN DE PLANTAS
+# ==========================================
+elif macro_idx == 6:
+    sub_names = ["📊 DASHBOARD", "⚖️ BÁSCULA", "🔄 TRAZABILIDAD", "🔧 MANTENIMIENTO", "🏭 SIMULADOR IA"]
+    sub_idx = custom_tabs(sub_names, "plant_sub", 0)
+    
+    if sub_idx == 0:
+        st.markdown("#### 📊 Dashboard de Planta")
+        with st.expander("⚖️ Registro Rápido de Báscula (Haz clic para abrir)", expanded=False):
+            with st.form("form_bascula_rapida"):
+                c1, c2, c3 = st.columns(3)
+                with c1: matricula = st.text_input("Matrícula:", placeholder="Ej: 1234 ABC")
+                with c2: residuo = st.selectbox("Residuo:", ["RSU", "Envases", "Orgánico", "Escombro", "Peligroso", "Chatarra"])
+                with c3: peso = st.number_input("Peso (kg):", min_value=0.0, value=1000.0, step=100.0)
+                operacion = st.radio("Operación:", ["Entrada", "Salida"], horizontal=True)
+                btn_save = st.form_submit_button("Guardar Registro Rápido", type="primary")
+                if btn_save and matricula:
+                    fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    insert_db("INSERT INTO bascula (fecha, matricula, residuo, peso, operacion) VALUES (?, ?, ?, ?, ?)", (fecha_actual, matricula, residuo, peso, operacion))
+                    st.success("✅ Registro guardado."); time.sleep(1); st.rerun()
+
+        st.markdown("---")
+        df_bascula = get_db_data("bascula"); df_lotes = get_db_data("lotes"); df_mant = get_db_data("mantenimiento")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if not df_bascula.empty: st.metric("Total Entradas (kg)", f"{df_bascula[df_bascula['operacion'] == 'Entrada']['peso'].sum():,.0f}")
+            else: st.metric("Total Entradas", "0 kg")
+        with c2:
+            if not df_lotes.empty: st.metric("Lotes Activos", len(df_lotes[df_lotes['estado'] != 'Completado']))
+            else: st.metric("Lotes Activos", "0")
+        with c3:
+            if not df_mant.empty: st.metric("Máquinas Averiadas", len(df_mant[df_mant['estado'] == 'Averiada']), delta_color="inverse")
+            else: st.metric("Máquinas Averiadas", "0")
+            
+        st.markdown("---")
+        if not df_bascula.empty:
+            st.markdown("##### Material Entrante por Tipo")
+            df_group = df_bascula.groupby('residuo')['peso'].sum().reset_index()
+            fig = px.pie(df_group, values='peso', names='residuo', hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#00f0ff')
+            st.plotly_chart(fig, use_container_width=True)
+
+    elif sub_idx == 1:
+        st.markdown("#### ⚖️ Control de Báscula")
+        with st.form("form_bascula"):
+            st.markdown("##### Registrar Paso por Báscula")
+            c1, c2 = st.columns(2)
+            with c1:
+                matricula = st.text_input("Matrícula del Camión:", placeholder="Ej: 1234 ABC")
+                residuo = st.selectbox("Tipo de Residuo:", ["RSU", "Envases", "Orgánico", "Escombro", "Peligroso", "Chatarra"])
+            with c2:
+                peso = st.number_input("Peso (kg):", min_value=0.0, value=1000.0, step=100.0)
+                operacion = st.radio("Operación:", ["Entrada", "Salida"], horizontal=True)
+            btn_save = st.form_submit_button("Guardar Registro", type="primary")
+            if btn_save and matricula:
+                fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                insert_db("INSERT INTO bascula (fecha, matricula, residuo, peso, operacion) VALUES (?, ?, ?, ?, ?)", (fecha_actual, matricula, residuo, peso, operacion))
+                st.success("✅ Registro guardado correctamente."); time.sleep(1); st.rerun()
+
+        st.markdown("---")
+        st.markdown("##### Últimos Registros")
+        df = get_db_data("bascula").sort_values("id", ascending=False).head(10)
+        if not df.empty: st.dataframe(df[['fecha', 'matricula', 'residuo', 'peso', 'operacion']], use_container_width=True)
+        else: st.info("No hay registros en la báscula.")
+
+    elif sub_idx == 2:
+        st.markdown("#### 🔄 Trazabilidad de Lotes")
+        with st.form("form_lote"):
+            c1, c2 = st.columns(2)
+            with c1:
+                lote_residuo = st.selectbox("Residuo del Lote:", ["RSU", "Envases", "Orgánico", "Escombro", "Peligroso"])
+                lote_peso_in = st.number_input("Peso Inicial (kg):", min_value=0.0, value=5000.0, step=100.0)
+            with c2:
+                lote_estado = st.selectbox("Estado Inicial:", ["Recibido", "En Proceso", "Clasificado"])
+                btn_lote = st.form_submit_button("Crear Lote", type="primary")
+                if btn_lote and lote_residuo:
+                    fecha = datetime.datetime.now().strftime("%Y-%m-%d")
+                    insert_db("INSERT INTO lotes (fecha, residuo, peso_in, estado, peso_out) VALUES (?, ?, ?, ?, ?)", (fecha, lote_residuo, lote_peso_in, lote_estado, 0.0))
+                    st.success("✅ Lote creado."); time.sleep(1); st.rerun()
+
+        st.markdown("---")
+        st.markdown("##### Lotes Activos")
+        df_lotes = get_db_data("lotes")
+        if not df_lotes.empty:
+            for idx, row in df_lotes.iterrows():
+                if row['estado'] != 'Completado':
+                    with st.expander(f"Lote #{row['id']} - {row['residuo']} ({row['fecha']})"):
+                        st.write(f"Peso Inicial: {row['peso_in']} kg")
+                        nuevo_estado = st.selectbox("Actualizar Estado:", ["Recibido", "En Proceso", "Clasificado", "Completado"], index=0, key=f"lote_est_{row['id']}")
+                        peso_out = st.number_input("Peso Final Recuperado (kg):", value=row['peso_out'], key=f"lote_p_{row['id']}")
+                        if st.button("Actualizar Lote", key=f"btn_lote_{row['id']}"):
+                            insert_db("UPDATE lotes SET estado=?, peso_out=? WHERE id=?", (nuevo_estado, peso_out, row['id']))
+                            st.success("Actualizado."); time.sleep(1); st.rerun()
+        else: st.info("No hay lotes registrados.")
+
+    elif sub_idx == 3:
+        st.markdown("#### 🔧 Mantenimiento y Averías")
+        with st.form("form_mant"):
+            c1, c2 = st.columns(2)
+            with c1:
+                maquina = st.selectbox("Máquina:", ["Trituradora Primaria", "Cinta Transportadora 1", "Separador Magnético", "Separador Balístico", "Prensa Hidráulica", "Otra"])
+                descripcion = st.text_area("Descripción del fallo:")
+            with c2:
+                st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+                btn_averia = st.form_submit_button("🚨 Reportar Avería", type="primary")
+                if btn_averia and descripcion:
+                    fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    insert_db("INSERT INTO mantenimiento (fecha, maquina, descripcion, estado) VALUES (?, ?, ?, ?)", (fecha, maquina, descripcion, "Averiada"))
+                    st.error("Avería reportada. La planta está parada en ese sector."); time.sleep(1); st.rerun()
+        st.markdown("---")
+        st.markdown("##### Estado de las Máquinas")
+        df_mant = get_db_data("mantenimiento")
+        if not df_mant.empty:
+            for idx, row in df_mant.iterrows():
+                if row['estado'] == 'Averiada':
+                    with st.expander(f"🚨 {row['maquina']} - {row['fecha']}", expanded=True):
+                        st.write(f"Fallo: {row['descripcion']}")
+                        if st.button("✅ Marcar como Reparada", key=f"rep_{row['id']}"):
+                            insert_db("UPDATE mantenimiento SET estado='Reparada' WHERE id=?", (row['id'],))
+                            st.success("Máquina reparada."); time.sleep(1); st.rerun()
+                else: st.success(f"✅ {row['maquina']} - Funcionando (Reparada el {row['fecha']})")
+        else: st.info("Todas las máquinas funcionan correctamente.")
+
+    elif sub_idx == 4:
+        st.markdown("#### 🏭 Simulador de Procesos y Maquinaria")
+        c1, c2 = st.columns(2)
+        with c1: residuo = st.selectbox("Tipo de Residuo:", ["RSU (Mezcla)", "Envases Ligeros", "Orgánico", "Escombro", "Peligroso", "Madera", "Chatarra"])
+        with c2: capacidad = st.number_input("Toneladas/día:", min_value=10, value=100)
+        contexto = cajita_adjuntar_archivo("plant_proc_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        if st.button("🔎 Generar Diagrama y Maquinaria", type="primary", key="btn_plant_proc"):
+            with st.spinner("Diseñando línea de producción..."):
+                prompt = f"Actúa como ingeniero de plantas de reciclaje. Diseña la línea de proceso para {capacidad} t/día de {residuo}. Genera un diagrama Mermaid de flujo (graph TD) y una lista de la maquinaria necesaria (trituradoras, separadores, etc.) explicando brevemente su función."
+                res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{prompt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+                if "[ERROR" in res: st.error(res)
+                else: st.session_state.plant_borrador = res
+        if st.session_state.get("plant_borrador"):
+            st.markdown("### 📝 Borrador de Ingeniería")
+            texto = st.text_area("Puedes editar el texto (las listas) aquí:", value=st.session_state.plant_borrador, height=300, key="plant_txt")
+            st.session_state.plant_borrador = texto
+            if "```mermaid" in texto:
+                mermaid_code = texto.split("```mermaid")[1].split("```")[0].strip()
+                st.html(f"<div class='mermaid'>{mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
+            st.markdown("---"); botones_descarga(texto, "Proceso_Planta")
+
+# ==========================================
+# CATEGORÍA 7: MÚSICA Y ARTE
+# ==========================================
+elif macro_idx == 7:
+    sub_names = ["🎵 CANCIONES", "🎨 POESÍA"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    if sub_idx == 0:
+        t = campo_con_ideas("Tema:", "song", "canciones", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Amor", "", "")
+        g = st.selectbox("Género:", ["Pop", "Rock", "Rap"]); to = st.select_slider("Tono:", ["Triste", "Alegre", "Épico"])
+        if st.button("Escribir") and t:
+            letra = llamar_ia(modelo_seleccionado, f"Canción {g} sobre {t}, tono {to}.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+            if "[ERROR" in letra: st.error(letra)
+            else:
+                st.text_area("Letra:", letra, height=300); botones_descarga(letra, "Cancion")
+                if st.button("Audio"):
+                    aud = generar_audio_sincrono(letra, "es-ES-ElviraNeural")
+                    if aud: st.audio(aud, format="audio/mp3")
+    elif sub_idx == 1:
+        t = campo_con_ideas("Tema:", "poem", "poemas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Mar", "", "")
+        if st.button("Escribir") and t:
+            res = llamar_ia(modelo_seleccionado, f"Poema sobre {t}.", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+            if "[ERROR" in res: st.error(res)
+            else: st.text_area("Poema:", res, height=300); botones_descarga(res, "Poema")
