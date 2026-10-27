@@ -208,6 +208,8 @@ def transcribir_audio_youtube(url, api_key_groq):
             "outtmpl": os.path.join(tmp, "audio.%(ext)s"),
             "quiet": True,
             "noplaylist": True,
+            # AÑADIDO: Evita el error HTTP 403 Forbidden de YouTube en Streamlit Cloud
+            "extractor_args": {"youtube": ["player_client=android"]},
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
