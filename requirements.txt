@@ -22,3 +22,5 @@ requests
 numpy
 groq
 python-dotenv
+yt-dlp[default,curl-cffi]
+curl_cffi
