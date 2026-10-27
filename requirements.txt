@@ -16,6 +16,7 @@ anthropic
 qrcode
 opencv-python-headless
 yt-dlp
+curl_cffi
 pandas
 requests
 numpy
