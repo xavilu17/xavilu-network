@@ -124,7 +124,8 @@ _defaults = {
     "plant_borrador": "",
     "pod_tema_input": "", "pod_sugs": [],
     "api_key_gemini_manual": "", "api_key_groq_manual": "", "api_key_silicon_manual": "", 
-    "api_key_mistral_manual": "", "api_key_openrouter_manual": ""
+    "api_key_mistral_manual": "", "api_key_openrouter_manual": "",
+    "multimedia_archivo_actual": "", "multimedia_resultado": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -1113,6 +1114,11 @@ elif macro_idx == 3:
         if a:
             n = a.name.lower()
             
+            # Reiniciar resultado si cambia el archivo
+            if a.name != st.session_state.get("multimedia_archivo_actual"):
+                st.session_state.multimedia_archivo_actual = a.name
+                st.session_state.multimedia_resultado = ""
+            
             if n.endswith((".png", ".jpg", ".jpeg", ".webp")):
                 st.image(a)
                 op = st.radio("Opción de imagen:", ["Describir", "OCR", "Prompt", "¿Es IA?"])
@@ -1121,8 +1127,7 @@ elif macro_idx == 3:
                         p = "Describe detalladamente" if "Describir" in op else "Extrae el texto (OCR)" if "OCR" in op else "Genera un prompt" if "Prompt" in op else "¿Es IA?"
                         try:
                             res = analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", p, st.session_state.api_key_gemini_manual)
-                            if "[ERROR" in res: st.error(res)
-                            else: st.info(res)
+                            st.session_state.multimedia_resultado = res
                         except Exception as ex:
                             st.error(f"Error inesperado: {ex}")
             
@@ -1138,8 +1143,7 @@ elif macro_idx == 3:
                             p = "Resume este audio" if "Resumen" in op else "Traduce al español este audio"
                             res = analizar_archivo_con_gemini(a.getvalue(), "audio/mp3", p, st.session_state.api_key_gemini_manual)
                         
-                        if "[ERROR" in res: st.error(res)
-                        else: st.info(res)
+                        st.session_state.multimedia_resultado = res
             
             elif n.endswith((".mp4", ".mov", ".avi", ".mkv")):
                 st.video(a)
@@ -1154,10 +1158,32 @@ elif macro_idx == 3:
                                 p = "Resume el contenido de este vídeo" if "Resumir" in op else "Describe las escenas de este vídeo"
                                 res = analizar_archivo_con_gemini(a.getvalue(), "video/mp4", p, st.session_state.api_key_gemini_manual)
                             
-                            if "[ERROR" in res: st.error(res)
-                            else: st.info(res)
+                            st.session_state.multimedia_resultado = res
                         except Exception as ex:
                             st.error(f"Error inesperado al procesar el vídeo: {ex}")
+
+        # Mostrar resultado si existe
+        if st.session_state.get("multimedia_resultado"):
+            st.markdown("---")
+            if st.session_state.multimedia_resultado.startswith("[ERROR"):
+                st.error(st.session_state.multimedia_resultado)
+            else:
+                st.markdown("### 📝 Resultado (Editable)")
+                texto_editado = st.text_area("Puedes editar el texto aquí:", value=st.session_state.multimedia_resultado, height=300, key="multi_edit_area")
+                st.session_state.multimedia_resultado = texto_editado
+                
+                # Botón para procesar el texto resultante con IA
+                if st.button("✨ Resumir este texto con IA", type="secondary"):
+                    with st.spinner("Resumiendo..."):
+                        prompt = f"Resume el siguiente texto de forma clara y concisa:\n\n{texto_editado}"
+                        resumen = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+                        if "[ERROR" in resumen: st.error(resumen)
+                        else:
+                            st.session_state.multimedia_resultado = resumen
+                            st.rerun()
+
+                # Botones de descarga
+                botones_descarga(st.session_state.multimedia_resultado, "Resultado_Multimedia")
 
     elif sub_idx == 1:
         p = campo_con_ideas("Describe imagen:", "img", "imágenes", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Gato astronauta", "", "")
