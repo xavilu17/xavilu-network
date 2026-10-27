@@ -485,7 +485,9 @@ def custom_tabs(tab_names, key_name, default_idx=0):
 # INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
-    st.markdown("""<style>[data-testid="stSidebar"] {display: none !important;}</style>""", unsafe_allow_html=True)
+    # Ocultamos las flechitas nativas de Streamlit para que no abran un menú vacío
+    st.markdown("""<style>[data-testid="collapsedControl"] {display: none !important;}</style>""", unsafe_allow_html=True)
+    # Botón de rescate en la parte superior central
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
@@ -494,45 +496,49 @@ if not st.session_state.sidebar_visible:
 
 st.markdown("<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● SISTEMA CONECTADO</p>", unsafe_allow_html=True)
 
-with st.sidebar:
-    try: st.image("logo.png", use_container_width=True)
-    except: st.markdown("### 🪐 PANEL DE CONTROL")
-    
-    if st.button("⛶ Ocultar Menú (Pantalla Completa)", use_container_width=True): 
-        st.session_state.sidebar_visible = False
-        st.rerun()
+if st.session_state.sidebar_visible:
+    with st.sidebar:
+        try: st.image("logo.png", use_container_width=True)
+        except: st.markdown("### 🪐 PANEL DE CONTROL")
         
-    st.markdown("---")
-    modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-    
-    # SECCIÓN DE KEYS
-    st.markdown("#### 🔑 Estado de Conexiones")
-    try:
-        if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
-    except: pass
-    
-    with st.expander("⚙️ Configurar Keys Manualmente"):
-        st.caption("Si no usas secrets.toml, pega aquí tus claves para esta sesión:")
-        st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
-        st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
-        st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
-        st.session_state.api_key_mistral_manual = st.text_input("Mistral API Key", type="password", value=st.session_state.api_key_mistral_manual)
-        st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter API Key", type="password", value=st.session_state.api_key_openrouter_manual)
+        if st.button("⛶ Ocultar Menú (Pantalla Completa)", use_container_width=True): 
+            st.session_state.sidebar_visible = False
+            st.rerun()
+            
+        st.markdown("---")
+        modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
+        
+        # SECCIÓN DE KEYS
+        st.markdown("#### 🔑 Estado de Conexiones")
+        try:
+            if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
+        except: pass
+        
+        with st.expander("⚙️ Configurar Keys Manualmente"):
+            st.caption("Si no usas secrets.toml, pega aquí tus claves para esta sesión:")
+            st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
+            st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
+            st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
+            st.session_state.api_key_mistral_manual = st.text_input("Mistral API Key", type="password", value=st.session_state.api_key_mistral_manual)
+            st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter API Key", type="password", value=st.session_state.api_key_openrouter_manual)
 
-    st.markdown("---")
-    st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
-    st.markdown("---")
-    archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
-    if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
-        with st.spinner("Procesando..."):
-            st.session_state.global_context = leer_archivo_universal(archivo_global, modelo_seleccionado)[:5000]
-            st.session_state.global_file_name = archivo_global.name; st.success("✅ Memorizado.")
-    if st.session_state.get("global_file_name"):
-        st.info(f"Activo: **{st.session_state.global_file_name}**")
-        if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
-    st.markdown("---")
-    for h in obtener_de_db():
-        with st.expander(f"{h[1]} - {h[0][:10]}"): st.caption(h[2][:200] + "...")
+        st.markdown("---")
+        st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
+        st.markdown("---")
+        archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
+        if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
+            with st.spinner("Procesando..."):
+                st.session_state.global_context = leer_archivo_universal(archivo_global, modelo_seleccionado)[:5000]
+                st.session_state.global_file_name = archivo_global.name; st.success("✅ Memorizado.")
+        if st.session_state.get("global_file_name"):
+            st.info(f"Activo: **{st.session_state.global_file_name}**")
+            if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
+        st.markdown("---")
+        for h in obtener_de_db():
+            with st.expander(f"{h[1]} - {h[0][:10]}"): st.caption(h[2][:200] + "...")
+else:
+    modelo_seleccionado = "llama3.2:latest"
+    api_key_gemini = st.session_state.api_key_gemini_manual
 
 macro_names = ["💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "♻️ GESTIÓN PLANTAS", "🎵 MÚSICA Y ARTE"]
 macro_idx = custom_tabs(macro_names, "macro", 0)
