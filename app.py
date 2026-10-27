@@ -58,9 +58,9 @@ GEMINI_MODEL = "gemini-3.8-flash"
 if os.name == 'nt':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# --- BASE DE DATOS PLANTAS ---
+# --- BASE DE DATOS PLANTAS (CON TIMEOUT Y LISTA BLANCA) ---
 def init_plant_db():
-    conn = sqlite3.connect('xavilu_planta.db')
+    conn = sqlite3.connect('xavilu_planta.db', timeout=20)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS bascula (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, matricula TEXT, residuo TEXT, peso REAL, operacion TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS lotes (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, residuo TEXT, peso_in REAL, estado TEXT, peso_out REAL)''')
@@ -69,33 +69,36 @@ def init_plant_db():
 init_plant_db()
 
 def get_db_data(table):
+    tablas_permitidas = ["bascula", "lotes", "mantenimiento"]
+    if table not in tablas_permitidas:
+        return pd.DataFrame()
     try:
-        conn = sqlite3.connect('xavilu_planta.db')
+        conn = sqlite3.connect('xavilu_planta.db', timeout=20)
         df = pd.read_sql_query(f"SELECT * FROM {table}", conn)
         conn.close(); return df
     except: return pd.DataFrame()
 
 def insert_db(query, params):
     try:
-        conn = sqlite3.connect('xavilu_planta.db')
+        conn = sqlite3.connect('xavilu_planta.db', timeout=20)
         conn.execute(query, params)
         conn.commit(); conn.close()
     except Exception as e: st.error(f"Error DB: {e}")
 
 # --- BASE DE DATOS HISTORIAL ---
 def init_db():
-    conn = sqlite3.connect('xavilu_memoria.db')
+    conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
     conn.execute('CREATE TABLE IF NOT EXISTS historial (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)')
     conn.commit(); conn.close()
 def guardar_en_db(tipo, contenido):
     try:
-        conn = sqlite3.connect('xavilu_memoria.db')
+        conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
         conn.execute("INSERT INTO historial (fecha, tipo, contenido) VALUES (?, ?, ?)", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tipo, contenido))
         conn.commit(); conn.close()
     except: pass
 def obtener_de_db():
     try:
-        conn = sqlite3.connect('xavilu_memoria.db')
+        conn = sqlite3.connect('xavilu_memoria.db', timeout=20)
         rows = conn.execute("SELECT fecha, tipo, contenido FROM historial ORDER BY id DESC LIMIT 5").fetchall()
         conn.close(); return rows
     except: return []
@@ -133,6 +136,35 @@ for _k, _v in _defaults.items():
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+
+/* ARREGLO DE LAS FLECHITAS DEL MENÚ LATERAL */
+[data-testid="collapsedControl"] {
+    color: #00f0ff !important;
+    background-color: #0a0a0a !important;
+    border: 2px solid #00f0ff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.8) !important;
+    width: 45px !important;
+    height: 45px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    top: 15px !important;
+    left: 15px !important;
+}
+[data-testid="collapsedControl"] svg {
+    fill: #00f0ff !important;
+    width: 30px !important;
+    height: 30px !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background-color: #00f0ff !important;
+    color: #000000 !important;
+}
+[data-testid="collapsedControl"]:hover svg {
+    fill: #000000 !important;
+}
+
 .stApp { background-color: #000000 !important; background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
 header[data-testid="stHeader"] { background-color: #000000 !important; background: #000000 !important; }
 [data-testid="stAppDeployButton"] { display: none !important; }
@@ -302,13 +334,21 @@ def obtener_ruta_fuente():
 
 def generar_pdf_pro(titulo, contenido):
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
+    temp_img_path = "temp_cover.jpg"
+    
     try:
         url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Book cover for ' + titulo + ', cyberpunk')}?width=512&height=512&nologo=true"
         req = urllib.request.Request(url_img, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response: img_data = response.read()
-        with open("temp_cover.jpg", "wb") as f: f.write(img_data)
-        pdf.image("temp_cover.jpg", x=40, y=50, w=130); pdf.ln(150); os.remove("temp_cover.jpg")
-    except: pass
+        with open(temp_img_path, "wb") as f: f.write(img_data)
+        pdf.image(temp_img_path, x=40, y=50, w=130); pdf.ln(150)
+    except Exception: 
+        pass
+    finally:
+        if os.path.exists(temp_img_path):
+            try: os.remove(temp_img_path)
+            except: pass
+
     if font_path: pdf.add_font("Arial", "", font_path, uni=True); pdf.set_font("Arial", size=11)
     else: pdf.set_font("Helvetica", size=11); contenido = contenido.encode('latin-1', 'replace').decode('latin-1')
     pdf.set_font("Helvetica", "B", 24); pdf.multi_cell(0, 10, txt=titulo, align='C')
@@ -485,9 +525,6 @@ def custom_tabs(tab_names, key_name, default_idx=0):
 # INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
-    # Ocultamos las flechitas nativas de Streamlit para que no abran un menú vacío
-    st.markdown("""<style>[data-testid="collapsedControl"] {display: none !important;}</style>""", unsafe_allow_html=True)
-    # Botón de rescate en la parte superior central
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
