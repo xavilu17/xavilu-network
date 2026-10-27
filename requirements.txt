@@ -19,3 +19,5 @@ yt-dlp
 pandas
 requests
 numpy
+groq
+python-dotenv
