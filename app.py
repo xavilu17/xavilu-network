@@ -193,12 +193,23 @@ def extraer_youtube_id(url):
     if len(url.strip()) == 11: return url.strip()
     return None
 
-# NUEVO: transcribe el audio de un vídeo de YouTube usando Whisper de Groq
+# NUEVO: transcribe el audio de un vídeo de YouTube usando Whisper de Groq (vía URL)
 def transcribir_audio_youtube(url, api_key_groq):
     if not HAS_YTDLP or not HAS_OPENAI:
         return "[ERROR] Faltan yt-dlp u openai instalados."
     if not api_key_groq:
         return "[ERROR] No hay Groq API Key. Configúrala en la barra lateral."
+
+    cookies_path = None
+    try:
+        cookie_content = st.secrets.get("YT_COOKIES")
+        if cookie_content:
+            tmp_cookie_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt')
+            tmp_cookie_file.write(cookie_content)
+            tmp_cookie_file.close()
+            cookies_path = tmp_cookie_file.name
+    except Exception:
+        pass
 
     tmp = tempfile.mkdtemp()
     audio_path = None
@@ -208,10 +219,12 @@ def transcribir_audio_youtube(url, api_key_groq):
             "outtmpl": os.path.join(tmp, "audio.%(ext)s"),
             "quiet": True,
             "noplaylist": True,
-            # CORREGIDO: Usamos un target válido para impersonate y el cliente android
             "impersonate": "chrome", 
             "extractor_args": {"youtube": ["player_client=android"]},
         }
+        if cookies_path:
+            ydl_opts["cookiefile"] = cookies_path
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             audio_path = ydl.prepare_filename(info)
@@ -234,8 +247,39 @@ def transcribir_audio_youtube(url, api_key_groq):
         if audio_path and os.path.exists(audio_path):
             try: os.remove(audio_path)
             except: pass
+        if cookies_path and os.path.exists(cookies_path):
+            try: os.remove(cookies_path)
+            except: pass
         try: os.rmdir(tmp)
         except: pass
+
+# NUEVO: transcribe un archivo local (audio/vídeo) usando Whisper de Groq
+def transcribir_archivo_local(archivo_bytes, nombre_archivo, api_key_groq):
+    if not HAS_OPENAI:
+        return "[ERROR] Falta openai instalado."
+    if not api_key_groq:
+        return "[ERROR] No hay Groq API Key. Configúrala en la barra lateral."
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(nombre_archivo)[1])
+    tmp.write(archivo_bytes)
+    tmp.close()
+    audio_path = tmp.name
+
+    try:
+        client = openai.OpenAI(api_key=api_key_groq, base_url="https://api.groq.com/openai/v1")
+        with open(audio_path, "rb") as f:
+            resp = client.audio.transcriptions.create(
+                model="whisper-large-v3-turbo",
+                file=f,
+                response_format="text",
+            )
+        return resp if isinstance(resp, str) else resp.text
+    except Exception as e:
+        return f"[ERROR] {str(e)}"
+    finally:
+        if os.path.exists(audio_path):
+            try: os.remove(audio_path)
+            except: pass
 
 def leer_archivo_universal(upload, modelo_ia):
     if upload.size > MAX_FILE_MB * 1024 * 1024: return ""
@@ -935,69 +979,84 @@ elif macro_idx == 2:
                 out = BytesIO(); df.to_excel(out); st.download_button("📥 Excel", out.getvalue(), "tabla.xlsx")
             except: st.error("Fallo al leer.")
 
-    # REEMPLAZADO: subtab YouTube con subtítulos -> Whisper fallback -> traducción/resumen en español
+    # REEMPLAZADO: subtab YouTube con opción de enlace o subida de archivo
     elif sub_idx == 4:
-        st.markdown("#### 🎥 YouTube")
-        url = st.text_input("URL del vídeo:", placeholder="https://www.youtube.com/watch?v=...")
+        st.markdown("#### 🎥 YouTube / Audio")
+        
+        fuente_tipo = st.radio("Elige el método:", ["Subir archivo (Recomendado)", "Pegar enlace de YouTube"], horizontal=True)
+        
+        archivo_subido = None
+        url = ""
+        
+        if fuente_tipo == "Subir archivo (Recomendado)":
+            archivo_subido = st.file_uploader("Sube un audio (.mp3) o vídeo (.mp4):", type=["mp3", "wav", "m4a", "mp4"])
+        else:
+            url = st.text_input("URL del vídeo:", placeholder="https://www.youtube.com/watch?v=...")
+            
         modo = st.radio("¿Qué quieres hacer?", ["Resumir", "Traducir al español"], horizontal=True)
 
-        if st.button("Ejecutar", type="primary") and url:
-            vid = extraer_youtube_id(url)
-            if not vid:
-                st.error("No he podido extraer el ID del vídeo. Revisa el enlace.")
-            else:
-                texto_original = ""
-                fuente = ""
+        if st.button("Ejecutar", type="primary") and (archivo_subido or url):
+            texto_original = ""
+            fuente = ""
+            vid = extraer_youtube_id(url) if url else "archivo_local"
 
-                # Intento 1: subtítulos
+            key_groq = st.session_state.api_key_groq_manual
+            if not key_groq:
+                try: key_groq = st.secrets.get("GROQ_API_KEY", "")
+                except: pass
+
+            if archivo_subido:
+                with st.spinner("Transcribiendo archivo con Whisper..."):
+                    texto_original = transcribir_archivo_local(archivo_subido.getvalue(), archivo_subido.name, key_groq)
+                fuente = "archivo subido"
+            else:
+                if not vid:
+                    st.error("No he podido extraer el ID del vídeo. Revisa el enlace.")
+                    st.stop()
+                
                 try:
                     with st.spinner("Buscando subtítulos..."):
                         tr = YouTubeTranscriptApi.get_transcript(vid, languages=['es', 'en'])
                     texto_original = " ".join([t['text'] for t in tr])
-                    fuente = "subtítulos"
+                    fuente = "subtítulos de YouTube"
                 except Exception:
-                    # Intento 2: transcripción de audio con Whisper (Groq)
                     st.info("Este vídeo no tiene subtítulos. Transcribiendo el audio con Whisper...")
-                    key_groq = st.session_state.api_key_groq_manual
-                    if not key_groq:
-                        try: key_groq = st.secrets.get("GROQ_API_KEY", "")
-                        except: pass
                     with st.spinner("Descargando audio y transcribiendo..."):
                         texto_original = transcribir_audio_youtube(url, key_groq)
                     fuente = "whisper"
 
-                if texto_original.startswith("[ERROR]"):
-                    st.error(texto_original)
+            if texto_original.startswith("[ERROR]"):
+                st.error(texto_original)
+            else:
+                st.caption(f"Fuente: {fuente} · {len(texto_original)} caracteres")
+                with st.expander("Ver transcripción original"):
+                    st.text_area("Texto detectado:", value=texto_original, height=150, key=f"yt_orig_{vid}")
+
+                if modo == "Resumir":
+                    prompt = (
+                        "Resume este vídeo de YouTube en español, con tono claro y directo:\n"
+                        f"{texto_original[:8000]}"
+                    )
                 else:
-                    st.caption(f"Fuente: {fuente} · {len(texto_original)} caracteres")
-                    with st.expander("Ver transcripción original"):
-                        st.text_area("Texto detectado:", value=texto_original, height=150, key=f"yt_orig_{vid}")
+                    prompt = (
+                        "Traduce al español el siguiente texto manteniendo el tono natural "
+                        "del original, sin añadir ni quitar contenido. Si el texto ya está en "
+                        "español, devuélvelo tal cual. Devuelve solo la traducción:\n"
+                        f"{texto_original[:8000]}"
+                    )
 
-                    if modo == "Resumir":
-                        prompt = (
-                            "Resume este vídeo de YouTube en español, con tono claro y directo:\n"
-                            f"{texto_original[:8000]}"
-                        )
-                    else:
-                        prompt = (
-                            "Traduce al español el siguiente texto manteniendo el tono natural "
-                            "del original, sin añadir ni quitar contenido. Si el texto ya está en "
-                            "español, devuélvelo tal cual. Devuelve solo la traducción:\n"
-                            f"{texto_original[:8000]}"
-                        )
+                with st.spinner("Procesando con IA..."):
+                    res = llamar_ia(
+                        modelo_seleccionado, prompt,
+                        st.session_state.api_key_gemini_manual,
+                        api_key_openai="", api_key_anthropic=""
+                    )
 
-                    with st.spinner("Procesando con IA..."):
-                        res = llamar_ia(
-                            modelo_seleccionado, prompt,
-                            st.session_state.api_key_gemini_manual,
-                            api_key_openai="", api_key_anthropic=""
-                        )
-
-                    if "[ERROR" in res:
-                        st.error(res)
-                    else:
-                        st.text_area("Resultado:", res, height=300)
-                        botones_descarga(res, f"YT_{vid}")
+                if "[ERROR" in res:
+                    st.error(res)
+                else:
+                    st.text_area("Resultado:", res, height=300)
+                    botones_descarga(res, f"YT_{vid}")
 
     elif sub_idx == 5:
         url = st.text_input("URL Web:")
