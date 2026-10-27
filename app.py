@@ -31,6 +31,7 @@ import numpy as np
 import random
 import sqlite3
 import datetime
+import concurrent.futures
 
 try: import cv2; HAS_CV2 = True
 except ImportError: HAS_CV2 = False
@@ -46,14 +47,16 @@ try: import openai; HAS_OPENAI = True
 except ImportError: HAS_OPENAI = False
 try: import anthropic; HAS_ANTHROPIC = True
 except ImportError: HAS_ANTHROPIC = False
-try: import pywhatkit; HAS_WHATSAPP = True
-except ImportError: HAS_WHATSAPP = False
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Xavilu Network Pro", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 MAX_FILE_MB = 1000
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-3.8-flash"
+
+# Fix para Windows (evita conflictos de asyncio en Streamlit)
+if os.name == 'nt':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # --- BASE DE DATOS PLANTAS ---
 def init_plant_db():
@@ -118,7 +121,8 @@ _defaults = {
     "sidebar_visible": True,
     "whatsapp_number": "",
     "office_borrador": "", "pdf_borrador": "",
-    "plant_borrador": ""
+    "plant_borrador": "",
+    "pod_tema_input": "", "pod_sugs": []
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -222,28 +226,67 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
     if historial_chat:
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
-    if api_key_openai.strip() and HAS_OPENAI:
-        try:
-            client = openai.OpenAI(api_key=api_key_openai)
-            return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
-        except Exception as e: st.warning(f"⚠️ Error OpenAI: {str(e)[:50]}. Probando otros...")
-    if api_key_anthropic.strip() and HAS_ANTHROPIC:
-        try:
-            client = anthropic.Anthropic(api_key=api_key_anthropic)
-            return client.messages.create(model="claude-3-5-sonnet-20240620", max_tokens=4000, messages=[{"role": "user", "content": prompt_final}]).content[0].text
-        except Exception as e: st.warning(f"⚠️ Error Claude: {str(e)[:50]}. Probando otros...")
-    if api_key_gemini.strip() and HAS_GEMINI:
+
+    try: key_gemini = st.secrets.get("GEMINI_API_KEY", api_key_gemini)
+    except: key_gemini = api_key_gemini
+    try: key_groq = st.secrets.get("GROQ_API_KEY", "")
+    except: key_groq = ""
+    try: key_silicon = st.secrets.get("SILICONFLOW_API_KEY", "")
+    except: key_silicon = ""
+    try: key_mistral = st.secrets.get("MISTRAL_API_KEY", "")
+    except: key_mistral = ""
+    try: key_openrouter = st.secrets.get("OPENROUTER_API_KEY", "")
+    except: key_openrouter = ""
+
+    res_exitosa = False
+    res = None
+
+    if key_gemini.strip() and HAS_GEMINI and not res_exitosa:
         for intento in range(2):
             try:
-                return get_gemini_client(api_key_gemini).models.generate_content(model=GEMINI_MODEL, contents=prompt_final).text
+                res = get_gemini_client(key_gemini).models.generate_content(model=GEMINI_MODEL, contents=prompt_final).text
+                res_exitosa = True
+                break
             except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e): st.warning("🔋 Cuota Gemini agotada. Usando Ollama..."); break 
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e): st.warning("🔋 Cuota Gemini agotada. Probando Groq..."); break 
                 elif "503" in str(e) and intento < 1: time.sleep(2); continue
-                else: break
+                else: st.warning(f"⚠️ Error Gemini: {str(e)[:50]}. Probando Groq..."); break
+
+    if key_groq.strip() and HAS_OPENAI and not res_exitosa:
+        try:
+            client = openai.OpenAI(api_key=key_groq, base_url="https://api.groq.com/openai/v1")
+            res = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+            res_exitosa = True
+        except Exception as e: st.warning(f"⚠️ Error Groq: {str(e)[:50]}. Probando SiliconFlow...")
+
+    if key_silicon.strip() and HAS_OPENAI and not res_exitosa:
+        try:
+            client = openai.OpenAI(api_key=key_silicon, base_url="https://api.siliconflow.cn/v1")
+            res = client.chat.completions.create(model="Qwen/Qwen2.5-7B-Instruct", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+            res_exitosa = True
+        except Exception as e: st.warning(f"⚠️ Error SiliconFlow: {str(e)[:50]}. Probando Mistral...")
+
+    if key_mistral.strip() and HAS_OPENAI and not res_exitosa:
+        try:
+            client = openai.OpenAI(api_key=key_mistral, base_url="https://api.mistral.ai/v1")
+            res = client.chat.completions.create(model="mistral-small-latest", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+            res_exitosa = True
+        except Exception as e: st.warning(f"⚠️ Error Mistral: {str(e)[:50]}. Probando OpenRouter...")
+
+    if key_openrouter.strip() and HAS_OPENAI and not res_exitosa:
+        try:
+            client = openai.OpenAI(api_key=key_openrouter, base_url="https://openrouter.ai/api/v1")
+            res = client.chat.completions.create(model="deepseek/deepseek-r1:free", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+            res_exitosa = True
+        except Exception as e: st.warning(f"⚠️ Error OpenRouter: {str(e)[:50]}. Probando Ollama local...")
+
+    if res_exitosa and res:
+        return res
+
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         return client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"].split("</think>")[-1].strip()
-    except Exception as e: return f"[ERROR CRÍTICO] IA desconectada o tiempo de espera agotado. Detalle: {e}"
+    except Exception as e: return f"[ERROR CRÍTICO] Todas las IAs fallaron o se agotaron. Detalle Ollama: {e}"
 
 def obtener_ruta_fuente():
     for ruta in ["C:/Windows/Fonts/arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/Library/Fonts/Arial.ttf"]:
@@ -295,75 +338,109 @@ def generar_pptx(titulo, texto):
             txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(5)); txBox.text_frame.text = contenido_texto
     out = BytesIO(); prs.save(out); out.seek(0); return out.getvalue()
 
-def enviar_whatsapp(texto):
-    num = st.session_state.get("whatsapp_number", "").strip()
-    if not num or not HAS_WHATSAPP: st.warning("⚠️ Configura WhatsApp o instala pywhatkit."); return
-    try:
-        pywhatkit.sendwhatmsg_instantly(f"+{num}", texto[:1000], wait_time=15, tab_close=True)
-        st.success("✅ Mensaje enviado a WhatsApp.")
-    except Exception as e: st.error(f"Error: {e}")
-
 def botones_descarga(texto, nombre_por_defecto="documento"):
     if texto:
         st.markdown("---")
         key_u = f"{nombre_por_defecto}".replace(" ", "_")
         nombre_elegido = st.text_input("📝 Nombre (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_') or nombre_por_defecto
+        
         c1, c2, c3 = st.columns(3)
         with c1: st.download_button("📥 TXT", texto.encode('utf-8'), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
         with c2: st.download_button("📄 PDF", generar_pdf_pro(nombre_limpio, texto), f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
         with c3:
-            if st.button("📲 WhatsApp", key=f"wa_{key_u}", use_container_width=True): enviar_whatsapp(texto)
+            if st.button("📲 Enviar a WhatsApp", key=f"wa_{key_u}", use_container_width=True):
+                num = st.session_state.get("whatsapp_number", "").strip()
+                if num:
+                    url_wa = f"https://wa.me/{num}?text={urllib.parse.quote(texto[:1500])}"
+                    components.html(f"<script>window.open('{url_wa}', '_blank');</script>", height=0)
+                    st.success("✅ Abriendo WhatsApp...")
+                else:
+                    st.error("⚠️ Configura tu número en la barra lateral izquierda para usar WhatsApp.")
+
+def run_async_safe(coro):
+    def _run(): return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(_run).result()
 
 def generar_audio_sincrono(texto, voz):
-    loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
     async def _gen():
         buf = BytesIO()
         async for chunk in edge_tts.Communicate(texto, voz).stream():
             if chunk["type"] == "audio": buf.write(chunk["data"])
-        buf.seek(0); return buf.getvalue()
-    try: return loop.run_until_complete(_gen())
-    except: return None
-    finally: loop.close()
+        return buf.getvalue()
+    try: return run_async_safe(_gen())
+    except Exception as e: st.error(f"Error TTS: {e}"); return None
 
 def generar_podcast_3_voces(guion, v1, v2, v3):
-    loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
     async def _gen():
-        buf = BytesIO(); patron = re.compile(r'^(?:\*+)?(Locutor \d)(?:\*+)?\s*:\s*(.+)', re.IGNORECASE)
-        for linea in guion.split('\n'):
+        buf = BytesIO()
+        texto_procesado = re.sub(r'\(risas\)|\[risas\]|\*risas\*', 'jajaja', guion, flags=re.IGNORECASE)
+        texto_procesado = re.sub(r'\(pausa\)|\[pausa\]', '...', texto_procesado, flags=re.IGNORECASE)
+        texto_procesado = re.sub(r'[*#_]', '', texto_procesado)
+        
+        lineas = texto_procesado.split('\n')
+        
+        voz_actual = v1
+        for linea in lineas:
             linea = linea.strip()
             if not linea: continue
-            match = patron.match(linea)
+            
+            match = re.search(r'^Locutor\s*(\d)', linea, re.IGNORECASE)
             if match:
-                locutor = match.group(1).lower(); texto_a_leer = match.group(2).strip()
-                voz = v2 if "locutor 2" in locutor else v3 if "locutor 3" in locutor else v1
-                if texto_a_leer:
-                    async for chunk in edge_tts.Communicate(texto_a_leer, voz).stream():
-                        if chunk["type"] == "audio": buf.write(chunk["data"])
+                num = int(match.group(1))
+                if num == 1: voz_actual = v1
+                elif num == 2: voz_actual = v2
+                elif num == 3: voz_actual = v3
+                texto_a_leer = re.sub(r'^Locutor\s*\d\s*:?', '', linea, flags=re.IGNORECASE).strip()
             else:
-                async for chunk in edge_tts.Communicate(linea, v1).stream():
+                texto_a_leer = linea
+                
+            if not texto_a_leer or texto_a_leer.lower() in ["elvira", "jorge", "tomas", "carlos"]: continue
+                
+            try:
+                texto_final = texto_a_leer + ", "
+                async for chunk in edge_tts.Communicate(texto_final, voz_actual).stream():
                     if chunk["type"] == "audio": buf.write(chunk["data"])
-        buf.seek(0); return buf.getvalue()
-    try: return loop.run_until_complete(_gen())
-    except: return None
-    finally: loop.close()
+            except Exception: pass
+                
+        return buf.getvalue()
+
+    try: return run_async_safe(_gen())
+    except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
+    
+    def agregar_idea(idea_seleccionada):
+        texto_actual = st.session_state[input_key].strip()
+        if texto_actual:
+            st.session_state[input_key] = f"{texto_actual}\n\n{idea_seleccionada}"
+        else:
+            st.session_state[input_key] = idea_seleccionada
+        if f"{key_prefix}_sugs" in st.session_state:
+            del st.session_state[f"{key_prefix}_sugs"]
+
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
             prompt = f"Dame 3 ideas creativas para {contexto_ia}. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
+
     if st.session_state.get(f"{key_prefix}_sugs"):
-        st.markdown("✨ **Haz clic en una idea para usarla:**")
+        st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
             with cols[i]:
-                if st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True):
-                    st.session_state[input_key] = idea; del st.session_state[f"{key_prefix}_sugs"]; st.rerun()
-    return st.text_input(label, key=input_key, placeholder=placeholder)
+                st.button(
+                    idea, 
+                    key=f"{key_prefix}_idea_{i}", 
+                    use_container_width=True,
+                    on_click=agregar_idea, 
+                    args=(idea,)
+                )
+                
+    return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic=""):
     if st.button(f"🚀 Superpoder: {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
@@ -415,10 +492,17 @@ with st.sidebar:
     if st.button("⛶ Pantalla Completa", use_container_width=True): st.session_state.sidebar_visible = False; st.rerun()
     st.markdown("---")
     modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-    try: api_key_gemini = st.secrets["GEMINI_API_KEY"]; st.success("🔑 Gemini OK")
-    except: api_key_gemini = st.text_input("Gemini API Key", type="password")
-    api_key_openai = st.text_input("OpenAI API Key", type="password")
-    api_key_anthropic = st.text_input("Anthropic API Key", type="password")
+    
+    st.markdown("#### 🔑 Estado de Conexiones")
+    try:
+        if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado")
+        if st.secrets.get("GROQ_API_KEY"): st.success("✅ Groq Conectado")
+        if st.secrets.get("SILICONFLOW_API_KEY"): st.success("✅ SiliconFlow Conectado")
+        if st.secrets.get("MISTRAL_API_KEY"): st.success("✅ Mistral Conectado")
+        if st.secrets.get("OPENROUTER_API_KEY"): st.success("✅ OpenRouter Conectado")
+    except Exception:
+        st.warning("⚠️ No se encontró el archivo secrets.toml")
+
     st.markdown("---")
     st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
     st.markdown("---")
@@ -448,29 +532,69 @@ if macro_idx == 0:
     if sub_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts")
         contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, api_key_gemini)
-        tema = campo_con_ideas("Temática principal:", "pod", "podcasts", modelo_seleccionado, api_key_gemini, "Ej: El futuro de la IA", api_key_openai, api_key_anthropic)
+        
+        tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
+        
         c1, c2 = st.columns(2)
         with c1: estilo = st.selectbox("Estilo:", ["Entrevista", "Debate", "Educativo", "Narrativo"], key="p_est")
         with c2: dur = st.slider("Duración:", 1, 10, 3, key="p_dur")
-        if st.button("✨ Crear Guion", type="primary", key="btn_pod") and tema:
+        
+        st.markdown("---")
+        if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema, estilo y duración)", use_container_width=True, key="pod_btn_ideas"):
+            with st.spinner("Pensando ideas..."):
+                prompt_ideas = f"Dame 3 ideas creativas y concisas para un podcast de {dur} minutos, estilo {estilo}, sobre el tema: '{tema}'. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
+                res = llamar_ia(modelo_seleccionado, prompt_ideas, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
+                st.session_state["pod_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
+
+        def aplicar_idea_podcast(idea_seleccionada):
+            texto_actual = st.session_state["pod_tema_input"].strip()
+            if texto_actual:
+                st.session_state["pod_tema_input"] = f"{texto_actual}\n\n{idea_seleccionada}"
+            else:
+                st.session_state["pod_tema_input"] = idea_seleccionada
+            if "pod_sugs" in st.session_state:
+                del st.session_state["pod_sugs"]
+
+        if st.session_state.get("pod_sugs"):
+            st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
+            cols = st.columns(len(st.session_state["pod_sugs"]))
+            for i, idea in enumerate(st.session_state["pod_sugs"]):
+                with cols[i]:
+                    st.button(
+                        idea, 
+                        key=f"pod_idea_{i}", 
+                        use_container_width=True,
+                        on_click=aplicar_idea_podcast, 
+                        args=(idea,)
+                    )
+
+        st.markdown("---")
+        if st.button("✨ Crear Guion", type="primary", key="btn_pod") and st.session_state["pod_tema_input"]:
             with st.spinner("Escribiendo..."):
-                prompt = f"{contexto}\n\nGuion podcast {dur} min. Tema: '{tema}'. Estilo: {estilo}. 3 locutores. Formato estricto: 'Locutor 1: [texto]', etc."
+                prompt = f"{contexto}\n\nGuion podcast {dur} min. Tema: '{st.session_state['pod_tema_input']}'. Estilo: {estilo}. 3 locutores. REGLA ESTRICTA: Escribe de forma muy natural y coloquial. NO uses acotaciones como (risas) o (pausa). Si quieres que se rían, escribe 'jajaja'. Si quieres que piensen, escribe 'mmm'. Usa SOLO el formato exacto: 'Locutor 1: [texto]', 'Locutor 2: [texto]', 'Locutor 3: [texto]'."
                 res = llamar_ia(modelo_seleccionado, prompt, api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
                 if "[ERROR" in res: st.error(res)
                 else:
                     st.session_state.podcast_script = res
                     guardar_en_db("Podcast", res)
+
         if st.session_state.get("podcast_script"):
+            st.markdown("### 📜 Guion Generado")
             st.text_area("Guion (Editable):", value=st.session_state.podcast_script, height=300, key="pod_edit")
             st.session_state.podcast_script = st.session_state.pod_edit
             c1, c2, c3 = st.columns(3)
             with c1: v1 = st.selectbox("Voz L1:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural"], key="v1")
             with c2: v2 = st.selectbox("Voz L2:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural"], index=1, key="v2")
             with c3: v3 = st.selectbox("Voz L3:", ["es-AR-TomasNeural", "es-ES-ElviraNeural"], key="v3")
+            
             if st.button("🔊 Audio 3 Voces", key="btn_pod_aud"):
                 with st.spinner("Generando audio..."):
                     aud = generar_podcast_3_voces(st.session_state.podcast_script, v1, v2, v3)
-                    if aud: st.audio(aud, format="audio/mp3"); st.download_button("💾 MP3", aud, "podcast.mp3")
+                    if aud: 
+                        st.audio(aud, format="audio/mp3")
+                        st.download_button("💾 MP3", aud, "podcast.mp3")
+                    else:
+                        st.error("❌ Error al generar el audio. Revisa la consola.")
             botones_descarga(st.session_state.podcast_script, "Podcast")
 
     elif sub_idx == 1:
@@ -864,51 +988,33 @@ elif macro_idx == 6:
     
     if sub_idx == 0:
         st.markdown("#### 📊 Dashboard de Planta")
-        
-        # --- FORMULARIO RÁPIDO DE BÁSCULA ---
         with st.expander("⚖️ Registro Rápido de Báscula (Haz clic para abrir)", expanded=False):
             with st.form("form_bascula_rapida"):
                 c1, c2, c3 = st.columns(3)
                 with c1: matricula = st.text_input("Matrícula:", placeholder="Ej: 1234 ABC")
                 with c2: residuo = st.selectbox("Residuo:", ["RSU", "Envases", "Orgánico", "Escombro", "Peligroso", "Chatarra"])
                 with c3: peso = st.number_input("Peso (kg):", min_value=0.0, value=1000.0, step=100.0)
-                
                 operacion = st.radio("Operación:", ["Entrada", "Salida"], horizontal=True)
                 btn_save = st.form_submit_button("Guardar Registro Rápido", type="primary")
-                
                 if btn_save and matricula:
                     fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                     insert_db("INSERT INTO bascula (fecha, matricula, residuo, peso, operacion) VALUES (?, ?, ?, ?, ?)", (fecha_actual, matricula, residuo, peso, operacion))
-                    st.success("✅ Registro guardado.")
-                    time.sleep(1); st.rerun()
+                    st.success("✅ Registro guardado."); time.sleep(1); st.rerun()
 
         st.markdown("---")
-        
-        # --- MÉTRICAS DEL DASHBOARD ---
-        df_bascula = get_db_data("bascula")
-        df_lotes = get_db_data("lotes")
-        df_mant = get_db_data("mantenimiento")
-        
+        df_bascula = get_db_data("bascula"); df_lotes = get_db_data("lotes"); df_mant = get_db_data("mantenimiento")
         c1, c2, c3 = st.columns(3)
         with c1:
-            if not df_bascula.empty:
-                entradas = df_bascula[df_bascula['operacion'] == 'Entrada']['peso'].sum()
-                st.metric("Total Entradas (kg)", f"{entradas:,.0f}")
+            if not df_bascula.empty: st.metric("Total Entradas (kg)", f"{df_bascula[df_bascula['operacion'] == 'Entrada']['peso'].sum():,.0f}")
             else: st.metric("Total Entradas", "0 kg")
         with c2:
-            if not df_lotes.empty:
-                activos = len(df_lotes[df_lotes['estado'] != 'Completado'])
-                st.metric("Lotes Activos", activos)
+            if not df_lotes.empty: st.metric("Lotes Activos", len(df_lotes[df_lotes['estado'] != 'Completado']))
             else: st.metric("Lotes Activos", "0")
         with c3:
-            if not df_mant.empty:
-                averias = len(df_mant[df_mant['estado'] == 'Averiada'])
-                st.metric("Máquinas Averiadas", averias, delta_color="inverse")
+            if not df_mant.empty: st.metric("Máquinas Averiadas", len(df_mant[df_mant['estado'] == 'Averiada']), delta_color="inverse")
             else: st.metric("Máquinas Averiadas", "0")
             
         st.markdown("---")
-        
-        # --- GRÁFICO ---
         if not df_bascula.empty:
             st.markdown("##### Material Entrante por Tipo")
             df_group = df_bascula.groupby('residuo')['peso'].sum().reset_index()
@@ -927,13 +1033,11 @@ elif macro_idx == 6:
             with c2:
                 peso = st.number_input("Peso (kg):", min_value=0.0, value=1000.0, step=100.0)
                 operacion = st.radio("Operación:", ["Entrada", "Salida"], horizontal=True)
-                
             btn_save = st.form_submit_button("Guardar Registro", type="primary")
             if btn_save and matricula:
                 fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 insert_db("INSERT INTO bascula (fecha, matricula, residuo, peso, operacion) VALUES (?, ?, ?, ?, ?)", (fecha_actual, matricula, residuo, peso, operacion))
-                st.success("✅ Registro guardado correctamente.")
-                time.sleep(1); st.rerun()
+                st.success("✅ Registro guardado correctamente."); time.sleep(1); st.rerun()
 
         st.markdown("---")
         st.markdown("##### Últimos Registros")
@@ -969,8 +1073,7 @@ elif macro_idx == 6:
                         if st.button("Actualizar Lote", key=f"btn_lote_{row['id']}"):
                             insert_db("UPDATE lotes SET estado=?, peso_out=? WHERE id=?", (nuevo_estado, peso_out, row['id']))
                             st.success("Actualizado."); time.sleep(1); st.rerun()
-        else:
-            st.info("No hay lotes registrados.")
+        else: st.info("No hay lotes registrados.")
 
     elif sub_idx == 3:
         st.markdown("#### 🔧 Mantenimiento y Averías")
@@ -986,7 +1089,6 @@ elif macro_idx == 6:
                     fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                     insert_db("INSERT INTO mantenimiento (fecha, maquina, descripcion, estado) VALUES (?, ?, ?, ?)", (fecha, maquina, descripcion, "Averiada"))
                     st.error("Avería reportada. La planta está parada en ese sector."); time.sleep(1); st.rerun()
-                    
         st.markdown("---")
         st.markdown("##### Estado de las Máquinas")
         df_mant = get_db_data("mantenimiento")
@@ -998,38 +1100,29 @@ elif macro_idx == 6:
                         if st.button("✅ Marcar como Reparada", key=f"rep_{row['id']}"):
                             insert_db("UPDATE mantenimiento SET estado='Reparada' WHERE id=?", (row['id'],))
                             st.success("Máquina reparada."); time.sleep(1); st.rerun()
-                else:
-                    st.success(f"✅ {row['maquina']} - Funcionando (Reparada el {row['fecha']})")
-        else:
-            st.info("Todas las máquinas funcionan correctamente.")
+                else: st.success(f"✅ {row['maquina']} - Funcionando (Reparada el {row['fecha']})")
+        else: st.info("Todas las máquinas funcionan correctamente.")
 
     elif sub_idx == 4:
         st.markdown("#### 🏭 Simulador de Procesos y Maquinaria")
         c1, c2 = st.columns(2)
         with c1: residuo = st.selectbox("Tipo de Residuo:", ["RSU (Mezcla)", "Envases Ligeros", "Orgánico", "Escombro", "Peligroso", "Madera", "Chatarra"])
         with c2: capacidad = st.number_input("Toneladas/día:", min_value=10, value=100)
-        
         contexto = cajita_adjuntar_archivo("plant_proc_adj", modelo_seleccionado, api_key_gemini)
-        
         if st.button("🔎 Generar Diagrama y Maquinaria", type="primary", key="btn_plant_proc"):
             with st.spinner("Diseñando línea de producción..."):
                 prompt = f"Actúa como ingeniero de plantas de reciclaje. Diseña la línea de proceso para {capacidad} t/día de {residuo}. Genera un diagrama Mermaid de flujo (graph TD) y una lista de la maquinaria necesaria (trituradoras, separadores, etc.) explicando brevemente su función."
                 res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{prompt}", api_key_gemini, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
                 if "[ERROR" in res: st.error(res)
-                else:
-                    st.session_state.plant_borrador = res
-                    
+                else: st.session_state.plant_borrador = res
         if st.session_state.get("plant_borrador"):
             st.markdown("### 📝 Borrador de Ingeniería")
             texto = st.text_area("Puedes editar el texto (las listas) aquí:", value=st.session_state.plant_borrador, height=300, key="plant_txt")
             st.session_state.plant_borrador = texto
-            
             if "```mermaid" in texto:
                 mermaid_code = texto.split("```mermaid")[1].split("```")[0].strip()
                 st.html(f"<div class='mermaid'>{mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
-            
-            st.markdown("---")
-            botones_descarga(texto, "Proceso_Planta")
+            st.markdown("---"); botones_descarga(texto, "Proceso_Planta")
 
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
