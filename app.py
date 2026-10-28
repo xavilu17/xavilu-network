@@ -419,21 +419,23 @@ def botones_descarga(texto, nombre_por_defecto="documento"):
     if texto:
         st.markdown("---")
         key_u = f"{nombre_por_defecto}".replace(" ", "_")
-        nombre_elegido = st.text_input("📝 Nombre (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
+        nombre_elegido = st.text_input("📝 Nombre del archivo (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_') or nombre_por_defecto
         
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4, c5 = st.columns(5)
         with c1: st.download_button("📥 TXT", texto.encode('utf-8'), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
         with c2: st.download_button("📄 PDF", generar_pdf_pro(nombre_limpio, texto), f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
-        with c3:
-            if st.button("📲 Enviar a WhatsApp", key=f"wa_{key_u}", use_container_width=True):
+        with c3: st.download_button("📘 Word", generar_word(texto), f"{nombre_limpio}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"wd_{key_u}", use_container_width=True)
+        with c4: st.download_button("📊 Excel", generar_excel(texto), f"{nombre_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"ex_{key_u}", use_container_width=True)
+        with c5:
+            if st.button("📲 WhatsApp", key=f"wa_{key_u}", use_container_width=True):
                 num = st.session_state.get("whatsapp_number", "").strip()
                 if num:
                     url_wa = f"https://wa.me/{num}?text={urllib.parse.quote(texto[:1500])}"
                     components.html(f"<script>window.open('{url_wa}', '_blank');</script>", height=0)
                     st.success("✅ Abriendo WhatsApp...")
                 else:
-                    st.error("⚠️ Configura tu número en la barra lateral izquierda para usar WhatsApp.")
+                    st.error("⚠️ Configura tu número en la barra lateral para usar WhatsApp.")
 
 def run_async_safe(coro):
     def _run(): return asyncio.run(coro)
@@ -485,33 +487,54 @@ def generar_podcast_3_voces(guion, v1, v2, v3):
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
+# --- NUEVO FLUJO (CORREGIDO: IDEAS CON CHECKBOX Y BOTÓN DE AÑADIR) ---
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
     
-    def agregar_idea(idea_seleccionada):
-        texto_actual = st.session_state[input_key].strip()
-        if texto_actual:
-            st.session_state[input_key] = f"{texto_actual}\n\n{idea_seleccionada}"
-        else:
-            st.session_state[input_key] = idea_seleccionada
-        if f"{key_prefix}_sugs" in st.session_state:
-            del st.session_state[f"{key_prefix}_sugs"]
-
-    if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
+    # 1. EL USUARIO ESCRIBE SU IDEA PRIMERO
+    texto_ingresado = st.text_area(label, key=input_key, placeholder=placeholder, height=100)
+    
+    # 2. BOTÓN PARA GENERAR IDEAS BASADAS EN SU TEXTO
+    if st.button("💡 Generar 3 Ideas con IA (basadas en mi texto)", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
-            prompt = f"Dame 3 ideas creativas para {contexto_ia}. Solo lista separada por saltos de línea, sin numeración."
+            prompt = f"Basándote en esta idea: '{texto_ingresado}', dame 3 enfoques creativos o mejoras. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
+    # 3. MOSTRAR IDEAS CON CHECKBOXES Y BOTONES DE DECISIÓN
     if st.session_state.get(f"{key_prefix}_sugs"):
-        st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
-        cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
+        st.markdown("✨ **Selecciona las ideas que quieras añadir a tu texto (es opcional):**")
+        seleccionadas = []
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
-            with cols[i]:
-                st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
+            if st.checkbox(idea, key=f"{key_prefix}_chk_{i}"):
+                seleccionadas.append(idea)
+
+        c_add, c_discard = st.columns(2)
+        with c_add:
+            if st.button("➕ Añadir ideas seleccionadas al texto", key=f"{key_prefix}_add_selected", use_container_width=True, type="primary"):
+                if seleccionadas:
+                    texto_actual = st.session_state[input_key].strip()
+                    nuevo_texto = "\n\n".join(seleccionadas)
+                    if texto_actual:
+                        st.session_state[input_key] = f"{texto_actual}\n\n{nuevo_texto}"
+                    else:
+                        st.session_state[input_key] = nuevo_texto
+                # Limpiar checkboxes y sugerencias
+                for j in range(len(st.session_state[f"{key_prefix}_sugs"])):
+                    k = f"{key_prefix}_chk_{j}"
+                    if k in st.session_state: del st.session_state[k]
+                del st.session_state[f"{key_prefix}_sugs"]
+                st.rerun()
+        with c_discard:
+            if st.button("🗑️ Descartar ideas", key=f"{key_prefix}_discard", use_container_width=True):
+                for j in range(len(st.session_state[f"{key_prefix}_sugs"])):
+                    k = f"{key_prefix}_chk_{j}"
+                    if k in st.session_state: del st.session_state[k]
+                del st.session_state[f"{key_prefix}_sugs"]
+                st.rerun()
                 
-    return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
+    return texto_ingresado
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic=""):
     if st.button(f"🚀 Superpoder: {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
@@ -613,20 +636,21 @@ else:
     modelo_seleccionado = "llama3.2:latest"
     api_key_gemini = st.session_state.api_key_gemini_manual
 
-# AQUÍ ESTÁ XAVIWORK RESTAURADO
+# MENÚ PRINCIPAL
 macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "♻️ GESTIÓN PLANTAS", "🎵 MÚSICA Y ARTE"]
 macro_idx = custom_tabs(macro_names, "macro", 0)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
-# CATEGORÍA 0: XAVIWORK
+# CATEGORÍA 0: XAVIWORK (NUEVO FLUJO)
 # ==========================================
 if macro_idx == 0:
     st.markdown("#### 🛠️ XaviWork - El Estudio Definitivo")
     contexto = cajita_adjuntar_archivo("xaviwork_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+    
     tema_work = campo_con_ideas("¿Sobre qué quieres trabajar?", "xaviwork", "estrategias y proyectos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Estrategia de marketing...", "", "")
     
-    if st.button("✨ Generar Propuesta de XaviWork", type="primary"):
+    if st.button("✨ Generar Propuesta Final de XaviWork", type="primary"):
         if tema_work:
             with st.spinner("Trabajando en tu proyecto..."):
                 prompt = f"{contexto}\n\nActúa como un experto consultor. Desarrolla la siguiente idea de forma detallada y estructurada:\n{tema_work}"
@@ -661,23 +685,42 @@ elif macro_idx == 1:
         with c2: dur = st.slider("Duración:", 1, 10, 3, key="p_dur")
         
         st.markdown("---")
-        if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema, estilo y duración)", use_container_width=True, key="pod_btn_ideas"):
+        if st.button("💡 Generar 3 Ideas con IA (basadas en tu tema)", use_container_width=True, key="pod_btn_ideas"):
             with st.spinner("Pensando ideas..."):
                 prompt_ideas = f"Dame 3 ideas creativas y concisas para un podcast de {dur} minutos, estilo {estilo}, sobre el tema: '{tema}'. Devuelve SOLO las 3 ideas separadas por saltos de línea, sin numeración."
                 res = llamar_ia(modelo_seleccionado, prompt_ideas, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 st.session_state["pod_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
-        def aplicar_idea_podcast(idea_seleccionada):
-            texto_actual = st.session_state["pod_tema_input"].strip()
-            if texto_actual: st.session_state["pod_tema_input"] = f"{texto_actual}\n\n{idea_seleccionada}"
-            else: st.session_state["pod_tema_input"] = idea_seleccionada
-            if "pod_sugs" in st.session_state: del st.session_state["pod_sugs"]
-
+        # --- IDEAS CON CHECKBOX Y BOTÓN DE DECISIÓN (CORREGIDO) ---
         if st.session_state.get("pod_sugs"):
-            st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
-            cols = st.columns(len(st.session_state["pod_sugs"]))
+            st.markdown("✨ **Selecciona las ideas que quieras añadir al tema (es opcional):**")
+            seleccionadas_pod = []
             for i, idea in enumerate(st.session_state["pod_sugs"]):
-                with cols[i]: st.button(idea, key=f"pod_idea_{i}", use_container_width=True, on_click=aplicar_idea_podcast, args=(idea,))
+                if st.checkbox(idea, key=f"pod_chk_{i}"):
+                    seleccionadas_pod.append(idea)
+
+            c_pod1, c_pod2 = st.columns(2)
+            with c_pod1:
+                if st.button("➕ Añadir ideas seleccionadas al tema", key="pod_add_selected", use_container_width=True, type="primary"):
+                    if seleccionadas_pod:
+                        texto_actual = st.session_state["pod_tema_input"].strip()
+                        nuevo_texto = "\n\n".join(seleccionadas_pod)
+                        if texto_actual:
+                            st.session_state["pod_tema_input"] = f"{texto_actual}\n\n{nuevo_texto}"
+                        else:
+                            st.session_state["pod_tema_input"] = nuevo_texto
+                    for j in range(len(st.session_state["pod_sugs"])):
+                        k = f"pod_chk_{j}"
+                        if k in st.session_state: del st.session_state[k]
+                    del st.session_state["pod_sugs"]
+                    st.rerun()
+            with c_pod2:
+                if st.button("🗑️ Descartar ideas", key="pod_discard", use_container_width=True):
+                    for j in range(len(st.session_state["pod_sugs"])):
+                        k = f"pod_chk_{j}"
+                        if k in st.session_state: del st.session_state[k]
+                    del st.session_state["pod_sugs"]
+                    st.rerun()
 
         st.markdown("---")
         if st.button("✨ Crear Guion", type="primary", key="btn_pod") and st.session_state["pod_tema_input"]:
@@ -812,12 +855,12 @@ elif macro_idx == 1:
             if st.button("Receta") and ing: 
                 res = llamar_ia(modelo_seleccionado, f"Receta con {ing}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
-                else: st.info(res)
+                else: st.info(res); botones_descarga(res, "Receta")
         with c2:
             if st.button("Menú") and pref: 
                 res = llamar_ia(modelo_seleccionado, f"Menú semanal {pref}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
-                else: st.info(res)
+                else: st.info(res); botones_descarga(res, "Menu")
 
     elif sub_idx == 7:
         st.markdown("#### Cuentos")
@@ -838,7 +881,7 @@ elif macro_idx == 1:
         if st.button("Procesar") and req:
             res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
-            else: st.code(res, language="python")
+            else: st.code(res, language="python"); botones_descarga(res, "Codigo")
 
     elif sub_idx == 9:
         st.markdown("#### Traductor")
@@ -915,9 +958,7 @@ elif macro_idx == 2:
             with c3: boton_superpoder_borrador(texto_editado, "Añade más detalles", "of_sup3", modelo_seleccionado, st.session_state.api_key_gemini_manual, "office_borrador", "", "")
 
             st.markdown("---")
-            if formato == "Word": st.download_button("📥 Descargar Word", generar_word(texto_editado), "doc.docx")
-            elif formato == "Excel": st.download_button("📥 Descargar Excel", generar_excel(texto_editado), "doc.xlsx")
-            else: st.download_button("📥 Descargar PPTX", generar_pptx("Presentación", texto_editado), "doc.pptx")
+            botones_descarga(texto_editado, "Documento")
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro (Flujo Borrador)")
@@ -941,7 +982,7 @@ elif macro_idx == 2:
             with c2: boton_superpoder_borrador(texto_editado, "Añade conclusiones", "pdf_sup2", modelo_seleccionado, st.session_state.api_key_gemini_manual, "pdf_borrador", "", "")
 
             st.markdown("---")
-            st.download_button("📥 Descargar PDF (con portada)", generar_pdf_pro(titulo, texto_editado), f"{titulo}.pdf")
+            botones_descarga(texto_editado, titulo)
 
     elif sub_idx == 4:
         st.markdown("#### Mapas Mentales")
@@ -952,6 +993,7 @@ elif macro_idx == 2:
             else:
                 st.session_state.mermaid_code = html.escape(res.replace("```mermaid", "").replace("```", "").strip())
                 if st.session_state.mermaid_code: st.html(f"<div class='mermaid'>{st.session_state.mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({{ startOnLoad: true }});</script>")
+                botones_descarga(res, "Mapa")
 
     elif sub_idx == 5:
         c1, c2 = st.columns(2)
@@ -973,7 +1015,7 @@ elif macro_idx == 2:
         if st.button("Procesar") and txt and inst:
             res = llamar_ia(modelo_seleccionado, f"{inst}:\n{txt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in res: st.error(res)
-            else: st.info(res)
+            else: st.info(res); botones_descarga(res, "Portapapeles")
 
 # ==========================================
 # CATEGORÍA 3: WEB Y ACTUALIDAD
@@ -995,7 +1037,7 @@ elif macro_idx == 3:
             res = buscar_en_internet(c)
             r_ia = llamar_ia(modelo_seleccionado, f"Programación {c}: {res}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
             if "[ERROR" in r_ia: st.error(r_ia)
-            else: st.info(r_ia)
+            else: st.info(r_ia); botones_descarga(r_ia, "TV")
     elif sub_idx == 3:
         url = st.text_input("URL Tabla:")
         if st.button("Extraer") and url:
@@ -1010,7 +1052,7 @@ elif macro_idx == 3:
                 id = url.split("v=")[-1].split("&")[0]; tr = YouTubeTranscriptApi.get_transcript(id, languages=['es', 'en'])
                 res = llamar_ia(modelo_seleccionado, f"Resume: {' '.join([t['text'] for t in tr])[:5000]}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
-                else: st.text_area("Resumen:", res, height=200)
+                else: st.text_area("Resumen:", res, height=200); botones_descarga(res, "Youtube")
             except: st.error("Error.")
     elif sub_idx == 5:
         url = st.text_input("URL Web:")
@@ -1019,7 +1061,7 @@ elif macro_idx == 3:
                 txt = " ".join(re.sub('<[^<]+?>', ' ', requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text).split())[:5000]
                 res = llamar_ia(modelo_seleccionado, f"Resume: {txt}", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
-                else: st.text_area("Resumen:", res, height=200)
+                else: st.text_area("Resumen:", res, height=200); botones_descarga(res, "Web")
             except: st.error("Error.")
 
 # ==========================================
