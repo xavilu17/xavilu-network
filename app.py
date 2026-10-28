@@ -300,6 +300,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
+    # Cargar keys
     try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
     except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
     
@@ -318,6 +319,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
     res_exitosa = False
     res = None
 
+    # 1. GEMINI
     if key_gemini.strip() and HAS_GEMINI and not res_exitosa:
         for intento in range(2):
             try:
@@ -329,20 +331,27 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
                 elif "503" in str(e) and intento < 1: time.sleep(2); continue
                 else: st.warning(f"⚠️ Error Gemini: {str(e)[:50]}. Probando Groq..."); break
 
+    # 2. GROQ (Modelos actualizados)
     if key_groq.strip() and HAS_OPENAI and not res_exitosa:
-        try:
-            client = openai.OpenAI(api_key=key_groq, base_url="https://api.groq.com/openai/v1")
-            res = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
-            res_exitosa = True
-        except Exception as e: st.warning(f"⚠️ Error Groq: {str(e)[:50]}. Probando SiliconFlow...")
+        for m_groq in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+            try:
+                client = openai.OpenAI(api_key=key_groq, base_url="https://api.groq.com/openai/v1")
+                res = client.chat.completions.create(model=m_groq, messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+                res_exitosa = True
+                break
+            except Exception as e: 
+                if "404" in str(e): continue
+                st.warning(f"⚠️ Error Groq ({m_groq}): {str(e)[:50]}. Probando SiliconFlow..."); break
 
+    # 3. SILICONFLOW (Añadido .strip() para evitar errores de espacios)
     if key_silicon.strip() and HAS_OPENAI and not res_exitosa:
         try:
-            client = openai.OpenAI(api_key=key_silicon, base_url="https://api.siliconflow.cn/v1")
+            client = openai.OpenAI(api_key=key_silicon.strip(), base_url="https://api.siliconflow.cn/v1")
             res = client.chat.completions.create(model="Qwen/Qwen2.5-7B-Instruct", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
             res_exitosa = True
         except Exception as e: st.warning(f"⚠️ Error SiliconFlow: {str(e)[:50]}. Probando Mistral...")
 
+    # 4. MISTRAL
     if key_mistral.strip() and HAS_OPENAI and not res_exitosa:
         try:
             client = openai.OpenAI(api_key=key_mistral, base_url="https://api.mistral.ai/v1")
@@ -350,16 +359,22 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
             res_exitosa = True
         except Exception as e: st.warning(f"⚠️ Error Mistral: {str(e)[:50]}. Probando OpenRouter...")
 
+    # 5. OPENROUTER (Modelos actualizados)
     if key_openrouter.strip() and HAS_OPENAI and not res_exitosa:
-        try:
-            client = openai.OpenAI(api_key=key_openrouter, base_url="https://openrouter.ai/api/v1")
-            res = client.chat.completions.create(model="deepseek/deepseek-r1:free", messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
-            res_exitosa = True
-        except Exception as e: st.warning(f"⚠️ Error OpenRouter: {str(e)[:50]}. Probando Ollama local...")
+        for m_or in ["meta-llama/llama-3.1-8b-instruct:free", "google/gemma-2-9b-it:free"]:
+            try:
+                client = openai.OpenAI(api_key=key_openrouter, base_url="https://openrouter.ai/api/v1")
+                res = client.chat.completions.create(model=m_or, messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
+                res_exitosa = True
+                break
+            except Exception as e: 
+                if "404" in str(e): continue
+                st.warning(f"⚠️ Error OpenRouter ({m_or}): {str(e)[:50]}. Probando Ollama local..."); break
 
     if res_exitosa and res:
         return res
 
+    # 6. OLLAMA
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         return client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"].split("</think>")[-1].strip()
@@ -487,22 +502,19 @@ def generar_podcast_3_voces(guion, v1, v2, v3):
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
-# --- NUEVO FLUJO (CORREGIDO: IDEAS CON CHECKBOX Y BOTÓN DE AÑADIR) ---
+# --- NUEVO FLUJO (IDEAS CON CHECKBOX Y BOTÓN DE AÑADIR) ---
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
     
-    # 1. EL USUARIO ESCRIBE SU IDEA PRIMERO
     texto_ingresado = st.text_area(label, key=input_key, placeholder=placeholder, height=100)
     
-    # 2. BOTÓN PARA GENERAR IDEAS BASADAS EN SU TEXTO
     if st.button("💡 Generar 3 Ideas con IA (basadas en mi texto)", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
             prompt = f"Basándote en esta idea: '{texto_ingresado}', dame 3 enfoques creativos o mejoras. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
-    # 3. MOSTRAR IDEAS CON CHECKBOXES Y BOTONES DE DECISIÓN
     if st.session_state.get(f"{key_prefix}_sugs"):
         st.markdown("✨ **Selecciona las ideas que quieras añadir a tu texto (es opcional):**")
         seleccionadas = []
@@ -520,7 +532,6 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
                         st.session_state[input_key] = f"{texto_actual}\n\n{nuevo_texto}"
                     else:
                         st.session_state[input_key] = nuevo_texto
-                # Limpiar checkboxes y sugerencias
                 for j in range(len(st.session_state[f"{key_prefix}_sugs"])):
                     k = f"{key_prefix}_chk_{j}"
                     if k in st.session_state: del st.session_state[k]
@@ -594,7 +605,8 @@ if st.session_state.sidebar_visible:
             st.rerun()
             
         st.markdown("---")
-        modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
+        # DESPLEGABLE ACTUALIZADO CON TUS MODELOS
+        modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "qwen2.5:7b", "deepseek-r1:1.5b", "llama3.2-vision:latest"])
         
         st.markdown("#### 🔑 Estado de Conexiones")
         try:
@@ -691,7 +703,6 @@ elif macro_idx == 1:
                 res = llamar_ia(modelo_seleccionado, prompt_ideas, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 st.session_state["pod_sugs"] = [l.strip("-*1234567890. ") for l in res.split('\n') if len(l.strip()) > 5][:3]
 
-        # --- IDEAS CON CHECKBOX Y BOTÓN DE DECISIÓN (CORREGIDO) ---
         if st.session_state.get("pod_sugs"):
             st.markdown("✨ **Selecciona las ideas que quieras añadir al tema (es opcional):**")
             seleccionadas_pod = []
