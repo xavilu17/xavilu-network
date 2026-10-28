@@ -146,7 +146,7 @@ _defaults = {
     "sidebar_visible": True,
     "whatsapp_number": "",
     "office_borrador": "", "pdf_borrador": "",
-    "plant_borrador": "",
+    "plant_borrador": "", "work_result": "",
     "pod_tema_input": "", "pod_sugs": [],
     "api_key_gemini_manual": "", "api_key_groq_manual": "", "api_key_silicon_manual": "", 
     "api_key_mistral_manual": "", "api_key_openrouter_manual": "",
@@ -613,14 +613,41 @@ else:
     modelo_seleccionado = "llama3.2:latest"
     api_key_gemini = st.session_state.api_key_gemini_manual
 
-macro_names = ["💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "♻️ GESTIÓN PLANTAS", "🎵 MÚSICA Y ARTE"]
+# AQUÍ ESTÁ XAVIWORK RESTAURADO
+macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "♻️ GESTIÓN PLANTAS", "🎵 MÚSICA Y ARTE"]
 macro_idx = custom_tabs(macro_names, "macro", 0)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
-# CATEGORÍA 0: CHAT Y ASISTENTES IA
+# CATEGORÍA 0: XAVIWORK
 # ==========================================
 if macro_idx == 0:
+    st.markdown("#### 🛠️ XaviWork - El Estudio Definitivo")
+    contexto = cajita_adjuntar_archivo("xaviwork_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+    tema_work = campo_con_ideas("¿Sobre qué quieres trabajar?", "xaviwork", "estrategias y proyectos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Estrategia de marketing...", "", "")
+    
+    if st.button("✨ Generar Propuesta de XaviWork", type="primary"):
+        if tema_work:
+            with st.spinner("Trabajando en tu proyecto..."):
+                prompt = f"{contexto}\n\nActúa como un experto consultor. Desarrolla la siguiente idea de forma detallada y estructurada:\n{tema_work}"
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.session_state.work_result = res
+                    guardar_en_db("XaviWork", res)
+        else:
+            st.warning("Escribe sobre qué quieres trabajar primero.")
+
+    if st.session_state.get("work_result"):
+        st.markdown("### 📝 Resultado de XaviWork")
+        texto_editado = st.text_area("Modifica el resultado:", value=st.session_state.work_result, height=400, key="xaviwork_txt")
+        st.session_state.work_result = texto_editado
+        botones_descarga(texto_editado, "XaviWork_Proyecto")
+
+# ==========================================
+# CATEGORÍA 1: CHAT Y ASISTENTES IA
+# ==========================================
+elif macro_idx == 1:
     sub_names = ["🎙️ PODCAST", "💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES", "⚖️ DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"]
     sub_idx = custom_tabs(sub_names, "chat_sub", 0)
     
@@ -688,7 +715,6 @@ if macro_idx == 0:
 
     elif sub_idx == 1:
         st.markdown("#### 💬 Chat")
-        # HISTORIAL PERSISTENTE
         for m in st.session_state.chat_history: st.chat_message(m["role"]).write(m["content"])
         if st.session_state.chat_history:
             c1, c2, c3 = st.columns(3)
@@ -702,7 +728,6 @@ if macro_idx == 0:
         
         ctx = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
-        # SUPERPODERES DEL CHAT
         c_s1, c_s2, c_s3, c_s4 = st.columns(4)
         accion_rapida = None
         if c_s1.button("Resumir", key="q_res"): accion_rapida = "Resume esto de forma concisa:"
@@ -710,16 +735,13 @@ if macro_idx == 0:
         if c_s3.button("Formal", key="q_form"): accion_rapida = "Hazlo más formal y profesional:"
         if c_s4.button("Buscar Web", key="q_web"): accion_rapida = "Busca en internet sobre esto y resume:"
 
-        # DICTADO POR VOZ (Solo Admin o Niños, funciona en móvil)
         st.markdown("##### 🎤 Dictado por voz (Opcional)")
         audio_value = st.audio_input("Graba tu mensaje aquí", key="voice_input")
         
         p = chat_input_pro("main")
         
-        # Lógica para procesar el audio si se ha grabado
         if audio_value:
             with st.spinner("Escuchando y transcribiendo..."):
-                # Usamos Gemini para transcribir el audio
                 transcripcion = analizar_archivo_con_gemini(audio_value.getvalue(), "audio/wav", "Transcribe exactamente lo que dice este audio. Devuelve solo el texto.", st.session_state.api_key_gemini_manual)
                 if transcripcion and "[ERROR" not in transcripcion:
                     p = transcripcion.strip()
@@ -830,9 +852,9 @@ if macro_idx == 0:
             else: st.info(res); botones_descarga(res, "Traduccion")
 
 # ==========================================
-# CATEGORÍA 1: DOCUMENTOS Y TEXTO
+# CATEGORÍA 2: DOCUMENTOS Y TEXTO
 # ==========================================
-elif macro_idx == 1:
+elif macro_idx == 2:
     sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🕸️ MAPAS", "📇 QR & CV", "📋 PORTAPAPELES"]
     sub_idx = custom_tabs(sub_names, "doc_sub", 0)
     
@@ -862,7 +884,6 @@ elif macro_idx == 1:
         st.markdown("#### Creación de Documentos (Flujo Borrador)")
         contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
-        # PRESETS DE PERSONALIDAD
         st.markdown("**Elige el estilo de la IA:**")
         c_est1, c_est2, c_est3 = st.columns(3)
         if c_est1.button("👔 Profesional", use_container_width=True): st.session_state.office_estilo = "Profesional y formal"
@@ -955,9 +976,9 @@ elif macro_idx == 1:
             else: st.info(res)
 
 # ==========================================
-# CATEGORÍA 2: WEB Y ACTUALIDAD
+# CATEGORÍA 3: WEB Y ACTUALIDAD
 # ==========================================
-elif macro_idx == 2:
+elif macro_idx == 3:
     sub_names = ["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR"]
     sub_idx = custom_tabs(sub_names, "web_sub", 0)
     if sub_idx == 0:
@@ -1002,9 +1023,9 @@ elif macro_idx == 2:
             except: st.error("Error.")
 
 # ==========================================
-# CATEGORÍA 3: MULTIMEDIA
+# CATEGORÍA 4: MULTIMEDIA
 # ==========================================
-elif macro_idx == 3:
+elif macro_idx == 4:
     sub_names = ["🖼️ ANÁLISIS", "🎨 VISUAL", "🛡️ LOGOS", "📥 DESCARGADOR", "🖼️ GALERÍA"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
     if sub_idx == 0:
@@ -1064,9 +1085,9 @@ elif macro_idx == 3:
                 st.image(url, caption=f"Imagen {idx+1}")
 
 # ==========================================
-# CATEGORÍA 4: ESTUDIO Y OFICIOS
+# CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
-elif macro_idx == 4:
+elif macro_idx == 5:
     sub_names = ["🌐 REDES", "💇‍♀️ PELUQUERÍA", "📚 DEBERES", "🦺 PRL"]
     sub_idx = custom_tabs(sub_names, "study_sub", 0)
     if sub_idx == 0:
@@ -1091,9 +1112,9 @@ elif macro_idx == 4:
             else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "PRL")
 
 # ==========================================
-# CATEGORÍA 5: VIAJES Y HOGAR
+# CATEGORÍA 6: VIAJES Y HOGAR
 # ==========================================
-elif macro_idx == 5:
+elif macro_idx == 6:
     sub_names = ["🌍 VIAJES", "💰 FINANZAS", "✉️ CARTAS"]
     sub_idx = custom_tabs(sub_names, "travel_sub", 0)
     if sub_idx == 0:
@@ -1113,9 +1134,9 @@ elif macro_idx == 5:
             else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "Carta")
 
 # ==========================================
-# CATEGORÍA 6: GESTIÓN DE PLANTAS (PROTEGIDA)
+# CATEGORÍA 7: GESTIÓN DE PLANTAS (PROTEGIDA)
 # ==========================================
-elif macro_idx == 6:
+elif macro_idx == 7:
     if st.session_state.get("rol") == "ninos":
         st.error("🔒 Esta sección está bloqueada en Modo Niños.")
         st.stop()
@@ -1262,9 +1283,9 @@ elif macro_idx == 6:
             st.markdown("---"); botones_descarga(texto, "Proceso_Planta")
 
 # ==========================================
-# CATEGORÍA 7: MÚSICA Y ARTE
+# CATEGORÍA 8: MÚSICA Y ARTE
 # ==========================================
-elif macro_idx == 7:
+elif macro_idx == 8:
     sub_names = ["🎵 CANCIONES", "🎨 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
     if sub_idx == 0:
