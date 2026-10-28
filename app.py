@@ -147,7 +147,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
 # ==========================================
-# 4. CSS - ESTILO VISUAL MEJORADO (MÁS CLARO)
+# 4. CSS - ESTILO VISUAL MEJORADO (OSCURO Y CIAN)
 # ==========================================
 st.markdown("""
 <style>
@@ -170,7 +170,7 @@ h4 { font-family: 'Orbitron', sans-serif !important; color: #FF007F !important; 
 p, span, div, label, .stMarkdown { color: #e2e8f0 !important; }
 [data-testid="stWidgetLabel"] p { color: #00f0ff !important; font-family: 'Orbitron', sans-serif !important; font-size: 14px !important; font-weight: bold !important; }
 
-/* Inputs y TextAreas (Fondo más claro para leer mejor) */
+/* Inputs y TextAreas */
 .stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { 
     background-color: #1a1e24 !important; 
     border: 1px solid #00f0ff !important; 
@@ -180,13 +180,68 @@ p, span, div, label, .stMarkdown { color: #e2e8f0 !important; }
 }
 .stTextArea textarea:focus, .stTextInput input:focus { border: 1px solid #FF007F !important; box-shadow: 0 0 10px rgba(255, 0, 127, 0.5) !important; }
 
-/* Tablas de datos (Muy importante para claridad) */
+/* --- ARREGLO DEL DESPLEGABLE (EXPANDER) --- */
+[data-testid="stExpander"] { 
+    background-color: #1a1e24 !important; 
+    border: 1px solid #00f0ff !important; 
+    border-radius: 8px !important; 
+}
+[data-testid="stExpander"] summary { 
+    color: #00f0ff !important; 
+    font-weight: bold !important; 
+}
+[data-testid="stExpander"] summary:hover {
+    color: #FF007F !important;
+}
+[data-testid="stExpander"] svg { 
+    fill: #00f0ff !important; 
+    color: #00f0ff !important; 
+}
+
+/* --- ARREGLO DEL BOTÓN DE SUBIR ARCHIVOS (QUE ESTABA BLANCO) --- */
+[data-testid="stFileUploader"] { 
+    background-color: #1a1e24 !important; 
+    border: 1px dashed #00f0ff !important; 
+    border-radius: 8px !important; 
+    padding: 10px !important;
+}
+[data-testid="stFileUploaderDropzone"] { 
+    background-color: #0a0a0a !important; 
+    border: 1px dashed #00f0ff !important; 
+}
+[data-testid="stFileUploaderDropzone"] p { 
+    color: #ffffff !important; 
+}
+[data-testid="stFileUploaderDropzone"] button { 
+    background-color: #1a1e24 !important; 
+    color: #00f0ff !important; 
+    border: 1px solid #00f0ff !important; 
+    border-radius: 8px !important;
+    font-weight: bold !important;
+    transition: all 0.3s !important;
+}
+[data-testid="stFileUploaderDropzone"] button:hover {
+    background-color: #00f0ff !important;
+    color: #000000 !important;
+}
+[data-testid="stFileUploaderFile"] {
+    background-color: #0a0a0a !important;
+    border: 1px solid #FF007F !important;
+    color: #ffffff !important;
+}
+[data-testid="stFileUploaderFile"] button {
+    background-color: transparent !important;
+    color: #FF007F !important;
+    border: none !important;
+}
+
+/* Tablas de datos */
 [data-testid="stDataFrame"] { background-color: #1a1e24 !important; border-radius: 8px; padding: 5px; }
 
 /* Sidebar */
 [data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 2px solid #FFD700 !important; }
 
-/* Botones (Primario y Secundario) */
+/* Botones Principales y Secundarios */
 div.stButton > button[kind="secondary"] { background-color: #1a1e24 !important; color: #00f0ff !important; border: 1px solid #00f0ff !important; border-radius: 8px !important; width: 100% !important; font-weight: bold !important; transition: all 0.3s; }
 div.stButton > button[kind="secondary"]:hover { background-color: #00f0ff !important; color: #000 !important; }
 div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #00f0ff 0%, #FF007F 100%) !important; color: #000000 !important; border: none !important; border-radius: 8px !important; font-weight: 900 !important; width: 100% !important; box-shadow: 0 0 15px rgba(0, 240, 255, 0.5) !important; transition: all 0.3s; }
@@ -357,7 +412,6 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
     if res_exitosa and res: return res
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
-        # CORRECCIÓN AQUÍ: Eliminado el .split("") que causaba el error
         return client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"].strip()
     except Exception as e: return f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}"
 
@@ -399,23 +453,58 @@ def generar_excel(texto_csv):
     out = BytesIO(); wb.save(out); out.seek(0); return out.getvalue()
 
 def generar_pptx(titulo, texto):
-    prs = Presentation(); slide = prs.slides.add_slide(prs.slide_layouts[0]); slide.shapes.title.text = titulo
-    for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
-        slide = prs.slides.add_slide(prs.slide_layouts[1]); lineas = bloque.split("\n")
-        if slide.shapes.title: slide.shapes.title.text = lineas[0][:50]
-        contenido_texto = "\n".join(lineas[1:]) if len(lineas) > 1 else ""
-        tiene_ph = False
-        for shape in slide.placeholders:
-            if shape.placeholder_format.idx == 1: shape.text = contenido_texto; tiene_ph = True
-        if not tiene_ph:
-            txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(5)); txBox.text_frame.text = contenido_texto
+    prs = Presentation()
+    
+    # Diapositiva 1: Portada
+    slide_portada = prs.slides.add_slide(prs.slide_layouts[0])
+    slide_portada.shapes.title.text = titulo.replace("**", "").replace("#", "")
+    
+    # Limpiamos el texto de asteriscos y almohadillas
+    texto_limpio = texto.replace("**", "").replace("##", "").replace("#", "").replace("*", "")
+    bloques = [b.strip() for b in texto_limpio.split("\n\n") if b.strip()]
+    
+    for bloque in bloques:
+        lineas = bloque.split("\n")
+        slide_titulo = lineas[0].strip()[:60]
+        contenido = "\n".join(lineas[1:]).strip()
+        
+        # Diapositiva en blanco para tener control total
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        
+        # Añadir Título (Caja de texto manual)
+        txBox_title = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1))
+        tf_title = txBox_title.text_frame
+        tf_title.text = slide_titulo
+        
+        # Añadir Contenido (Caja de texto manual a la izquierda)
+        txBox_content = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(4.5), Inches(4))
+        tf_content = txBox_content.text_frame
+        tf_content.word_wrap = True
+        tf_content.text = contenido
+        
+        # Añadir Imagen a la derecha (usando Pollinations IA)
+        try:
+            url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(slide_titulo + ', high quality presentation illustration, clean background')}?width=512&height=512&nologo=true"
+            req = urllib.request.Request(url_img, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=10) as response: 
+                img_data = response.read()
+            
+            tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+            tmp_img.write(img_data); tmp_img.close()
+            
+            # Insertar imagen en la mitad derecha
+            slide.shapes.add_picture(tmp_img.name, Inches(5.5), Inches(2), height=Inches(4))
+            os.remove(tmp_img.name)
+        except Exception as e:
+            pass # Si falla la imagen, la diapositiva se queda solo con texto
+            
     out = BytesIO(); prs.save(out); out.seek(0); return out.getvalue()
 
 def botones_descarga(texto, nombre_por_defecto="documento", formatos_extra=False):
     if texto:
         st.markdown("---")
         key_u = f"{nombre_por_defecto}".replace(" ", "_")
-        nombre_elegido = st.text_input("📝 Nombre del archivo:", value=nombre_por_defecto, key=f"name_{key_u}")
+        nombre_elegido = st.text_input("📝 Nombre del archivo (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nombre_elegido).strip().replace(' ', '_') or nombre_por_defecto
         
         if formatos_extra:
@@ -626,17 +715,24 @@ if macro_idx == 0:
             st.session_state.xw_mapa = st.session_state.edit_xw_mapa
             c1, c2 = st.columns(2)
             with c1: boton_superpoder_borrador(st.session_state.xw_mapa, "Hazlo más profesional", "xw_map_p1", modelo_seleccionado, st.session_state.api_key_gemini_manual, "xw_mapa")
-            with c2: st.download_button("📥 Descargar Markdown", st.session_state.xw_mapa.encode(), "mapa.md", use_container_width=True)
+            with c2: 
+                nom_m = st.text_input("Nombre del archivo (sin .md):", "mapa", key="n_map")
+                st.download_button("📥 Descargar Markdown", st.session_state.xw_mapa.encode(), f"{nom_m or 'mapa'}.md", use_container_width=True)
 
     with tabs_xw[1]:
         if st.button("✨ Generar Presentación", key="btn_xw_ppt", type="primary"):
-            with st.spinner("Estructurando..."):
-                res = llamar_ia(modelo_seleccionado, f"{contexto_xw}\n\nCrea una estructura de presentación para PowerPoint sobre: {st.session_state.xw_tema_input}. Separa cada diapositiva con doble salto de línea.", st.session_state.api_key_gemini_manual)
+            with st.spinner("Estructurando y generando imágenes..."):
+                # Instrucción estricta para evitar asteriscos y separar bien
+                prompt_ppt = f"{contexto_xw}\n\nCrea el contenido para una presentación de PowerPoint sobre: {st.session_state.xw_tema_input}. REGLA ESTRICTA: No uses formato Markdown (nada de ** ni #). Separa cada diapositiva con un doble salto de línea. La primera línea es el título de la diapositiva. A partir de la segunda línea, escribe los puntos clave separados por saltos de línea simples."
+                res = llamar_ia(modelo_seleccionado, prompt_ppt, st.session_state.api_key_gemini_manual)
                 st.session_state.xw_ppt = res
         if st.session_state.xw_ppt:
-            st.text_area("Editar Presentación:", value=st.session_state.xw_ppt, height=250, key="edit_xw_ppt")
+            st.text_area("Editar Estructura (Texto):", value=st.session_state.xw_ppt, height=250, key="edit_xw_ppt")
             st.session_state.xw_ppt = st.session_state.edit_xw_ppt
-            st.download_button("📥 Descargar PPTX", generar_pptx("Presentación XaviWork", st.session_state.xw_ppt), "presentacion.pptx", use_container_width=True)
+            
+            st.info("💡 Al descargar, se generarán imágenes automáticas para cada diapositiva.")
+            nom_p = st.text_input("Nombre del archivo PPT (sin .pptx):", "presentacion", key="n_ppt")
+            st.download_button("📥 Descargar PPTX con Imágenes", generar_pptx("Presentación XaviWork", st.session_state.xw_ppt), f"{nom_p or 'presentacion'}.pptx", use_container_width=True)
 
     with tabs_xw[2]:
         if st.button("✨ Generar Informe", key="btn_xw_informe", type="primary"):
@@ -656,7 +752,7 @@ if macro_idx == 0:
         if st.session_state.xw_tarjetas:
             st.text_area("Editar Tarjetas:", value=st.session_state.xw_tarjetas, height=250, key="edit_xw_tarjetas")
             st.session_state.xw_tarjetas = st.session_state.edit_xw_tarjetas
-            st.download_button("📥 Descargar Tarjetas", st.session_state.xw_tarjetas.encode(), "tarjetas.txt", use_container_width=True)
+            botones_descarga(st.session_state.xw_tarjetas, "Tarjetas", formatos_extra=False)
 
     with tabs_xw[4]:
         if st.button("✨ Generar Cuestionario", key="btn_xw_cuest", type="primary"):
@@ -666,7 +762,7 @@ if macro_idx == 0:
         if st.session_state.xw_cuestionario:
             st.text_area("Editar Cuestionario:", value=st.session_state.xw_cuestionario, height=250, key="edit_xw_cuest")
             st.session_state.xw_cuestionario = st.session_state.edit_xw_cuest
-            st.download_button("📥 Descargar Test", st.session_state.xw_cuestionario.encode(), "cuestionario.txt", use_container_width=True)
+            botones_descarga(st.session_state.xw_cuestionario, "Cuestionario", formatos_extra=False)
 
     with tabs_xw[5]:
         if st.button("✨ Generar Tabla de Datos", key="btn_xw_tabla", type="primary"):
@@ -676,7 +772,8 @@ if macro_idx == 0:
         if st.session_state.xw_tabla:
             st.text_area("Editar Tabla (CSV):", value=st.session_state.xw_tabla, height=250, key="edit_xw_tabla")
             st.session_state.xw_tabla = st.session_state.edit_xw_tabla
-            st.download_button("📥 Descargar Excel", generar_excel(st.session_state.xw_tabla), "tabla.xlsx", use_container_width=True)
+            nom_t = st.text_input("Nombre del archivo Excel (sin .xlsx):", "tabla", key="n_tabla")
+            st.download_button("📥 Descargar Excel", generar_excel(st.session_state.xw_tabla), f"{nom_t or 'tabla'}.xlsx", use_container_width=True)
 
     with tabs_xw[6]:
         if st.button("✨ Generar Guion Podcast", key="btn_xw_pod", type="primary"):
@@ -692,7 +789,8 @@ if macro_idx == 0:
                     if aud: st.session_state.xw_podcast_audio = aud; st.success("✅ Audio listo.")
             if st.session_state.xw_podcast_audio:
                 st.audio(st.session_state.xw_podcast_audio, format="audio/mp3")
-                st.download_button("💾 Descargar MP3", st.session_state.xw_podcast_audio, "podcast_xaviwork.mp3")
+                nom_mp3 = st.text_input("Nombre del archivo MP3 (sin .mp3):", "podcast_xaviwork", key="n_mp3")
+                st.download_button("💾 Descargar MP3", st.session_state.xw_podcast_audio, f"{nom_mp3 or 'podcast'}.mp3", use_container_width=True)
 
     with tabs_xw[7]:
         chat_container = st.container(height=400)
@@ -750,7 +848,8 @@ if macro_idx == 0:
                 except Exception as e: st.error(f"Error: {e}")
         if st.session_state.xw_cover_img:
             st.image(st.session_state.xw_cover_img, use_container_width=True)
-            st.download_button("📥 Descargar Imagen", st.session_state.xw_cover_img, "portada.png", "image/png", use_container_width=True)
+            nom_img = st.text_input("Nombre del archivo (sin .png):", "portada", key="n_img")
+            st.download_button("📥 Descargar Imagen", st.session_state.xw_cover_img, f"{nom_img or 'portada'}.png", "image/png", use_container_width=True)
 
     with tabs_xw[12]:
         st.markdown("#### 🏢 Multioffice - Generación Simultánea")
@@ -775,7 +874,7 @@ if macro_idx == 0:
                         res_csv = llamar_ia(modelo_seleccionado, f"{contexto_xw}\n\nGenera una tabla de datos en formato CSV sobre: {st.session_state.xw_tema_input}. Devuelve SOLO el código CSV.", st.session_state.api_key_gemini_manual)
                         st.session_state.xw_multi_excel = res_csv.replace("```csv", "").replace("```", "").strip()
                     if opt_ppt:
-                        res_ppt = llamar_ia(modelo_seleccionado, f"{contexto_xw}\n\nCrea una estructura de diapositivas para PowerPoint sobre: {st.session_state.xw_tema_input}. Usa doble salto de línea entre diapositivas.", st.session_state.api_key_gemini_manual)
+                        res_ppt = llamar_ia(modelo_seleccionado, f"{contexto_xw}\n\nCrea el contenido para PowerPoint sobre: {st.session_state.xw_tema_input}. REGLA ESTRICTA: No uses Markdown (**, #). Separa diapositivas con doble salto de línea. Primera línea = Título. Siguientes líneas = puntos clave.", st.session_state.api_key_gemini_manual)
                         st.session_state.xw_multi_ppt = res_ppt
                 st.success("✅ Contenidos generados. Revisa y descarga abajo.")
 
@@ -786,25 +885,29 @@ if macro_idx == 0:
             with st.expander("📝 Documento Word (Editable)", expanded=False):
                 st.text_area("Texto Word:", value=st.session_state.xw_multi_word, height=200, key="edit_multi_word")
                 st.session_state.xw_multi_word = st.session_state.edit_multi_word
-                st.download_button("📥 Descargar Word", generar_word(st.session_state.xw_multi_word), "multioffice_doc.docx", use_container_width=True)
+                nom_mw = st.text_input("Nombre Word (sin .docx):", "multioffice_doc", key="n_mw")
+                st.download_button("📥 Descargar Word", generar_word(st.session_state.xw_multi_word), f"{nom_mw or 'doc'}.docx", use_container_width=True)
 
         if opt_excel and st.session_state.get("xw_multi_excel"):
             with st.expander("📊 Tabla Excel (Editable)", expanded=False):
                 st.text_area("CSV Excel:", value=st.session_state.xw_multi_excel, height=200, key="edit_multi_excel")
                 st.session_state.xw_multi_excel = st.session_state.edit_multi_excel
-                st.download_button("📥 Descargar Excel", generar_excel(st.session_state.xw_multi_excel), "multioffice_tabla.xlsx", use_container_width=True)
+                nom_me = st.text_input("Nombre Excel (sin .xlsx):", "multioffice_tabla", key="n_me")
+                st.download_button("📥 Descargar Excel", generar_excel(st.session_state.xw_multi_excel), f"{nom_me or 'tabla'}.xlsx", use_container_width=True)
 
         if opt_ppt and st.session_state.get("xw_multi_ppt"):
             with st.expander("📉 Presentación PPT (Editable)", expanded=False):
                 st.text_area("Estructura PPT:", value=st.session_state.xw_multi_ppt, height=200, key="edit_multi_ppt")
                 st.session_state.xw_multi_ppt = st.session_state.edit_multi_ppt
-                st.download_button("📥 Descargar PowerPoint", generar_pptx("Presentación Multioffice", st.session_state.xw_multi_ppt), "multioffice_ppt.pptx", use_container_width=True)
+                nom_mp = st.text_input("Nombre PPT (sin .pptx):", "multioffice_ppt", key="n_mp")
+                st.download_button("📥 Descargar PowerPoint", generar_pptx("Presentación Multioffice", st.session_state.xw_multi_ppt), f"{nom_mp or 'ppt'}.pptx", use_container_width=True)
 
         if opt_pdf and st.session_state.get("xw_multi_pdf"):
             with st.expander("📄 Documento PDF (Editable)", expanded=False):
                 st.text_area("Texto PDF:", value=st.session_state.xw_multi_pdf, height=200, key="edit_multi_pdf")
                 st.session_state.xw_multi_pdf = st.session_state.edit_multi_pdf
-                st.download_button("📥 Descargar PDF", generar_pdf_pro("Multioffice PDF", st.session_state.xw_multi_pdf), "multioffice_pdf.pdf", use_container_width=True)
+                nom_mpdf = st.text_input("Nombre PDF (sin .pdf):", "multioffice_pdf", key="n_mpdf")
+                st.download_button("📥 Descargar PDF", generar_pdf_pro("Multioffice PDF", st.session_state.xw_multi_pdf), f"{nom_mpdf or 'pdf'}.pdf", use_container_width=True)
 
 # --- MACRO 1: CHAT Y ASISTENTES ---
 elif macro_idx == 1:
@@ -825,7 +928,10 @@ elif macro_idx == 1:
             if st.button("🔊 Audio 3 Voces", key="btn_pod_aud"):
                 with st.spinner("Generando audio..."):
                     aud = generar_podcast_3_voces(st.session_state.podcast_script, "es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural")
-                    if aud: st.audio(aud, format="audio/mp3"); st.download_button("💾 MP3", aud, "podcast.mp3")
+                    if aud: st.audio(aud, format="audio/mp3"); 
+                    if aud: 
+                        nom_pod = st.text_input("Nombre del MP3 (sin .mp3):", "podcast", key="n_pod_1")
+                        st.download_button("💾 MP3", aud, f"{nom_pod or 'podcast'}.mp3", use_container_width=True)
             botones_descarga(st.session_state.podcast_script, "Podcast")
 
     elif sub_idx == 1:
@@ -946,9 +1052,13 @@ elif macro_idx == 2:
         if st.session_state.get("office_borrador"):
             st.text_area("Editar Borrador:", value=st.session_state.office_borrador, height=250, key="off_b")
             st.session_state.office_borrador = st.session_state.off_b
-            if formato == "Word": st.download_button("📥 Word", generar_word(st.session_state.office_borrador), "doc.docx")
-            elif formato == "Excel": st.download_button("📥 Excel", generar_excel(st.session_state.office_borrador), "doc.xlsx")
-            else: st.download_button("📥 PPTX", generar_pptx("Presentación", st.session_state.office_borrador), "doc.pptx")
+            
+            nom_off = st.text_input(f"Nombre archivo {formato} (sin extensión):", "documento", key="n_off")
+            nombre_final = nom_off or "documento"
+
+            if formato == "Word": st.download_button("📥 Word", generar_word(st.session_state.office_borrador), f"{nombre_final}.docx")
+            elif formato == "Excel": st.download_button("📥 Excel", generar_excel(st.session_state.office_borrador), f"{nombre_final}.xlsx")
+            else: st.download_button("📥 PPTX", generar_pptx("Presentación", st.session_state.office_borrador), f"{nombre_final}.pptx")
 
     elif sub_idx == 3:
         st.markdown("#### PDF Pro")
@@ -961,7 +1071,9 @@ elif macro_idx == 2:
         if st.session_state.get("pdf_borrador"):
             st.text_area("Editar:", value=st.session_state.pdf_borrador, height=250, key="pdf_b")
             st.session_state.pdf_borrador = st.session_state.pdf_b
-            st.download_button("📥 PDF", generar_pdf_pro(titulo, st.session_state.pdf_borrador), f"{titulo}.pdf")
+            
+            nom_pdf = st.text_input("Nombre del archivo PDF (sin extensión):", titulo or "documento", key="n_pdf_pro")
+            st.download_button("📥 PDF", generar_pdf_pro(titulo, st.session_state.pdf_borrador), f"{nom_pdf or 'pdf'}.pdf")
 
     elif sub_idx == 4:
         c1, c2 = st.columns(2)
@@ -1007,7 +1119,9 @@ elif macro_idx == 3:
         if st.button("Extraer") and url:
             try:
                 df = pd.read_html(url)[0]; st.dataframe(df)
-                out = BytesIO(); df.to_excel(out); st.download_button("📥 Excel", out.getvalue(), "tabla.xlsx")
+                out = BytesIO(); df.to_excel(out)
+                nom_tab = st.text_input("Nombre archivo (sin .xlsx):", "tabla_web", key="n_tab_web")
+                st.download_button("📥 Excel", out.getvalue(), f"{nom_tab or 'tabla'}.xlsx")
             except: st.error("Fallo al leer.")
     elif sub_idx == 4:
         st.markdown("#### 🎥 YouTube")
