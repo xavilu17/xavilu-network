@@ -23,3 +23,4 @@ python-dotenv
 yt-dlp
 curl_cffi
 streamlit-markmap
+streamlit>=1.39.0
