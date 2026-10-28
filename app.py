@@ -104,6 +104,7 @@ init_db()
 # --- ESTADO DE SESIÓN ---
 _defaults = {
     "password_correct": False,
+    "rol": "ninos",
     "chat_history": [], "img_url": "", "app_code": "", "pdf_chat_history": [],
     "mermaid_code": "", "analisis_ia": "", "dl_bytes": None, "dl_filename": "", "dl_mime": "",
     "cuento_generado": "", "receta_generada": "", "menu_generado": "",
@@ -131,7 +132,7 @@ for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
 # ==========================================
-# 🔐 SISTEMA DE LOGIN
+# 🔐 SISTEMA DE LOGIN (ADMIN Y NIÑOS)
 # ==========================================
 def check_password():
     if st.session_state.get("password_correct", False):
@@ -146,14 +147,19 @@ def check_password():
         
     if submitted:
         try:
-            # Lee la contraseña de los Secrets de Streamlit Cloud
-            clave_correcta = st.secrets["PASSWORD"]
+            pwd_admin = st.secrets.get("PASSWORD", "admin")
+            pwd_ninos = st.secrets.get("PASSWORD_NINOS", "ninos")
         except:
-            # Si no existe en secrets, usa "admin" por defecto (para pruebas locales)
-            clave_correcta = "admin"
+            pwd_admin = "admin"
+            pwd_ninos = "ninos"
             
-        if pwd == clave_correcta:
+        if pwd == pwd_admin:
             st.session_state["password_correct"] = True
+            st.session_state["rol"] = "admin"
+            st.rerun()
+        elif pwd == pwd_ninos:
+            st.session_state["password_correct"] = True
+            st.session_state["rol"] = "ninos"
             st.rerun()
         else:
             st.error("❌ Contraseña incorrecta. Inténtalo de nuevo.")
@@ -163,7 +169,7 @@ if not check_password():
     st.stop() # Si no hay login, detiene la app aquí.
 
 # ==========================================
-# 🎨 CSS NEGRO ESPACIAL Y OCULTAR BARRA BLANCA
+# 🎨 CSS NEGRO ESPACIAL Y ARREGLOS MÓVIL
 # ==========================================
 st.markdown("""
 <style>
@@ -176,6 +182,8 @@ header[data-testid="stHeader"] { visibility: hidden !important; }
 footer { visibility: hidden !important; }
 [data-testid="stAppDeployButton"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
+[data-testid="stToolbar"] { visibility: hidden !important; }
+[data-testid="stStatusWidget"] { visibility: hidden !important; }
 
 h1 { font-family: 'Orbitron', sans-serif !important; color: #FFD700 !important; text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700, 0 0 35px #FF8C00 !important; text-align: center; letter-spacing: 3px; }
 h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #ffffff !important; text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; text-align: center; letter-spacing: 3px; }
@@ -203,6 +211,12 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
 [data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.8) !important; border: 1px solid #FF007F !important; border-radius: 15px !important; padding: 10px; box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important; }
 .stAlert { border-radius: 10px; font-weight: bold; background-color: rgba(0, 240, 255, 0.1) !important; border-left: 5px solid #00f0ff !important; }
 [data-testid="stVerticalBlock"] > div { padding-bottom: 0.5rem !important; }
+
+/* ARREGLOS PARA MÓVIL */
+@media (max-width: 768px) {
+    .block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+    div.stButton > button { padding: 8px 10px !important; font-size: 12px !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -269,7 +283,6 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         contexto_chat = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in historial_chat[-10:]])
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
-    # Lógica: 1º busca en las cajas de texto de la app, 2º busca en secrets.toml, 3º vacío.
     try: key_gemini = st.session_state.api_key_gemini_manual or st.secrets.get("GEMINI_API_KEY", api_key_gemini)
     except: key_gemini = st.session_state.api_key_gemini_manual or api_key_gemini
     
@@ -525,7 +538,6 @@ def custom_tabs(tab_names, key_name, default_idx=0):
 # INTERFAZ PRINCIPAL Y CONTROL DE MENÚ
 # ==========================================
 if not st.session_state.sidebar_visible:
-    # Botón de rescate en la parte superior central
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
@@ -550,19 +562,20 @@ if st.session_state.sidebar_visible:
         st.markdown("---")
         modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
         
-        # SECCIÓN DE KEYS
+        # SECCIÓN DE KEYS (PROTEGIDA)
         st.markdown("#### 🔑 Estado de Conexiones")
         try:
             if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
         except: pass
         
-        with st.expander("⚙️ Configurar Keys Manualmente"):
-            st.caption("Si no usas secrets.toml, pega aquí tus claves para esta sesión:")
-            st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
-            st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
-            st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
-            st.session_state.api_key_mistral_manual = st.text_input("Mistral API Key", type="password", value=st.session_state.api_key_mistral_manual)
-            st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter API Key", type="password", value=st.session_state.api_key_openrouter_manual)
+        if st.session_state.get("rol") == "admin":
+            with st.expander("⚙️ Configurar Keys Manualmente"):
+                st.caption("Si no usas secrets.toml, pega aquí tus claves para esta sesión:")
+                st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
+                st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
+                st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
+                st.session_state.api_key_mistral_manual = st.text_input("Mistral API Key", type="password", value=st.session_state.api_key_mistral_manual)
+                st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter API Key", type="password", value=st.session_state.api_key_openrouter_manual)
 
         st.markdown("---")
         st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
@@ -576,8 +589,16 @@ if st.session_state.sidebar_visible:
             st.info(f"Activo: **{st.session_state.global_file_name}**")
             if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
         st.markdown("---")
-        for h in obtener_de_db():
-            with st.expander(f"{h[1]} - {h[0][:10]}"): st.caption(h[2][:200] + "...")
+        
+        if st.session_state.get("rol") == "admin":
+            st.markdown("#### 📂 Historial Reciente")
+            for h in obtener_de_db():
+                with st.expander(f"{h[1]} - {h[0][:10]}"): 
+                    st.caption(h[2][:200] + "...")
+                    if st.button("Recuperar", key=f"rec_{h[0]}_{h[1]}"):
+                        st.session_state.office_borrador = h[2]
+                        st.session_state.podcast_script = h[2]
+                        st.success("¡Texto cargado en el borrador del Podcast/Office!")
 else:
     modelo_seleccionado = "llama3.2:latest"
     api_key_gemini = st.session_state.api_key_gemini_manual
@@ -651,14 +672,23 @@ if macro_idx == 0:
             with c2: v2 = st.selectbox("Voz L2:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural"], index=1, key="v2")
             with c3: v3 = st.selectbox("Voz L3:", ["es-AR-TomasNeural", "es-ES-ElviraNeural"], key="v3")
             
-            if st.button("🔊 Audio 3 Voces", key="btn_pod_aud"):
-                with st.spinner("Generando audio..."):
-                    aud = generar_podcast_3_voces(st.session_state.podcast_script, v1, v2, v3)
-                    if aud: 
-                        st.audio(aud, format="audio/mp3")
-                        st.download_button("💾 MP3", aud, "podcast.mp3")
-                    else:
-                        st.error("❌ Error al generar el audio. Revisa la consola.")
+            c_v1, c_v2 = st.columns(2)
+            with c_v1:
+                if st.button("🔊 Audio 3 Voces", key="btn_pod_aud"):
+                    with st.spinner("Generando audio..."):
+                        aud = generar_podcast_3_voces(st.session_state.podcast_script, v1, v2, v3)
+                        if aud: 
+                            st.audio(aud, format="audio/mp3")
+                            st.download_button("💾 MP3", aud, "podcast.mp3")
+                        else:
+                            st.error("❌ Error al generar el audio. Revisa la consola.")
+            with c_v2:
+                if st.button("🎨 Generar Portada", key="btn_pod_cover", type="secondary"):
+                    with st.spinner("Diseñando portada..."):
+                        tema_portada = st.session_state.get('pod_tema_input', 'Podcast')[:50]
+                        url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Podcast cover about ' + tema_portada + ', high quality')}?width=1024&height=1024&nologo=true"
+                        st.image(url_img, caption="Portada generada por IA")
+            
             botones_descarga(st.session_state.podcast_script, "Podcast")
 
     elif sub_idx == 1:
@@ -674,11 +704,21 @@ if macro_idx == 0:
                     aud = generar_audio_sincrono(st.session_state.chat_history[-1]["content"], "es-ES-ElviraNeural")
                     if aud: st.audio(aud, format="audio/mp3")
         ctx = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        
+        # SUPERPODERES DEL CHAT
+        c_s1, c_s2, c_s3, c_s4 = st.columns(4)
+        accion_rapida = None
+        if c_s1.button("Resumir", key="q_res"): accion_rapida = "Resume esto de forma concisa:"
+        if c_s2.button("Traducir", key="q_trad"): accion_rapida = "Traduce al inglés:"
+        if c_s3.button("Formal", key="q_form"): accion_rapida = "Hazlo más formal y profesional:"
+        if c_s4.button("Buscar Web", key="q_web"): accion_rapida = "Busca en internet sobre esto y resume:"
+
         p = chat_input_pro("main")
         if p:
+            prompt_chat = f"{accion_rapida}\n\n{p}" if accion_rapida else p
             st.session_state.chat_history.append({"role": "user", "content": p}); st.chat_message("user").write(p)
             with st.spinner("Pensando..."):
-                res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{p}", st.session_state.api_key_gemini_manual, st.session_state.chat_history, "", "")
+                res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{prompt_chat}", st.session_state.api_key_gemini_manual, st.session_state.chat_history, "", "")
                 if "[ERROR" in res: st.error(res)
                 else:
                     st.session_state.chat_history.append({"role": "assistant", "content": res}); st.chat_message("assistant").write(res); guardar_en_db("Chat", res)
@@ -1044,9 +1084,13 @@ elif macro_idx == 5:
             else: st.text_area("Resultado:", res, height=300); botones_descarga(res, "Carta")
 
 # ==========================================
-# CATEGORÍA 6: GESTIÓN DE PLANTAS
+# CATEGORÍA 6: GESTIÓN DE PLANTAS (PROTEGIDA)
 # ==========================================
 elif macro_idx == 6:
+    if st.session_state.get("rol") == "ninos":
+        st.error("🔒 Esta sección está bloqueada en Modo Niños.")
+        st.stop()
+        
     sub_names = ["📊 DASHBOARD", "⚖️ BÁSCULA", "🔄 TRAZABILIDAD", "🔧 MANTENIMIENTO", "🏭 SIMULADOR IA"]
     sub_idx = custom_tabs(sub_names, "plant_sub", 0)
     
