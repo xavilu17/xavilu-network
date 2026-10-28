@@ -54,7 +54,6 @@ MAX_FILE_MB = 1000
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-3.8-flash"
 
-# Fix para Windows (evita conflictos de asyncio en Streamlit)
 if os.name == 'nt':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -82,30 +81,54 @@ def insert_db(query, params):
         conn.commit(); conn.close()
     except Exception as e: st.error(f"Error DB: {e}")
 
-# --- BASE DE DATOS HISTORIAL ---
+# --- BASE DE DATOS HISTORIAL Y CHAT ---
 def init_db():
     conn = sqlite3.connect('xavilu_memoria.db')
     conn.execute('CREATE TABLE IF NOT EXISTS historial (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS chat_db (id INTEGER PRIMARY KEY AUTOINCREMENT, rol TEXT, contenido TEXT)')
     conn.commit(); conn.close()
+
 def guardar_en_db(tipo, contenido):
     try:
         conn = sqlite3.connect('xavilu_memoria.db')
         conn.execute("INSERT INTO historial (fecha, tipo, contenido) VALUES (?, ?, ?)", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tipo, contenido))
         conn.commit(); conn.close()
     except: pass
+
 def obtener_de_db():
     try:
         conn = sqlite3.connect('xavilu_memoria.db')
         rows = conn.execute("SELECT fecha, tipo, contenido FROM historial ORDER BY id DESC LIMIT 5").fetchall()
         conn.close(); return rows
     except: return []
+
+def cargar_chat_db():
+    try:
+        conn = sqlite3.connect('xavilu_memoria.db')
+        rows = conn.execute("SELECT rol, contenido FROM chat_db ORDER BY id ASC").fetchall()
+        conn.close(); return [{"role": r[0], "content": r[1]} for r in rows]
+    except: return []
+
+def guardar_chat_db(rol, contenido):
+    try:
+        conn = sqlite3.connect('xavilu_memoria.db')
+        conn.execute("INSERT INTO chat_db (rol, contenido) VALUES (?, ?)", (rol, contenido))
+        conn.commit(); conn.close()
+    except: pass
+
+def limpiar_chat_db():
+    try:
+        conn = sqlite3.connect('xavilu_memoria.db')
+        conn.execute("DELETE FROM chat_db")
+        conn.commit(); conn.close()
+    except: pass
+
 init_db()
 
 # --- ESTADO DE SESIÓN ---
 _defaults = {
-    "password_correct": False,
-    "rol": "ninos",
-    "chat_history": [], "img_url": "", "app_code": "", "pdf_chat_history": [],
+    "password_correct": False, "rol": "ninos",
+    "chat_history": cargar_chat_db(), "img_url": "", "app_code": "", "pdf_chat_history": [],
     "mermaid_code": "", "analisis_ia": "", "dl_bytes": None, "dl_filename": "", "dl_mime": "",
     "cuento_generado": "", "receta_generada": "", "menu_generado": "",
     "redes_resultado": "", "pelo_resultado": "", "deberes_resultado": "", "prl_resultado": "",
@@ -126,7 +149,8 @@ _defaults = {
     "plant_borrador": "",
     "pod_tema_input": "", "pod_sugs": [],
     "api_key_gemini_manual": "", "api_key_groq_manual": "", "api_key_silicon_manual": "", 
-    "api_key_mistral_manual": "", "api_key_openrouter_manual": ""
+    "api_key_mistral_manual": "", "api_key_openrouter_manual": "",
+    "galeria_imgs": [], "office_estilo": "Normal"
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -137,14 +161,11 @@ for _k, _v in _defaults.items():
 def check_password():
     if st.session_state.get("password_correct", False):
         return True
-    
     st.markdown("## 🔐 Xavilu Network")
     st.caption("Introduce la contraseña para acceder")
-    
     with st.form("login_form"):
         pwd = st.text_input("Contraseña", type="password")
         submitted = st.form_submit_button("Entrar", use_container_width=True)
-        
     if submitted:
         try:
             pwd_admin = st.secrets.get("PASSWORD", "admin")
@@ -152,7 +173,6 @@ def check_password():
         except:
             pwd_admin = "admin"
             pwd_ninos = "ninos"
-            
         if pwd == pwd_admin:
             st.session_state["password_correct"] = True
             st.session_state["rol"] = "admin"
@@ -166,7 +186,7 @@ def check_password():
     return False
 
 if not check_password():
-    st.stop() # Si no hay login, detiene la app aquí.
+    st.stop()
 
 # ==========================================
 # 🎨 CSS NEGRO ESPACIAL Y ARREGLOS MÓVIL
@@ -175,8 +195,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
 .stApp { background-color: #000000 !important; background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
-
-/* OCULTAR BARRA SUPERIOR BLANCA Y MENÚS */
 header[data-testid="stHeader"] { visibility: hidden !important; }
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
@@ -212,7 +230,6 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
 .stAlert { border-radius: 10px; font-weight: bold; background-color: rgba(0, 240, 255, 0.1) !important; border-left: 5px solid #00f0ff !important; }
 [data-testid="stVerticalBlock"] > div { padding-bottom: 0.5rem !important; }
 
-/* ARREGLOS PARA MÓVIL */
 @media (max-width: 768px) {
     .block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
     div.stButton > button { padding: 8px 10px !important; font-size: 12px !important; }
@@ -492,13 +509,7 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
             with cols[i]:
-                st.button(
-                    idea, 
-                    key=f"{key_prefix}_idea_{i}", 
-                    use_container_width=True,
-                    on_click=agregar_idea, 
-                    args=(idea,)
-                )
+                st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
                 
     return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
 
@@ -562,7 +573,6 @@ if st.session_state.sidebar_visible:
         st.markdown("---")
         modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
         
-        # SECCIÓN DE KEYS (PROTEGIDA)
         st.markdown("#### 🔑 Estado de Conexiones")
         try:
             if st.secrets.get("GEMINI_API_KEY"): st.success("✅ Gemini Conectado (vía TOML)")
@@ -617,7 +627,6 @@ if macro_idx == 0:
     if sub_idx == 0:
         st.markdown("#### 🎙️ Generador de Podcasts")
         contexto = cajita_adjuntar_archivo("podcast_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
-        
         tema = st.text_area("Temática principal:", placeholder="Ej: El futuro de la IA, La pizza con piña...", key="pod_tema_input", height=100)
         
         c1, c2 = st.columns(2)
@@ -633,25 +642,15 @@ if macro_idx == 0:
 
         def aplicar_idea_podcast(idea_seleccionada):
             texto_actual = st.session_state["pod_tema_input"].strip()
-            if texto_actual:
-                st.session_state["pod_tema_input"] = f"{texto_actual}\n\n{idea_seleccionada}"
-            else:
-                st.session_state["pod_tema_input"] = idea_seleccionada
-            if "pod_sugs" in st.session_state:
-                del st.session_state["pod_sugs"]
+            if texto_actual: st.session_state["pod_tema_input"] = f"{texto_actual}\n\n{idea_seleccionada}"
+            else: st.session_state["pod_tema_input"] = idea_seleccionada
+            if "pod_sugs" in st.session_state: del st.session_state["pod_sugs"]
 
         if st.session_state.get("pod_sugs"):
             st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
             cols = st.columns(len(st.session_state["pod_sugs"]))
             for i, idea in enumerate(st.session_state["pod_sugs"]):
-                with cols[i]:
-                    st.button(
-                        idea, 
-                        key=f"pod_idea_{i}", 
-                        use_container_width=True,
-                        on_click=aplicar_idea_podcast, 
-                        args=(idea,)
-                    )
+                with cols[i]: st.button(idea, key=f"pod_idea_{i}", use_container_width=True, on_click=aplicar_idea_podcast, args=(idea,))
 
         st.markdown("---")
         if st.button("✨ Crear Guion", type="primary", key="btn_pod") and st.session_state["pod_tema_input"]:
@@ -659,9 +658,7 @@ if macro_idx == 0:
                 prompt = f"{contexto}\n\nGuion podcast {dur} min. Tema: '{st.session_state['pod_tema_input']}'. Estilo: {estilo}. 3 locutores. REGLA ESTRICTA: Escribe de forma muy natural y coloquial. NO uses acotaciones como (risas) o (pausa). Si quieres que se rían, escribe 'jajaja'. Si quieres que piensen, escribe 'mmm'. Usa SOLO el formato exacto: 'Locutor 1: [texto]', 'Locutor 2: [texto]', 'Locutor 3: [texto]'."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
                 if "[ERROR" in res: st.error(res)
-                else:
-                    st.session_state.podcast_script = res
-                    guardar_en_db("Podcast", res)
+                else: st.session_state.podcast_script = res; guardar_en_db("Podcast", res)
 
         if st.session_state.get("podcast_script"):
             st.markdown("### 📜 Guion Generado")
@@ -677,32 +674,32 @@ if macro_idx == 0:
                 if st.button("🔊 Audio 3 Voces", key="btn_pod_aud"):
                     with st.spinner("Generando audio..."):
                         aud = generar_podcast_3_voces(st.session_state.podcast_script, v1, v2, v3)
-                        if aud: 
-                            st.audio(aud, format="audio/mp3")
-                            st.download_button("💾 MP3", aud, "podcast.mp3")
-                        else:
-                            st.error("❌ Error al generar el audio. Revisa la consola.")
+                        if aud: st.audio(aud, format="audio/mp3"); st.download_button("💾 MP3", aud, "podcast.mp3")
+                        else: st.error("❌ Error al generar el audio.")
             with c_v2:
                 if st.button("🎨 Generar Portada", key="btn_pod_cover", type="secondary"):
                     with st.spinner("Diseñando portada..."):
                         tema_portada = st.session_state.get('pod_tema_input', 'Podcast')[:50]
                         url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Podcast cover about ' + tema_portada + ', high quality')}?width=1024&height=1024&nologo=true"
                         st.image(url_img, caption="Portada generada por IA")
+                        st.session_state.galeria_imgs.append(url_img)
             
             botones_descarga(st.session_state.podcast_script, "Podcast")
 
     elif sub_idx == 1:
         st.markdown("#### 💬 Chat")
+        # HISTORIAL PERSISTENTE
         for m in st.session_state.chat_history: st.chat_message(m["role"]).write(m["content"])
         if st.session_state.chat_history:
             c1, c2, c3 = st.columns(3)
             with c1: st.download_button("📥 TXT", "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history]), "chat.txt")
             with c2: 
-                if st.button("🗑️ Limpiar"): st.session_state.chat_history = []; st.rerun()
+                if st.button("🗑️ Limpiar"): st.session_state.chat_history = []; limpiar_chat_db(); st.rerun()
             with c3:
                 if st.button("🔊 Leer"):
                     aud = generar_audio_sincrono(st.session_state.chat_history[-1]["content"], "es-ES-ElviraNeural")
                     if aud: st.audio(aud, format="audio/mp3")
+        
         ctx = cajita_adjuntar_archivo("chat_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
         
         # SUPERPODERES DEL CHAT
@@ -713,15 +710,29 @@ if macro_idx == 0:
         if c_s3.button("Formal", key="q_form"): accion_rapida = "Hazlo más formal y profesional:"
         if c_s4.button("Buscar Web", key="q_web"): accion_rapida = "Busca en internet sobre esto y resume:"
 
+        # DICTADO POR VOZ (Solo Admin o Niños, funciona en móvil)
+        st.markdown("##### 🎤 Dictado por voz (Opcional)")
+        audio_value = st.audio_input("Graba tu mensaje aquí", key="voice_input")
+        
         p = chat_input_pro("main")
+        
+        # Lógica para procesar el audio si se ha grabado
+        if audio_value:
+            with st.spinner("Escuchando y transcribiendo..."):
+                # Usamos Gemini para transcribir el audio
+                transcripcion = analizar_archivo_con_gemini(audio_value.getvalue(), "audio/wav", "Transcribe exactamente lo que dice este audio. Devuelve solo el texto.", st.session_state.api_key_gemini_manual)
+                if transcripcion and "[ERROR" not in transcripcion:
+                    p = transcripcion.strip()
+
         if p:
             prompt_chat = f"{accion_rapida}\n\n{p}" if accion_rapida else p
             st.session_state.chat_history.append({"role": "user", "content": p}); st.chat_message("user").write(p)
+            guardar_chat_db("user", p)
             with st.spinner("Pensando..."):
                 res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{prompt_chat}", st.session_state.api_key_gemini_manual, st.session_state.chat_history, "", "")
                 if "[ERROR" in res: st.error(res)
                 else:
-                    st.session_state.chat_history.append({"role": "assistant", "content": res}); st.chat_message("assistant").write(res); guardar_en_db("Chat", res)
+                    st.session_state.chat_history.append({"role": "assistant", "content": res}); st.chat_message("assistant").write(res); guardar_en_db("Chat", res); guardar_chat_db("assistant", res)
             st.rerun()
 
     elif sub_idx == 2:
@@ -750,8 +761,7 @@ if macro_idx == 0:
     elif sub_idx == 4:
         st.markdown("#### Agentes")
         nom = st.text_input("Nombre:"); rol = st.text_area("Personalidad:")
-        if st.button("Crear"):
-            st.session_state.agente_activo = {"nombre": nom, "rol": rol}; st.session_state.agente_chat_history = []
+        if st.button("Crear"): st.session_state.agente_activo = {"nombre": nom, "rol": rol}; st.session_state.agente_chat_history = []
         if st.session_state.get("agente_activo"):
             ag = st.session_state.agente_activo
             for m in st.session_state.agente_chat_history: st.chat_message(m["role"]).write(m["content"])
@@ -851,13 +861,21 @@ elif macro_idx == 1:
     elif sub_idx == 2:
         st.markdown("#### Creación de Documentos (Flujo Borrador)")
         contexto = cajita_adjuntar_archivo("office_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
+        
+        # PRESETS DE PERSONALIDAD
+        st.markdown("**Elige el estilo de la IA:**")
+        c_est1, c_est2, c_est3 = st.columns(3)
+        if c_est1.button("👔 Profesional", use_container_width=True): st.session_state.office_estilo = "Profesional y formal"
+        if c_est2.button("🎨 Creativo", use_container_width=True): st.session_state.office_estilo = "Creativo y original"
+        if c_est3.button("👨‍💻 Técnico", use_container_width=True): st.session_state.office_estilo = "Técnico y preciso"
+
         prompt_office = campo_con_ideas("¿Qué documento quieres crear?", "office", "documentos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Presupuesto para cliente", "", "")
         formato = st.radio("Formato final:", ["Word", "Excel", "PowerPoint"], key="office_fmt", horizontal=True)
         
         if st.button("✨ Generar Borrador de Texto", type="primary", key="btn_office_gen"):
             if prompt_office:
                 with st.spinner("Generando borrador..."):
-                    prompt_ia = f"{contexto}\n\n{prompt_office}"
+                    prompt_ia = f"Actúa con un estilo {st.session_state.office_estilo}.\n\n{contexto}\n\n{prompt_office}"
                     if formato == "PowerPoint": prompt_ia += "\n\nIMPORTANTE: Formatea para diapositivas. Título, salto de línea, guiones para los puntos. Doble salto de línea entre diapositivas."
                     elif formato == "Excel": prompt_ia += "\n\nIMPORTANTE: Devuelve los datos en formato CSV separados por comas."
                     res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="")
@@ -987,7 +1005,7 @@ elif macro_idx == 2:
 # CATEGORÍA 3: MULTIMEDIA
 # ==========================================
 elif macro_idx == 3:
-    sub_names = ["🖼️ ANÁLISIS", "🎨 VISUAL", "🛡️ LOGOS", "📥 DESCARGADOR"]
+    sub_names = ["🖼️ ANÁLISIS", "🎨 VISUAL", "🛡️ LOGOS", "📥 DESCARGADOR", "🖼️ GALERÍA"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
     if sub_idx == 0:
         a = st.file_uploader("Sube archivo:", type=["png", "jpg", "mp3", "wav", "mp4"])
@@ -1013,11 +1031,15 @@ elif macro_idx == 3:
         if st.button("Generar") and p:
             with st.spinner("Traduciendo..."):
                 en = llamar_ia(modelo_seleccionado, f"Traduce: '{p}'", st.session_state.api_key_gemini_manual, api_key_openai="", api_key_anthropic="").replace('"', '').replace("'", "").strip()
-                st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(en)}?width=1024&height=1024&nologo=true")
+                url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(en)}?width=1024&height=1024&nologo=true"
+                st.image(url_img)
+                st.session_state.galeria_imgs.append(url_img)
     elif sub_idx == 2:
         m = st.text_input("Marca:")
         if st.button("Logo") and m:
-            st.image(f"https://image.pollinations.ai/prompt/{urllib.parse.quote(f'logo {m}, minimalist, white background')}?width=1024&height=1024&nologo=true")
+            url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(f'logo {m}, minimalist, white background')}?width=1024&height=1024&nologo=true"
+            st.image(url_img)
+            st.session_state.galeria_imgs.append(url_img)
     elif sub_idx == 3:
         u = st.text_input("URL YouTube/TikTok:")
         if st.button("⬇️ Descargar") and u and HAS_YTDLP:
@@ -1033,6 +1055,13 @@ elif macro_idx == 3:
                     for f in os.listdir(t): os.remove(os.path.join(t, f))
                     os.rmdir(t)
         if st.session_state.dl_bytes: st.download_button("💾 Guardar", st.session_state.dl_bytes, st.session_state.dl_filename)
+    elif sub_idx == 4:
+        st.markdown("#### 🖼️ Galería de Imágenes Generadas")
+        if not st.session_state.galeria_imgs:
+            st.info("Aún no has generado ninguna imagen en esta sesión.")
+        else:
+            for idx, url in enumerate(reversed(st.session_state.galeria_imgs)):
+                st.image(url, caption=f"Imagen {idx+1}")
 
 # ==========================================
 # CATEGORÍA 4: ESTUDIO Y OFICIOS
