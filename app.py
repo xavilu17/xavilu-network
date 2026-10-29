@@ -99,7 +99,7 @@ with col1:
               type="primary" if st.session_state.pagina == "Inicio" else "secondary", 
               on_click=ir_a, args=("Inicio",))
 with col2:
-    st.button("📅\nAvisos ITV", use_container_width=True, 
+    st.button("📅\nAvisos / Tareas", use_container_width=True, 
               type="primary" if st.session_state.pagina == "Avisos" else "secondary", 
               on_click=ir_a, args=("Avisos",))
 with col3:
@@ -138,28 +138,90 @@ if st.session_state.pagina == "Inicio":
     st.title("Bienvenido al sistema de gestión")
     st.info("Selecciona una opción en la botonera superior para empezar a trabajar.")
 
-# --- PESTAÑA 2: AVISOS ITV ---
+# --- PESTAÑA 2: AVISOS / TAREAS ---
 elif st.session_state.pagina == "Avisos":
-    st.header("📅 Avisos ITV")
-    st.write("Gestión de avisos y recordatorios de ITV.")
+    st.header("📅 Avisos y Tareas Pendientes")
+    st.write("Programa futuros trabajos para tus clientes y no dejes que se te pase ninguno.")
     
-    st.subheader("Ejemplo de Aviso por WhatsApp")
-    tel_ejemplo = "34600000000" 
-    nombre_ejemplo = "Cliente Prueba"
-    moto_ejemplo = "Yamaha T-Max"
+    df_clientes = db.obtener_clientes()
     
-    mensaje = f"Hola {nombre_ejemplo}, te escribimos de Taller Olivares 4T. Tu {moto_ejemplo} tiene la ITV próxima a caducar. ¿Quieres que te pidamos cita? 🏍️"
-    mensaje_url = urllib.parse.quote(mensaje)
-    url_whatsapp = f"https://wa.me/{tel_ejemplo}?text={mensaje_url}"
-    
-    st.link_button("📱 Avisar ITV por WhatsApp", url_whatsapp, type="primary")
+    if df_clientes.empty:
+        st.warning("⚠️ No hay clientes en la base de datos. Añade uno primero en la pestaña 'Clientes'.")
+    else:
+        tab_avisos1, tab_avisos2 = st.tabs(["➕ Crear Aviso", "📋 Ver Avisos"])
+        
+        with tab_avisos1:
+            with st.form("form_nuevo_aviso", clear_on_submit=True):
+                st.subheader("Programar un aviso")
+                
+                opciones_clientes = {
+                    f"{row['nombre']} - {row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'}": row['id'] 
+                    for _, row in df_clientes.iterrows()
+                }
+                
+                cliente_aviso = st.selectbox("Selecciona el Cliente", options=list(opciones_clientes.keys()))
+                
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    fecha_aviso = st.date_input("Fecha del aviso")
+                with col_f2:
+                    motivo = st.text_input("Motivo (Ej: ITV, Cambio de neumáticos, Revisión)")
+                
+                submit_aviso = st.form_submit_button("Guardar Aviso", type="primary")
+                
+                if submit_aviso:
+                    if motivo.strip() == "":
+                        st.error("El motivo es obligatorio.")
+                    else:
+                        id_aviso_cliente = opciones_clientes[cliente_aviso]
+                        fecha_str = fecha_aviso.strftime("%Y-%m-%d") 
+                        db.añadir_aviso(id_aviso_cliente, fecha_str, motivo)
+                        st.success("¡Aviso guardado correctamente!")
+        
+        with tab_avisos2:
+            st.subheader("Lista de Avisos")
+            df_avisos = db.obtener_avisos()
+            
+            if not df_avisos.empty:
+                df_avisos['fecha'] = pd.to_datetime(df_avisos['fecha']).dt.strftime('%d/%m/%Y')
+                
+                st.dataframe(df_avisos, use_container_width=True, hide_index=True)
+                
+                st.divider()
+                st.subheader("Gestionar un aviso")
+                
+                opciones_avisos = {
+                    f"{row['id']} - {row['nombre']} ({row['fecha']} - {row['motivo']})": row['id']
+                    for _, row in df_avisos.iterrows()
+                }
+                
+                aviso_seleccionado = st.selectbox("Selecciona un aviso para gestionar:", options=list(opciones_avisos.keys()))
+                
+                if aviso_seleccionado:
+                    id_aviso = opciones_avisos[aviso_seleccionado]
+                    datos_aviso = df_avisos[df_avisos['id'] == id_aviso].iloc[0]
+                    
+                    nombre_cliente_aviso = datos_aviso['nombre']
+                    mensaje_wa = f"Hola {nombre_cliente_aviso}, te escribimos de Taller Olivares 4T. Te recordamos que tienes pendiente: {datos_aviso['motivo']}. ¿Quieres que te pidamos cita? 🏍️"
+                    mensaje_url = urllib.parse.quote(mensaje_wa)
+                    url_whatsapp = f"https://wa.me/?text={mensaje_url}" 
+                    
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        st.link_button("📱 Enviar Recordatorio WhatsApp", url_whatsapp, use_container_width=True)
+                    with col_g2:
+                        if st.button("✅ Marcar como Completado (Borrar)", type="primary", use_container_width=True):
+                            db.eliminar_aviso(id_aviso)
+                            st.success("Aviso marcado como completado y eliminado de la lista.")
+                            st.rerun()
+            else:
+                st.info("No hay avisos pendientes. ¡Todo al día!")
 
 # --- PESTAÑA 3: PIEZAS ---
 elif st.session_state.pagina == "Piezas":
     st.header("🔧 Buscador de Piezas y Precios")
     st.write("Consulta disponibilidad y precios de repuestos. (Datos de ejemplo)")
 
-    # --- SIMULACIÓN DE BASE DE DATOS ---
     piezas_db = [
         {"Ref": "ACE-10W40", "Pieza": "Aceite Motor 10W40 (1L)", "Marca": "Castrol", "Precio (€)": 12.50, "Stock": 15},
         {"Ref": "PAS-BRE-01", "Pieza": "Pastillas de freno delanteras", "Marca": "Brembo", "Precio (€)": 35.00, "Stock": 8},
@@ -169,10 +231,8 @@ elif st.session_state.pagina == "Piezas":
         {"Ref": "FIL-AIR-02", "Pieza": "Filtro de aire", "Marca": "K&N", "Precio (€)": 45.00, "Stock": 6},
     ]
 
-    # --- BUSCADOR ---
     busqueda = st.text_input("🔍 Buscar por pieza, marca o referencia:", placeholder="Ej: Pastillas, Michelin, o NEU-MIC-17")
 
-    # --- FILTRADO ---
     if busqueda:
         resultados = [
             p for p in piezas_db 
@@ -183,7 +243,6 @@ elif st.session_state.pagina == "Piezas":
     else:
         resultados = piezas_db
 
-    # --- MOSTRAR RESULTADOS ---
     st.divider()
     if resultados:
         st.dataframe(
@@ -201,46 +260,66 @@ elif st.session_state.pagina == "Piezas":
 # --- PESTAÑA 4: PDFs / ALBARANES ---
 elif st.session_state.pagina == "PDFs":
     st.header("📄 Generación de Albaranes")
-    st.write("Crea y descarga el albarán del trabajo realizado.")
+    st.write("Crea el albarán del trabajo. Si el cliente tenía una tarea pendiente, se rellenará sola.")
     
-    # --- CARGAMOS LOS CLIENTES DE LA BASE DE DATOS ---
     df_clientes = db.obtener_clientes()
     
     if df_clientes.empty:
-        st.warning("⚠️ No hay clientes en la base de datos. Ve a la pestaña de 'Clientes' y añade al menos uno para poder generar un albarán.")
+        st.warning("⚠️ No hay clientes en la base de datos. Ve a la pestaña de 'Clientes' y añade al menos uno.")
     else:
-        # Creamos un formulario
+        # SELECCIÓN DE CLIENTE (Fuera del formulario para que actualice el texto dinámicamente)
+        opciones_clientes = {
+            f"{row['nombre']} - {row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'}": row['id'] 
+            for _, row in df_clientes.iterrows()
+        }
+        
+        cliente_seleccionado = st.selectbox("1. Selecciona el Cliente", options=list(opciones_clientes.keys()))
+        
+        id_cliente = opciones_clientes[cliente_seleccionado]
+        datos_cliente = df_clientes[df_clientes['id'] == id_cliente].iloc[0]
+        
+        nombre_cliente = datos_cliente['nombre']
+        matricula_cliente = datos_cliente['matricula'] if pd.notna(datos_cliente['matricula']) else ""
+        
+        # BUSCAMOS AVISOS PENDIENTES DE ESTE CLIENTE
+        df_avisos_pendientes = db.obtener_avisos_cliente(id_cliente)
+        texto_autocompletado = ""
+        aviso_a_borrar = None
+        
+        if not df_avisos_pendientes.empty:
+            st.info("💡 Este cliente tiene tareas pendientes de la pestaña de Avisos.")
+            opciones_pendientes = {row['motivo']: row['id'] for _, row in df_avisos_pendientes.iterrows()}
+            
+            # Desplegable para elegir cuál de las tareas pendientes estamos haciendo
+            tarea_seleccionada = st.selectbox(
+                "2. ¿Qué trabajo vas a realizar hoy?", 
+                options=["-- Selecciona una tarea para autocompletar --"] + list(opciones_pendientes.keys())
+            )
+            
+            if tarea_seleccionada != "-- Selecciona una tarea para autocompletar --":
+                texto_autocompletado = tarea_seleccionada
+                aviso_a_borrar = opciones_pendientes[tarea_seleccionada]
+        
+        # FORMULARIO DEL ALBARÁN
         with st.form("form_albaran"):
-            st.subheader("Datos del Albarán")
+            st.subheader("3. Detalles del trabajo")
             
-            # Desplegable de clientes
-            opciones_clientes = {
-                f"{row['nombre']} - {row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'}": row['id'] 
-                for _, row in df_clientes.iterrows()
-            }
-            
-            cliente_seleccionado = st.selectbox("Selecciona el Cliente", options=list(opciones_clientes.keys()))
-            
-            # Sacamos los datos del cliente seleccionado
-            id_cliente = opciones_clientes[cliente_seleccionado]
-            datos_cliente = df_clientes[df_clientes['id'] == id_cliente].iloc[0]
-            
-            nombre_cliente = datos_cliente['nombre']
-            matricula_cliente = datos_cliente['matricula'] if pd.notna(datos_cliente['matricula']) else ""
-            
-            # Campo para el trabajo
-            trabajo = st.text_area("Trabajo realizado / Piezas")
+            # El texto se rellena solo si has elegido una tarea pendiente arriba
+            trabajo = st.text_area("Trabajo realizado / Piezas", value=texto_autocompletado)
             
             submit = st.form_submit_button("Generar Albarán", type="primary")
         
-        # El botón de descarga va FUERA del formulario
         if submit:
             fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
             
-            # 1. GUARDAMOS EN EL HISTORIAL DE LA MOTO (Base de Datos)
+            # 1. Guardamos el trabajo en el historial de la moto
             db.guardar_historial(id_cliente, fecha_hoy, trabajo)
             
-            # 2. Texto para TXT
+            # 2. Si venía de un aviso, lo eliminamos de pendientes
+            if aviso_a_borrar:
+                db.eliminar_aviso(aviso_a_borrar)
+            
+            # 3. Generamos los documentos
             texto_albaran = f"""
             =========================================
                     TALLER OLIVARES 4T
@@ -255,12 +334,10 @@ elif st.session_state.pagina == "PDFs":
             * Documento no válido como factura.
             """
             
-            # 3. Generamos el PDF
             pdf_bytes = crear_pdf_albaran(nombre_cliente, matricula_cliente, trabajo, fecha_hoy)
             
-            st.success(f"¡Albarán para {nombre_cliente} generado y guardado en su historial! Elige el formato de descarga:")
+            st.success(f"¡Albarán generado! El trabajo se ha guardado en el historial y la tarea pendiente ha sido eliminada.")
             
-            # Botones de descarga en dos columnas
             col_desc1, col_desc2 = st.columns(2)
             
             with col_desc1:
@@ -295,9 +372,8 @@ elif st.session_state.pagina == "Voz/IA":
 # --- PESTAÑA 7: CLIENTES ---
 elif st.session_state.pagina == "Clientes":
     st.header("👥 Gestión de Clientes")
-    st.write("Añade, consulta o modifica los clientes del taller.")
+    st.write("Añade, consulta, modifica o revisa el historial de los clientes.")
 
-    # CUATRO pestañas internas (Añadimos Historial)
     tab1, tab2, tab3, tab4 = st.tabs(["➕ Añadir", "📋 Ver", "✏️ Modificar", "📜 Historial"])
 
     with tab1:
@@ -308,14 +384,25 @@ elif st.session_state.pagina == "Clientes":
             matricula = st.text_input("Matrícula")
             moto = st.text_input("Modelo de Moto")
             
+            st.markdown("---")
+            st.markdown("**¿Tiene algún trabajo pendiente? (Opcional)**")
+            trabajo_pendiente = st.text_area("Trabajo a realizar (Ej: Cambio de aceite, ITV...)")
+            fecha_trabajo = st.date_input("Fecha prevista para el trabajo")
+            
             submit_cliente = st.form_submit_button("Guardar Cliente", type="primary")
             
             if submit_cliente:
                 if nombre.strip() == "":
                     st.error("El nombre es obligatorio.")
                 else:
-                    db.añadir_cliente(nombre, telefono, matricula, moto)
-                    st.success(f"¡Cliente '{nombre}' guardado con éxito!")
+                    nuevo_id = db.añadir_cliente(nombre, telefono, matricula, moto)
+                    
+                    if trabajo_pendiente.strip() != "":
+                        fecha_str = fecha_trabajo.strftime("%Y-%m-%d")
+                        db.añadir_aviso(nuevo_id, fecha_str, trabajo_pendiente)
+                        st.success(f"¡Cliente '{nombre}' guardado y aviso programado!")
+                    else:
+                        st.success(f"¡Cliente '{nombre}' guardado con éxito!")
 
     with tab2:
         st.subheader("Listado de clientes")
@@ -324,7 +411,7 @@ elif st.session_state.pagina == "Clientes":
         if not df_clientes.empty:
             st.dataframe(df_clientes, use_container_width=True, hide_index=True)
         else:
-            st.info("Todavía no hay clientes en la base de datos. ¡Añade el primero en la pestaña anterior!")
+            st.info("Todavía no hay clientes en la base de datos. ¡Añade el primero!")
 
     with tab3:
         st.subheader("Editar un cliente existente")
