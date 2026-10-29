@@ -384,7 +384,16 @@ elif st.session_state.pagina == "Clientes":
             matricula = st.text_input("Matrícula")
             moto = st.text_input("Modelo de Moto")
             
-            # (Las notas internas se han quitado de aquí)
+            # --- AQUÍ ESTÁ LA TAREA A REALIZAR ---
+            st.markdown("---")
+            st.markdown("**🔧 Tarea a realizar (Opcional)**")
+            st.write("Apúntalo aquí para que salte en la pestaña de Avisos cuando toque.")
+            
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                tarea_inicial = st.text_input("Trabajo a realizar (Ej: Cambio de aceite)")
+            with col_t2:
+                fecha_inicial = st.date_input("Fecha para el aviso")
             
             submit_cliente = st.form_submit_button("Guardar Cliente", type="primary")
             
@@ -392,8 +401,14 @@ elif st.session_state.pagina == "Clientes":
                 if nombre.strip() == "":
                     st.error("El nombre es obligatorio.")
                 else:
-                    db.añadir_cliente(nombre, telefono, matricula, moto)
-                    st.success(f"¡Cliente '{nombre}' guardado con éxito!")
+                    nuevo_id = db.añadir_cliente(nombre, telefono, matricula, moto)
+                    
+                    if tarea_inicial.strip() != "":
+                        fecha_str = fecha_inicial.strftime("%Y-%m-%d")
+                        db.añadir_aviso(nuevo_id, fecha_str, tarea_inicial)
+                        st.success(f"¡Cliente '{nombre}' guardado y Tarea apuntada!")
+                    else:
+                        st.success(f"¡Cliente '{nombre}' guardado con éxito!")
 
     with tab2:
         st.subheader("Listado de clientes")
