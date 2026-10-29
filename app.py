@@ -237,7 +237,10 @@ elif st.session_state.pagina == "PDFs":
         if submit:
             fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
             
-            # Texto para TXT
+            # 1. GUARDAMOS EN EL HISTORIAL DE LA MOTO (Base de Datos)
+            db.guardar_historial(id_cliente, fecha_hoy, trabajo)
+            
+            # 2. Texto para TXT
             texto_albaran = f"""
             =========================================
                     TALLER OLIVARES 4T
@@ -252,10 +255,10 @@ elif st.session_state.pagina == "PDFs":
             * Documento no válido como factura.
             """
             
-            # Generamos el PDF pasando los datos del cliente seleccionado
+            # 3. Generamos el PDF
             pdf_bytes = crear_pdf_albaran(nombre_cliente, matricula_cliente, trabajo, fecha_hoy)
             
-            st.success(f"¡Albarán para {nombre_cliente} generado con éxito! Elige el formato de descarga:")
+            st.success(f"¡Albarán para {nombre_cliente} generado y guardado en su historial! Elige el formato de descarga:")
             
             # Botones de descarga en dos columnas
             col_desc1, col_desc2 = st.columns(2)
@@ -294,8 +297,8 @@ elif st.session_state.pagina == "Clientes":
     st.header("👥 Gestión de Clientes")
     st.write("Añade, consulta o modifica los clientes del taller.")
 
-    # Tres pestañas internas
-    tab1, tab2, tab3 = st.tabs(["➕ Añadir Cliente", "📋 Ver Clientes", "✏️ Modificar Cliente"])
+    # CUATRO pestañas internas (Añadimos Historial)
+    tab1, tab2, tab3, tab4 = st.tabs(["➕ Añadir", "📋 Ver", "✏️ Modificar", "📜 Historial"])
 
     with tab1:
         with st.form("form_nuevo_cliente", clear_on_submit=True):
@@ -328,7 +331,6 @@ elif st.session_state.pagina == "Clientes":
         df_clientes = db.obtener_clientes()
         
         if not df_clientes.empty:
-            # Creamos un diccionario para el desplegable: "ID - Nombre (Matrícula)" -> ID
             opciones = {
                 f"{row['id']} - {row['nombre']} ({row['matricula'] if row['matricula'] else 'Sin matrícula'})": row['id'] 
                 for _, row in df_clientes.iterrows()
@@ -338,14 +340,11 @@ elif st.session_state.pagina == "Clientes":
             
             if cliente_seleccionado:
                 id_sel = opciones[cliente_seleccionado]
-                # Buscamos los datos actuales de ese ID
                 datos_actuales = df_clientes[df_clientes['id'] == id_sel].iloc[0]
                 
-                # Formulario rellenado con los datos actuales
                 with st.form("form_editar_cliente"):
                     edit_nombre = st.text_input("Nombre completo *", value=datos_actuales['nombre'])
                     
-                    # Controlamos si los campos están vacíos en la BD para que no falle Streamlit
                     val_tel = datos_actuales['telefono'] if pd.notna(datos_actuales['telefono']) else ""
                     val_mat = datos_actuales['matricula'] if pd.notna(datos_actuales['matricula']) else ""
                     val_mot = datos_actuales['moto'] if pd.notna(datos_actuales['moto']) else ""
@@ -362,9 +361,31 @@ elif st.session_state.pagina == "Clientes":
                         else:
                             db.actualizar_cliente(id_sel, edit_nombre, edit_telefono, edit_matricula, edit_moto)
                             st.success(f"¡Cliente '{edit_nombre}' actualizado con éxito!")
-                            st.rerun() # Refrescamos la app para ver los cambios en la tabla
+                            st.rerun() 
         else:
             st.info("No hay clientes registrados para modificar.")
+
+    with tab4:
+        st.subheader("Historial de la Moto")
+        df_clientes = db.obtener_clientes()
+        
+        if not df_clientes.empty:
+            opciones_hist = {
+                f"{row['nombre']} - {row['moto'] if pd.notna(row['moto']) else 'Moto'} ({row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'})": row['id'] 
+                for _, row in df_clientes.iterrows()
+            }
+            
+            cliente_hist = st.selectbox("Selecciona una moto para ver su historial:", options=list(opciones_hist.keys()))
+            id_hist = opciones_hist[cliente_hist]
+            
+            df_historial = db.obtener_historial(id_hist)
+            
+            if not df_historial.empty:
+                st.dataframe(df_historial, use_container_width=True, hide_index=True)
+            else:
+                st.info("Esta moto todavía no tiene trabajos registrados. Genera un albarán para empezar su historial.")
+        else:
+            st.info("No hay clientes en la base de datos.")
 
 # --- PESTAÑA 8: AJUSTES ---
 elif st.session_state.pagina == "Ajustes":
