@@ -7,7 +7,7 @@ import datetime # Para la fecha del albarán
 # ==========================================
 st.set_page_config(page_title="Taller Olivares 4T", layout="wide", page_icon="🏍️")
 
-# LOGO TRANSPARENTE (Asegúrate de que el archivo se llama así)
+# LOGO TRANSPARENTE
 st.logo("logo_transparent.png", size="large")
 
 # ==========================================
@@ -97,35 +97,38 @@ elif st.session_state.pagina == "PDFs":
     st.header("📄 Generación de Albaranes")
     st.write("Crea y descarga el albarán del trabajo realizado.")
     
+    # Formulario para recoger datos
     with st.form("form_albaran"):
         cliente = st.text_input("Nombre del Cliente")
         matricula = st.text_input("Matrícula de la Moto")
         trabajo = st.text_area("Trabajo realizado / Piezas")
         submit = st.form_submit_button("Generar Albarán")
+    
+    # El botón de descarga va FUERA del formulario (esto soluciona el error)
+    if submit:
+        fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
+        texto_albaran = f"""
+        =========================================
+                TALLER OLIVARES 4T
+        =========================================
+        Fecha: {fecha_hoy}
+        Cliente: {cliente}
+        Matrícula: {matricula}
+        -----------------------------------------
+        DETALLES DEL TRABAJO:
+        {trabajo}
+        -----------------------------------------
+        * Documento no válido como factura.
+        """
+        st.success("¡Albarán generado con éxito!")
         
-        if submit:
-            fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
-            texto_albaran = f"""
-            =========================================
-                    TALLER OLIVARES 4T
-            =========================================
-            Fecha: {fecha_hoy}
-            Cliente: {cliente}
-            Matrícula: {matricula}
-            -----------------------------------------
-            DETALLES DEL TRABAJO:
-            {trabajo}
-            -----------------------------------------
-            * Documento no válido como factura.
-            """
-            st.success("¡Albarán generado con éxito!")
-            st.download_button(
-                label="⬇️ Descargar Albarán en TXT",
-                data=texto_albaran,
-                file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.txt",
-                mime="text/plain",
-                type="primary"
-            )
+        st.download_button(
+            label="⬇️ Descargar Albarán en TXT",
+            data=texto_albaran,
+            file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.txt",
+            mime="text/plain",
+            type="primary"
+        )
 
 # --- PESTAÑA 5: INVENTARIO ---
 elif st.session_state.pagina == "Inventario":
