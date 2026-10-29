@@ -3,6 +3,7 @@ import urllib.parse # Para el botón de WhatsApp
 import datetime # Para la fecha del albarán
 import os # Para comprobar si existe el logo
 from fpdf import FPDF # Para generar el PDF
+import db # Nuestro gestor de base de datos SQLite
 
 # ==========================================
 # FUNCIÓN PARA GENERAR EL PDF
@@ -268,8 +269,37 @@ elif st.session_state.pagina == "Voz/IA":
 
 # --- PESTAÑA 7: CLIENTES ---
 elif st.session_state.pagina == "Clientes":
-    st.header("👥 Clientes")
-    st.write("Base de datos de clientes del taller.")
+    st.header("👥 Gestión de Clientes")
+    st.write("Añade y consulta los clientes del taller.")
+
+    # Pestañas internas para separar "Añadir" de "Ver"
+    tab1, tab2 = st.tabs(["➕ Añadir Cliente", "📋 Ver Clientes"])
+
+    with tab1:
+        with st.form("form_nuevo_cliente", clear_on_submit=True):
+            st.subheader("Datos del nuevo cliente")
+            nombre = st.text_input("Nombre completo *")
+            telefono = st.text_input("Teléfono")
+            matricula = st.text_input("Matrícula")
+            moto = st.text_input("Modelo de Moto")
+            
+            submit_cliente = st.form_submit_button("Guardar Cliente", type="primary")
+            
+            if submit_cliente:
+                if nombre.strip() == "":
+                    st.error("El nombre es obligatorio.")
+                else:
+                    db.añadir_cliente(nombre, telefono, matricula, moto)
+                    st.success(f"¡Cliente '{nombre}' guardado con éxito!")
+
+    with tab2:
+        st.subheader("Listado de clientes")
+        df_clientes = db.obtener_clientes()
+        
+        if not df_clientes.empty:
+            st.dataframe(df_clientes, use_container_width=True, hide_index=True)
+        else:
+            st.info("Todavía no hay clientes en la base de datos. ¡Añade el primero en la pestaña anterior!")
 
 # --- PESTAÑA 8: AJUSTES ---
 elif st.session_state.pagina == "Ajustes":
