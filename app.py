@@ -203,58 +203,81 @@ elif st.session_state.pagina == "PDFs":
     st.header("📄 Generación de Albaranes")
     st.write("Crea y descarga el albarán del trabajo realizado.")
     
-    # Formulario para recoger datos
-    with st.form("form_albaran"):
-        cliente = st.text_input("Nombre del Cliente")
-        matricula = st.text_input("Matrícula de la Moto")
-        trabajo = st.text_area("Trabajo realizado / Piezas")
-        submit = st.form_submit_button("Generar Albarán")
+    # --- CARGAMOS LOS CLIENTES DE LA BASE DE DATOS ---
+    df_clientes = db.obtener_clientes()
     
-    # El botón de descarga va FUERA del formulario
-    if submit:
-        fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
-        
-        # Texto para TXT
-        texto_albaran = f"""
-        =========================================
-                TALLER OLIVARES 4T
-        =========================================
-        Fecha: {fecha_hoy}
-        Cliente: {cliente}
-        Matrícula: {matricula}
-        -----------------------------------------
-        DETALLES DEL TRABAJO:
-        {trabajo}
-        -----------------------------------------
-        * Documento no válido como factura.
-        """
-        
-        # Generamos el PDF
-        pdf_bytes = crear_pdf_albaran(cliente, matricula, trabajo, fecha_hoy)
-        
-        st.success("¡Albarán generado con éxito! Elige el formato de descarga:")
-        
-        # Botones de descarga en dos columnas
-        col_desc1, col_desc2 = st.columns(2)
-        
-        with col_desc1:
-            st.download_button(
-                label="⬇️ Descargar en PDF",
-                data=pdf_bytes,
-                file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
+    if df_clientes.empty:
+        st.warning("⚠️ No hay clientes en la base de datos. Ve a la pestaña de 'Clientes' y añade al menos uno para poder generar un albarán.")
+    else:
+        # Creamos un formulario
+        with st.form("form_albaran"):
+            st.subheader("Datos del Albarán")
             
-        with col_desc2:
-            st.download_button(
-                label="⬇️ Descargar en TXT",
-                data=texto_albaran,
-                file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+            # Desplegable de clientes
+            opciones_clientes = {
+                f"{row['nombre']} - {row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'}": row['id'] 
+                for _, row in df_clientes.iterrows()
+            }
+            
+            cliente_seleccionado = st.selectbox("Selecciona el Cliente", options=list(opciones_clientes.keys()))
+            
+            # Sacamos los datos del cliente seleccionado
+            id_cliente = opciones_clientes[cliente_seleccionado]
+            datos_cliente = df_clientes[df_clientes['id'] == id_cliente].iloc[0]
+            
+            nombre_cliente = datos_cliente['nombre']
+            matricula_cliente = datos_cliente['matricula'] if pd.notna(datos_cliente['matricula']) else ""
+            
+            # Campo para el trabajo
+            trabajo = st.text_area("Trabajo realizado / Piezas")
+            
+            submit = st.form_submit_button("Generar Albarán", type="primary")
+        
+        # El botón de descarga va FUERA del formulario
+        if submit:
+            fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
+            
+            # Texto para TXT
+            texto_albaran = f"""
+            =========================================
+                    TALLER OLIVARES 4T
+            =========================================
+            Fecha: {fecha_hoy}
+            Cliente: {nombre_cliente}
+            Matrícula: {matricula_cliente}
+            -----------------------------------------
+            DETALLES DEL TRABAJO:
+            {trabajo}
+            -----------------------------------------
+            * Documento no válido como factura.
+            """
+            
+            # Generamos el PDF pasando los datos del cliente seleccionado
+            pdf_bytes = crear_pdf_albaran(nombre_cliente, matricula_cliente, trabajo, fecha_hoy)
+            
+            st.success(f"¡Albarán para {nombre_cliente} generado con éxito! Elige el formato de descarga:")
+            
+            # Botones de descarga en dos columnas
+            col_desc1, col_desc2 = st.columns(2)
+            
+            with col_desc1:
+                st.download_button(
+                    label="⬇️ Descargar en PDF",
+                    data=pdf_bytes,
+                    file_name=f"Albaran_{nombre_cliente}_{fecha_hoy.replace('/','-')}.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
+                
+            with col_desc2:
+                st.download_button(
+                    label="⬇️ Descargar en TXT",
+                    data=texto_albaran,
+                    file_name=f"Albaran_{nombre_cliente}_{fecha_hoy.replace('/','-')}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
 
 # --- PESTAÑA 5: INVENTARIO ---
 elif st.session_state.pagina == "Inventario":
