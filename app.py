@@ -4,6 +4,7 @@ import datetime # Para la fecha del albarán
 import os # Para comprobar si existe el logo
 from fpdf import FPDF # Para generar el PDF
 import db # Nuestro gestor de base de datos SQLite
+import pandas as pd # Para manejar datos de la BD
 
 # ==========================================
 # FUNCIÓN PARA GENERAR EL PDF
@@ -16,11 +17,9 @@ def crear_pdf_albaran(cliente, matricula, trabajo, fecha):
     logo_path = "logo_transparent.png"
     logo_w = 35 # Ancho del logo en mm
     if os.path.exists(logo_path):
-        # Centrar el logo: (Ancho del papel 210 - Ancho del logo) / 2
         x_logo = (210 - logo_w) / 2
         pdf.image(logo_path, x=x_logo, y=10, w=logo_w) 
     
-    # Bajamos el cursor debajo del logo para escribir los textos
     pdf.set_y(45) 
     
     # --- TEXTO DE CABECERA CENTRADO ---
@@ -270,10 +269,10 @@ elif st.session_state.pagina == "Voz/IA":
 # --- PESTAÑA 7: CLIENTES ---
 elif st.session_state.pagina == "Clientes":
     st.header("👥 Gestión de Clientes")
-    st.write("Añade y consulta los clientes del taller.")
+    st.write("Añade, consulta o modifica los clientes del taller.")
 
-    # Pestañas internas para separar "Añadir" de "Ver"
-    tab1, tab2 = st.tabs(["➕ Añadir Cliente", "📋 Ver Clientes"])
+    # Tres pestañas internas
+    tab1, tab2, tab3 = st.tabs(["➕ Añadir Cliente", "📋 Ver Clientes", "✏️ Modificar Cliente"])
 
     with tab1:
         with st.form("form_nuevo_cliente", clear_on_submit=True):
@@ -300,6 +299,49 @@ elif st.session_state.pagina == "Clientes":
             st.dataframe(df_clientes, use_container_width=True, hide_index=True)
         else:
             st.info("Todavía no hay clientes en la base de datos. ¡Añade el primero en la pestaña anterior!")
+
+    with tab3:
+        st.subheader("Editar un cliente existente")
+        df_clientes = db.obtener_clientes()
+        
+        if not df_clientes.empty:
+            # Creamos un diccionario para el desplegable: "ID - Nombre (Matrícula)" -> ID
+            opciones = {
+                f"{row['id']} - {row['nombre']} ({row['matricula'] if row['matricula'] else 'Sin matrícula'})": row['id'] 
+                for _, row in df_clientes.iterrows()
+            }
+            
+            cliente_seleccionado = st.selectbox("Selecciona el cliente a modificar:", options=list(opciones.keys()))
+            
+            if cliente_seleccionado:
+                id_sel = opciones[cliente_seleccionado]
+                # Buscamos los datos actuales de ese ID
+                datos_actuales = df_clientes[df_clientes['id'] == id_sel].iloc[0]
+                
+                # Formulario rellenado con los datos actuales
+                with st.form("form_editar_cliente"):
+                    edit_nombre = st.text_input("Nombre completo *", value=datos_actuales['nombre'])
+                    
+                    # Controlamos si los campos están vacíos en la BD para que no falle Streamlit
+                    val_tel = datos_actuales['telefono'] if pd.notna(datos_actuales['telefono']) else ""
+                    val_mat = datos_actuales['matricula'] if pd.notna(datos_actuales['matricula']) else ""
+                    val_mot = datos_actuales['moto'] if pd.notna(datos_actuales['moto']) else ""
+                    
+                    edit_telefono = st.text_input("Teléfono", value=val_tel)
+                    edit_matricula = st.text_input("Matrícula", value=val_mat)
+                    edit_moto = st.text_input("Modelo de Moto", value=val_mot)
+                    
+                    submit_edit = st.form_submit_button("Actualizar Cliente", type="primary")
+                    
+                    if submit_edit:
+                        if edit_nombre.strip() == "":
+                            st.error("El nombre es obligatorio.")
+                        else:
+                            db.actualizar_cliente(id_sel, edit_nombre, edit_telefono, edit_matricula, edit_moto)
+                            st.success(f"¡Cliente '{edit_nombre}' actualizado con éxito!")
+                            st.rerun() # Refrescamos la app para ver los cambios en la tabla
+        else:
+            st.info("No hay clientes registrados para modificar.")
 
 # --- PESTAÑA 8: AJUSTES ---
 elif st.session_state.pagina == "Ajustes":
