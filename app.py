@@ -140,15 +140,15 @@ if st.session_state.pagina == "Inicio":
 
 # --- PESTAÑA 2: AVISOS / TAREAS ---
 elif st.session_state.pagina == "Avisos":
-    st.header("📅 Avisos y Tareas Pendientes")
-    st.write("Programa futuros trabajos para tus clientes y no dejes que se te pase ninguno.")
+    st.header("📅 Avisos y Tareas (Agenda Interna)")
+    st.write("Notas privadas del taller. El cliente no ve esto. Cuando llegue la fecha, tú decides si avisarle o no.")
     
     df_clientes = db.obtener_clientes()
     
     if df_clientes.empty:
         st.warning("⚠️ No hay clientes en la base de datos. Añade uno primero en la pestaña 'Clientes'.")
     else:
-        tab_avisos1, tab_avisos2 = st.tabs(["➕ Crear Aviso Manual", "📋 Ver Avisos"])
+        tab_avisos1, tab_avisos2 = st.tabs(["➕ Crear Nota Manual", "📋 Ver Avisos"])
         
         with tab_avisos1:
             with st.form("form_nuevo_aviso", clear_on_submit=True):
@@ -163,23 +163,23 @@ elif st.session_state.pagina == "Avisos":
                 
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    fecha_aviso = st.date_input("Fecha del aviso")
+                    fecha_aviso = st.date_input("Fecha para el aviso")
                 with col_f2:
-                    motivo = st.text_input("Motivo (Ej: ITV, Cambio de neumáticos)")
+                    motivo = st.text_input("Nota interna (Ej: Recordar cambio de correa, ITV...)")
                 
                 submit_aviso = st.form_submit_button("Guardar Aviso", type="primary")
                 
                 if submit_aviso:
                     if motivo.strip() == "":
-                        st.error("El motivo es obligatorio.")
+                        st.error("La nota es obligatoria.")
                     else:
                         id_aviso_cliente = opciones_clientes[cliente_aviso]
                         fecha_str = fecha_aviso.strftime("%Y-%m-%d") 
                         db.añadir_aviso(id_aviso_cliente, fecha_str, motivo)
-                        st.success("¡Aviso guardado correctamente!")
+                        st.success("¡Aviso interno guardado correctamente!")
         
         with tab_avisos2:
-            st.subheader("Lista de Avisos")
+            st.subheader("Lista de Avisos Internos")
             df_avisos = db.obtener_avisos()
             
             if not df_avisos.empty:
@@ -205,9 +205,10 @@ elif st.session_state.pagina == "Avisos":
                     mensaje_url = urllib.parse.quote(mensaje_wa)
                     url_whatsapp = f"https://wa.me/?text={mensaje_url}" 
                     
+                    st.info("💡 Tú decides: Puedes mandarle un WhatsApp al cliente o simplemente borrar el aviso si ya lo has gestionado.")
                     col_g1, col_g2 = st.columns(2)
                     with col_g1:
-                        st.link_button("📱 Enviar Recordatorio WhatsApp", url_whatsapp, use_container_width=True)
+                        st.link_button("📱 Avisar al cliente por WhatsApp", url_whatsapp, use_container_width=True)
                     with col_g2:
                         if st.button("✅ Marcar como Completado (Borrar)", type="primary", use_container_width=True):
                             db.eliminar_aviso(id_aviso)
@@ -258,8 +259,8 @@ elif st.session_state.pagina == "Piezas":
 
 # --- PESTAÑA 4: PDFs / ALBARANES ---
 elif st.session_state.pagina == "PDFs":
-    st.header("📄 Generación de Albaranes")
-    st.write("Crea el albarán del trabajo. Al final puedes programar un aviso automático.")
+    st.header("📄 Generación de Albaranes de Recogida")
+    st.write("Crea el albarán cuando el cliente venga a recoger la moto.")
     
     df_clientes = db.obtener_clientes()
     
@@ -279,7 +280,7 @@ elif st.session_state.pagina == "PDFs":
         nombre_cliente = datos_cliente['nombre']
         matricula_cliente = datos_cliente['matricula'] if pd.notna(datos_cliente['matricula']) else ""
         
-        # MOSTRAR EL HISTORIAL AQUÍ TAMBIÉN
+        # MOSTRAR EL HISTORIAL
         df_historial = db.obtener_historial(id_cliente)
         with st.expander("📜 Ver historial de trabajos anteriores de esta moto", expanded=False):
             if not df_historial.empty:
@@ -289,20 +290,20 @@ elif st.session_state.pagina == "PDFs":
         
         # FORMULARIO DEL ALBARÁN
         with st.form("form_albaran"):
-            st.subheader("2. Detalles del trabajo")
+            st.subheader("2. Detalles del trabajo (Lo que ve el cliente)")
             
             trabajo = st.text_area("Trabajo realizado / Piezas")
             
-            # --- BLOQUE OPCIONAL: PRÓXIMO AVISO ---
+            # --- BLOQUE OPCIONAL: NOTA INTERNA FUTURA ---
             st.markdown("---")
-            st.markdown("**🔔 Programar próximo aviso (Opcional)**")
-            st.write("Añade notas para el futuro y la app te avisará en la pestaña de Avisos.")
+            st.markdown("**🔔 Nota para el mecánico (Opcional)**")
+            st.write("El cliente NO verá esto en el albarán. Sirve para que te salte un aviso en la agenda del taller.")
             
             col_av1, col_av2 = st.columns(2)
             with col_av1:
-                recordatorio_motivo = st.text_input("Motivo del aviso (Ej: ITV en 1 año, Cambio de correa en 5 meses)")
+                recordatorio_motivo = st.text_input("Nota (Ej: Avisar en 5 meses para correa)")
             with col_av2:
-                recordatorio_fecha = st.date_input("Fecha para el aviso")
+                recordatorio_fecha = st.date_input("Fecha para que te salte el aviso")
             
             submit = st.form_submit_button("Generar Albarán y Guardar", type="primary")
         
@@ -312,11 +313,11 @@ elif st.session_state.pagina == "PDFs":
             # 1. Guardamos el trabajo en el historial de la moto
             db.guardar_historial(id_cliente, fecha_hoy, trabajo)
             
-            # 2. Si ha rellenado el motivo del aviso, lo creamos automáticamente
+            # 2. Si ha rellenado la nota interna, la guardamos en Avisos
             if recordatorio_motivo.strip() != "":
                 fecha_aviso_str = recordatorio_fecha.strftime("%Y-%m-%d")
                 db.añadir_aviso(id_cliente, fecha_aviso_str, recordatorio_motivo)
-                st.success(f"¡Albarán generado y Aviso programado para el {recordatorio_fecha.strftime('%d/%m/%Y')}!")
+                st.success(f"¡Albarán generado y Aviso interno programado para el {recordatorio_fecha.strftime('%d/%m/%Y')}!")
             else:
                 st.success(f"¡Albarán generado con éxito!")
             
@@ -373,7 +374,6 @@ elif st.session_state.pagina == "Clientes":
     st.header("👥 Gestión de Clientes")
     st.write("Añade, consulta, modifica o revisa el historial de los clientes.")
 
-    # AHORA HAY 3 PESTAÑAS (Hemos fusionado Ver + Historial)
     tab1, tab2, tab3 = st.tabs(["➕ Añadir", "📋 Ver / Historial", "✏️ Modificar"])
 
     with tab1:
@@ -383,6 +383,8 @@ elif st.session_state.pagina == "Clientes":
             telefono = st.text_input("Teléfono")
             matricula = st.text_input("Matrícula")
             moto = st.text_input("Modelo de Moto")
+            
+            # (Las notas internas se han quitado de aquí)
             
             submit_cliente = st.form_submit_button("Guardar Cliente", type="primary")
             
@@ -403,7 +405,6 @@ elif st.session_state.pagina == "Clientes":
             st.divider()
             st.subheader("📜 Historial de la Moto")
             
-            # Desplegable para ver el historial de un cliente concreto desde aquí
             opciones_hist = {
                 f"{row['nombre']} - {row['moto'] if pd.notna(row['moto']) else 'Moto'} ({row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'})": row['id'] 
                 for _, row in df_clientes.iterrows()
