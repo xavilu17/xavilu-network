@@ -1,6 +1,59 @@
 import streamlit as st
 import urllib.parse # Para el botón de WhatsApp
 import datetime # Para la fecha del albarán
+import os # Para comprobar si existe el logo
+from fpdf import FPDF # Para generar el PDF
+
+# ==========================================
+# FUNCIÓN PARA GENERAR EL PDF
+# ==========================================
+def crear_pdf_albaran(cliente, matricula, trabajo, fecha):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # --- CABECERA CON LOGO ---
+    logo_path = "logo_transparent.png"
+    if os.path.exists(logo_path):
+        # Ajusta el ancho (w) y posición (x, y) según tu logo
+        pdf.image(logo_path, x=10, y=10, w=35) 
+    
+    # Texto de la cabecera (a la derecha del logo)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_xy(50, 12)
+    pdf.cell(0, 8, "TALLER OLIVARES 4T", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_x(50)
+    pdf.cell(0, 5, "C/ Ejemplo, 123 - Tel: 600 000 000", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.ln(15) # Espacio debajo de la cabecera
+    
+    # --- DATOS DEL ALBARÁN ---
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, f"ALBARÁN - Fecha: {fecha}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Cliente: {cliente}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Matrícula: {matricula}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    
+    # --- DETALLES DEL TRABAJO ---
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 8, "Detalles del trabajo:", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("Helvetica", "", 11)
+    # multi_cell permite escribir texto largo y que salte de línea solo
+    pdf.multi_cell(0, 8, trabajo) 
+    
+    pdf.ln(15)
+    
+    # --- PIE DE PÁGINA ---
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.cell(0, 10, "* Documento no válido como factura.", new_x="LMARGIN", new_y="NEXT")
+    
+    # Devolvemos el PDF en bytes para que Streamlit lo pueda descargar
+    return bytes(pdf.output())
 
 # ==========================================
 # 1. CONFIGURACIÓN Y LOGO
@@ -104,9 +157,11 @@ elif st.session_state.pagina == "PDFs":
         trabajo = st.text_area("Trabajo realizado / Piezas")
         submit = st.form_submit_button("Generar Albarán")
     
-    # El botón de descarga va FUERA del formulario (esto soluciona el error)
+    # El botón de descarga va FUERA del formulario
     if submit:
         fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
+        
+        # Generamos el texto para TXT
         texto_albaran = f"""
         =========================================
                 TALLER OLIVARES 4T
@@ -120,15 +175,33 @@ elif st.session_state.pagina == "PDFs":
         -----------------------------------------
         * Documento no válido como factura.
         """
-        st.success("¡Albarán generado con éxito!")
         
-        st.download_button(
-            label="⬇️ Descargar Albarán en TXT",
-            data=texto_albaran,
-            file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.txt",
-            mime="text/plain",
-            type="primary"
-        )
+        # Generamos el PDF pasando los datos
+        pdf_bytes = crear_pdf_albaran(cliente, matricula, trabajo, fecha_hoy)
+        
+        st.success("¡Albarán generado con éxito! Elige el formato de descarga:")
+        
+        # Colocamos los botones en dos columnas
+        col_desc1, col_desc2 = st.columns(2)
+        
+        with col_desc1:
+            st.download_button(
+                label="⬇️ Descargar en PDF",
+                data=pdf_bytes,
+                file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+            
+        with col_desc2:
+            st.download_button(
+                label="⬇️ Descargar en TXT",
+                data=texto_albaran,
+                file_name=f"Albaran_{cliente}_{fecha_hoy.replace('/','-')}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
 
 # --- PESTAÑA 5: INVENTARIO ---
 elif st.session_state.pagina == "Inventario":
