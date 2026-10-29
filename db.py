@@ -34,9 +34,18 @@ def añadir_cliente(nombre, telefono, matricula, moto):
 
 def obtener_clientes():
     with crear_conexion() as conn:
-        # Usamos pandas para que Streamlit lo muestre en tabla muy fácil
         df = pd.read_sql_query("SELECT * FROM clientes", conn)
         return df
+
+def actualizar_cliente(id_cliente, nombre, telefono, matricula, moto):
+    with crear_conexion() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE clientes 
+            SET nombre=?, telefono=?, matricula=?, moto=? 
+            WHERE id=?
+        """, (nombre, telefono, matricula, moto, id_cliente))
+        conn.commit()
 
 # Inicializamos la base de datos al importar este archivo
 inicializar_bd()
