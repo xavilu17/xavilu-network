@@ -148,7 +148,7 @@ elif st.session_state.pagina == "Avisos":
     if df_clientes.empty:
         st.warning("⚠️ No hay clientes en la base de datos. Añade uno primero en la pestaña 'Clientes'.")
     else:
-        tab_avisos1, tab_avisos2 = st.tabs(["➕ Crear Aviso", "📋 Ver Avisos"])
+        tab_avisos1, tab_avisos2 = st.tabs(["➕ Crear Aviso Manual", "📋 Ver Avisos"])
         
         with tab_avisos1:
             with st.form("form_nuevo_aviso", clear_on_submit=True):
@@ -165,7 +165,7 @@ elif st.session_state.pagina == "Avisos":
                 with col_f1:
                     fecha_aviso = st.date_input("Fecha del aviso")
                 with col_f2:
-                    motivo = st.text_input("Motivo (Ej: ITV, Cambio de neumáticos, Revisión)")
+                    motivo = st.text_input("Motivo (Ej: ITV, Cambio de neumáticos)")
                 
                 submit_aviso = st.form_submit_button("Guardar Aviso", type="primary")
                 
@@ -184,7 +184,6 @@ elif st.session_state.pagina == "Avisos":
             
             if not df_avisos.empty:
                 df_avisos['fecha'] = pd.to_datetime(df_avisos['fecha']).dt.strftime('%d/%m/%Y')
-                
                 st.dataframe(df_avisos, use_container_width=True, hide_index=True)
                 
                 st.divider()
@@ -212,7 +211,7 @@ elif st.session_state.pagina == "Avisos":
                     with col_g2:
                         if st.button("✅ Marcar como Completado (Borrar)", type="primary", use_container_width=True):
                             db.eliminar_aviso(id_aviso)
-                            st.success("Aviso marcado como completado y eliminado de la lista.")
+                            st.success("Aviso eliminado.")
                             st.rerun()
             else:
                 st.info("No hay avisos pendientes. ¡Todo al día!")
@@ -231,7 +230,7 @@ elif st.session_state.pagina == "Piezas":
         {"Ref": "FIL-AIR-02", "Pieza": "Filtro de aire", "Marca": "K&N", "Precio (€)": 45.00, "Stock": 6},
     ]
 
-    busqueda = st.text_input("🔍 Buscar por pieza, marca o referencia:", placeholder="Ej: Pastillas, Michelin, o NEU-MIC-17")
+    busqueda = st.text_input("🔍 Buscar por pieza, marca o referencia:", placeholder="Ej: Pastillas, Michelin...")
 
     if busqueda:
         resultados = [
@@ -255,19 +254,18 @@ elif st.session_state.pagina == "Piezas":
             }
         )
     else:
-        st.warning("No se encontraron piezas que coincidan con la búsqueda. Prueba con otra palabra.")
+        st.warning("No se encontraron piezas que coincidan con la búsqueda.")
 
 # --- PESTAÑA 4: PDFs / ALBARANES ---
 elif st.session_state.pagina == "PDFs":
     st.header("📄 Generación de Albaranes")
-    st.write("Crea el albarán del trabajo. Si el cliente tenía una tarea pendiente, se rellenará sola.")
+    st.write("Crea el albarán del trabajo. Al final puedes programar un aviso automático.")
     
     df_clientes = db.obtener_clientes()
     
     if df_clientes.empty:
         st.warning("⚠️ No hay clientes en la base de datos. Ve a la pestaña de 'Clientes' y añade al menos uno.")
     else:
-        # SELECCIÓN DE CLIENTE (Fuera del formulario para que actualice el texto dinámicamente)
         opciones_clientes = {
             f"{row['nombre']} - {row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'}": row['id'] 
             for _, row in df_clientes.iterrows()
@@ -281,33 +279,32 @@ elif st.session_state.pagina == "PDFs":
         nombre_cliente = datos_cliente['nombre']
         matricula_cliente = datos_cliente['matricula'] if pd.notna(datos_cliente['matricula']) else ""
         
-        # BUSCAMOS AVISOS PENDIENTES DE ESTE CLIENTE
-        df_avisos_pendientes = db.obtener_avisos_cliente(id_cliente)
-        texto_autocompletado = ""
-        aviso_a_borrar = None
-        
-        if not df_avisos_pendientes.empty:
-            st.info("💡 Este cliente tiene tareas pendientes de la pestaña de Avisos.")
-            opciones_pendientes = {row['motivo']: row['id'] for _, row in df_avisos_pendientes.iterrows()}
-            
-            # Desplegable para elegir cuál de las tareas pendientes estamos haciendo
-            tarea_seleccionada = st.selectbox(
-                "2. ¿Qué trabajo vas a realizar hoy?", 
-                options=["-- Selecciona una tarea para autocompletar --"] + list(opciones_pendientes.keys())
-            )
-            
-            if tarea_seleccionada != "-- Selecciona una tarea para autocompletar --":
-                texto_autocompletado = tarea_seleccionada
-                aviso_a_borrar = opciones_pendientes[tarea_seleccionada]
+        # MOSTRAR EL HISTORIAL AQUÍ TAMBIÉN
+        df_historial = db.obtener_historial(id_cliente)
+        with st.expander("📜 Ver historial de trabajos anteriores de esta moto", expanded=False):
+            if not df_historial.empty:
+                st.dataframe(df_historial, use_container_width=True, hide_index=True)
+            else:
+                st.info("Todavía no hay trabajos registrados para esta moto.")
         
         # FORMULARIO DEL ALBARÁN
         with st.form("form_albaran"):
-            st.subheader("3. Detalles del trabajo")
+            st.subheader("2. Detalles del trabajo")
             
-            # El texto se rellena solo si has elegido una tarea pendiente arriba
-            trabajo = st.text_area("Trabajo realizado / Piezas", value=texto_autocompletado)
+            trabajo = st.text_area("Trabajo realizado / Piezas")
             
-            submit = st.form_submit_button("Generar Albarán", type="primary")
+            # --- BLOQUE OPCIONAL: PRÓXIMO AVISO ---
+            st.markdown("---")
+            st.markdown("**🔔 Programar próximo aviso (Opcional)**")
+            st.write("Añade notas para el futuro y la app te avisará en la pestaña de Avisos.")
+            
+            col_av1, col_av2 = st.columns(2)
+            with col_av1:
+                recordatorio_motivo = st.text_input("Motivo del aviso (Ej: ITV en 1 año, Cambio de correa en 5 meses)")
+            with col_av2:
+                recordatorio_fecha = st.date_input("Fecha para el aviso")
+            
+            submit = st.form_submit_button("Generar Albarán y Guardar", type="primary")
         
         if submit:
             fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
@@ -315,9 +312,13 @@ elif st.session_state.pagina == "PDFs":
             # 1. Guardamos el trabajo en el historial de la moto
             db.guardar_historial(id_cliente, fecha_hoy, trabajo)
             
-            # 2. Si venía de un aviso, lo eliminamos de pendientes
-            if aviso_a_borrar:
-                db.eliminar_aviso(aviso_a_borrar)
+            # 2. Si ha rellenado el motivo del aviso, lo creamos automáticamente
+            if recordatorio_motivo.strip() != "":
+                fecha_aviso_str = recordatorio_fecha.strftime("%Y-%m-%d")
+                db.añadir_aviso(id_cliente, fecha_aviso_str, recordatorio_motivo)
+                st.success(f"¡Albarán generado y Aviso programado para el {recordatorio_fecha.strftime('%d/%m/%Y')}!")
+            else:
+                st.success(f"¡Albarán generado con éxito!")
             
             # 3. Generamos los documentos
             texto_albaran = f"""
@@ -335,8 +336,6 @@ elif st.session_state.pagina == "PDFs":
             """
             
             pdf_bytes = crear_pdf_albaran(nombre_cliente, matricula_cliente, trabajo, fecha_hoy)
-            
-            st.success(f"¡Albarán generado! El trabajo se ha guardado en el historial y la tarea pendiente ha sido eliminada.")
             
             col_desc1, col_desc2 = st.columns(2)
             
@@ -374,7 +373,8 @@ elif st.session_state.pagina == "Clientes":
     st.header("👥 Gestión de Clientes")
     st.write("Añade, consulta, modifica o revisa el historial de los clientes.")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["➕ Añadir", "📋 Ver", "✏️ Modificar", "📜 Historial"])
+    # AHORA HAY 3 PESTAÑAS (Hemos fusionado Ver + Historial)
+    tab1, tab2, tab3 = st.tabs(["➕ Añadir", "📋 Ver / Historial", "✏️ Modificar"])
 
     with tab1:
         with st.form("form_nuevo_cliente", clear_on_submit=True):
@@ -384,25 +384,14 @@ elif st.session_state.pagina == "Clientes":
             matricula = st.text_input("Matrícula")
             moto = st.text_input("Modelo de Moto")
             
-            st.markdown("---")
-            st.markdown("**¿Tiene algún trabajo pendiente? (Opcional)**")
-            trabajo_pendiente = st.text_area("Trabajo a realizar (Ej: Cambio de aceite, ITV...)")
-            fecha_trabajo = st.date_input("Fecha prevista para el trabajo")
-            
             submit_cliente = st.form_submit_button("Guardar Cliente", type="primary")
             
             if submit_cliente:
                 if nombre.strip() == "":
                     st.error("El nombre es obligatorio.")
                 else:
-                    nuevo_id = db.añadir_cliente(nombre, telefono, matricula, moto)
-                    
-                    if trabajo_pendiente.strip() != "":
-                        fecha_str = fecha_trabajo.strftime("%Y-%m-%d")
-                        db.añadir_aviso(nuevo_id, fecha_str, trabajo_pendiente)
-                        st.success(f"¡Cliente '{nombre}' guardado y aviso programado!")
-                    else:
-                        st.success(f"¡Cliente '{nombre}' guardado con éxito!")
+                    db.añadir_cliente(nombre, telefono, matricula, moto)
+                    st.success(f"¡Cliente '{nombre}' guardado con éxito!")
 
     with tab2:
         st.subheader("Listado de clientes")
@@ -410,6 +399,25 @@ elif st.session_state.pagina == "Clientes":
         
         if not df_clientes.empty:
             st.dataframe(df_clientes, use_container_width=True, hide_index=True)
+            
+            st.divider()
+            st.subheader("📜 Historial de la Moto")
+            
+            # Desplegable para ver el historial de un cliente concreto desde aquí
+            opciones_hist = {
+                f"{row['nombre']} - {row['moto'] if pd.notna(row['moto']) else 'Moto'} ({row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'})": row['id'] 
+                for _, row in df_clientes.iterrows()
+            }
+            
+            cliente_hist = st.selectbox("Selecciona una moto para ver su historial:", options=list(opciones_hist.keys()))
+            id_hist = opciones_hist[cliente_hist]
+            
+            df_historial = db.obtener_historial(id_hist)
+            
+            if not df_historial.empty:
+                st.dataframe(df_historial, use_container_width=True, hide_index=True)
+            else:
+                st.info("Esta moto todavía no tiene trabajos registrados.")
         else:
             st.info("Todavía no hay clientes en la base de datos. ¡Añade el primero!")
 
@@ -451,28 +459,6 @@ elif st.session_state.pagina == "Clientes":
                             st.rerun() 
         else:
             st.info("No hay clientes registrados para modificar.")
-
-    with tab4:
-        st.subheader("Historial de la Moto")
-        df_clientes = db.obtener_clientes()
-        
-        if not df_clientes.empty:
-            opciones_hist = {
-                f"{row['nombre']} - {row['moto'] if pd.notna(row['moto']) else 'Moto'} ({row['matricula'] if pd.notna(row['matricula']) else 'Sin matrícula'})": row['id'] 
-                for _, row in df_clientes.iterrows()
-            }
-            
-            cliente_hist = st.selectbox("Selecciona una moto para ver su historial:", options=list(opciones_hist.keys()))
-            id_hist = opciones_hist[cliente_hist]
-            
-            df_historial = db.obtener_historial(id_hist)
-            
-            if not df_historial.empty:
-                st.dataframe(df_historial, use_container_width=True, hide_index=True)
-            else:
-                st.info("Esta moto todavía no tiene trabajos registrados. Genera un albarán para empezar su historial.")
-        else:
-            st.info("No hay clientes en la base de datos.")
 
 # --- PESTAÑA 8: AJUSTES ---
 elif st.session_state.pagina == "Ajustes":
