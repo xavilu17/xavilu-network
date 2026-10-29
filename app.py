@@ -14,53 +14,64 @@ def crear_pdf_albaran(cliente, matricula, trabajo, fecha):
     # --- CABECERA CON LOGO ---
     logo_path = "logo_transparent.png"
     if os.path.exists(logo_path):
-        # Ajusta el ancho (w) y posición (x, y) según tu logo
-        pdf.image(logo_path, x=10, y=10, w=35) 
+        pdf.image(logo_path, x=10, y=10, w=30) 
     
-    # Texto de la cabecera (a la derecha del logo)
+    # Texto de la cabecera
     pdf.set_font("Helvetica", "B", 16)
-    pdf.set_xy(50, 12)
+    pdf.set_xy(45, 12) 
     pdf.cell(0, 8, "TALLER OLIVARES 4T", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_x(50)
+    pdf.set_x(45)
     pdf.cell(0, 5, "C/ Ejemplo, 123 - Tel: 600 000 000", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(45)
+    pdf.cell(0, 5, "NIF: B-12345678", new_x="LMARGIN", new_y="NEXT")
     
-    pdf.ln(15) # Espacio debajo de la cabecera
+    # --- LÍNEA SEPARADORA ---
+    pdf.ln(10)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(10)
     
     # --- DATOS DEL ALBARÁN ---
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, f"ALBARÁN - Fecha: {fecha}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, f"ALBARÁN Nº: 0001/{datetime.date.today().year}", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, f"Cliente: {cliente}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Matrícula: {matricula}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"Fecha: {fecha}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
+    
+    # --- DATOS DEL CLIENTE ---
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(30, 7, "Cliente:")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 7, cliente if cliente else "-", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(30, 7, "Matrícula:")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 7, matricula if matricula else "-", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(10)
     
     # --- DETALLES DEL TRABAJO ---
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 8, "Detalles del trabajo:", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "DETALLES DEL TRABAJO:", new_x="LMARGIN", new_y="NEXT")
     
-    pdf.set_font("Helvetica", "", 11)
-    # multi_cell permite escribir texto largo y que salte de línea solo
-    pdf.multi_cell(0, 8, trabajo) 
+    pdf.set_fill_color(245, 245, 245)
+    pdf.multi_cell(0, 10, trabajo if trabajo else "Sin detalles especificados.", border=1, fill=True)
     
-    pdf.ln(15)
+    pdf.ln(20)
     
     # --- PIE DE PÁGINA ---
     pdf.set_font("Helvetica", "I", 9)
-    pdf.cell(0, 10, "* Documento no válido como factura.", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 10, "* Documento no válido como factura. Generado por Taller Olivares 4T.", new_x="LMARGIN", new_y="NEXT")
     
-    # Devolvemos el PDF en bytes para que Streamlit lo pueda descargar
     return bytes(pdf.output())
 
 # ==========================================
 # 1. CONFIGURACIÓN Y LOGO
 # ==========================================
 st.set_page_config(page_title="Taller Olivares 4T", layout="wide", page_icon="🏍️")
-
-# LOGO TRANSPARENTE
 st.logo("logo_transparent.png", size="large")
 
 # ==========================================
@@ -142,8 +153,47 @@ elif st.session_state.pagina == "Avisos":
 
 # --- PESTAÑA 3: PIEZAS ---
 elif st.session_state.pagina == "Piezas":
-    st.header("🔧 Gestión de Piezas")
-    st.write("Control y búsqueda de repuestos.")
+    st.header("🔧 Buscador de Piezas y Precios")
+    st.write("Consulta disponibilidad y precios de repuestos. (Datos de ejemplo)")
+
+    # --- SIMULACIÓN DE BASE DE DATOS ---
+    piezas_db = [
+        {"Ref": "ACE-10W40", "Pieza": "Aceite Motor 10W40 (1L)", "Marca": "Castrol", "Precio (€)": 12.50, "Stock": 15},
+        {"Ref": "PAS-BRE-01", "Pieza": "Pastillas de freno delanteras", "Marca": "Brembo", "Precio (€)": 35.00, "Stock": 8},
+        {"Ref": "NEU-MIC-17", "Pieza": "Neumático 120/70-17", "Marca": "Michelin", "Precio (€)": 110.00, "Stock": 4},
+        {"Ref": "BUJ-NGK-01", "Pieza": "Bujía de iridio", "Marca": "NGK", "Precio (€)": 18.20, "Stock": 20},
+        {"Ref": "CAD-DID-520", "Pieza": "Kit de arrastre 520", "Marca": "DID", "Precio (€)": 85.00, "Stock": 3},
+        {"Ref": "FIL-AIR-02", "Pieza": "Filtro de aire", "Marca": "K&N", "Precio (€)": 45.00, "Stock": 6},
+    ]
+
+    # --- BUSCADOR ---
+    busqueda = st.text_input("🔍 Buscar por pieza, marca o referencia:", placeholder="Ej: Pastillas, Michelin, o NEU-MIC-17")
+
+    # --- FILTRADO ---
+    if busqueda:
+        resultados = [
+            p for p in piezas_db 
+            if busqueda.lower() in p["Pieza"].lower() 
+            or busqueda.lower() in p["Marca"].lower() 
+            or busqueda.lower() in p["Ref"].lower()
+        ]
+    else:
+        resultados = piezas_db
+
+    # --- MOSTRAR RESULTADOS ---
+    st.divider()
+    if resultados:
+        st.dataframe(
+            resultados, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Precio (€)": st.column_config.NumberColumn(format="%.2f €"),
+                "Stock": st.column_config.ProgressColumn(min_value=0, max_value=25)
+            }
+        )
+    else:
+        st.warning("No se encontraron piezas que coincidan con la búsqueda. Prueba con otra palabra.")
 
 # --- PESTAÑA 4: PDFs / ALBARANES ---
 elif st.session_state.pagina == "PDFs":
@@ -161,7 +211,7 @@ elif st.session_state.pagina == "PDFs":
     if submit:
         fecha_hoy = datetime.date.today().strftime("%d/%m/%Y")
         
-        # Generamos el texto para TXT
+        # Texto para TXT
         texto_albaran = f"""
         =========================================
                 TALLER OLIVARES 4T
@@ -176,12 +226,12 @@ elif st.session_state.pagina == "PDFs":
         * Documento no válido como factura.
         """
         
-        # Generamos el PDF pasando los datos
+        # Generamos el PDF
         pdf_bytes = crear_pdf_albaran(cliente, matricula, trabajo, fecha_hoy)
         
         st.success("¡Albarán generado con éxito! Elige el formato de descarga:")
         
-        # Colocamos los botones en dos columnas
+        # Botones de descarga en dos columnas
         col_desc1, col_desc2 = st.columns(2)
         
         with col_desc1:
