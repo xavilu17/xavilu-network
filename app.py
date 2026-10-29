@@ -297,7 +297,7 @@ elif st.session_state.pagina == "PDFs":
             # --- BLOQUE OPCIONAL: NOTA INTERNA FUTURA ---
             st.markdown("---")
             st.markdown("**🔔 Nota para el mecánico (Opcional)**")
-            st.write("El cliente NO verá esto en el albarán. Sirve para que te salte un aviso en la agenda del taller.")
+            st.write("El cliente NO verá esto en el albarán. Sirve para que te salte un aviso en la agenda del taller para el futuro.")
             
             col_av1, col_av2 = st.columns(2)
             with col_av1:
@@ -384,14 +384,14 @@ elif st.session_state.pagina == "Clientes":
             matricula = st.text_input("Matrícula")
             moto = st.text_input("Modelo de Moto")
             
-            # --- AQUÍ ESTÁ LA TAREA A REALIZAR ---
+            # --- TAREA A REALIZAR (AHORA OBLIGATORIA) ---
             st.markdown("---")
-            st.markdown("**🔧 Tarea a realizar (Opcional)**")
-            st.write("Apúntalo aquí para que salte en la pestaña de Avisos cuando toque.")
+            st.markdown("**🔧 Tarea a realizar (Obligatorio)**")
+            st.write("¿A qué viene el cliente? Esta tarea saltará en la pestaña de Avisos.")
             
             col_t1, col_t2 = st.columns(2)
             with col_t1:
-                tarea_inicial = st.text_input("Trabajo a realizar (Ej: Cambio de aceite)")
+                tarea_inicial = st.text_input("Trabajo a realizar * (Ej: Cambio de aceite)")
             with col_t2:
                 fecha_inicial = st.date_input("Fecha para el aviso")
             
@@ -400,15 +400,13 @@ elif st.session_state.pagina == "Clientes":
             if submit_cliente:
                 if nombre.strip() == "":
                     st.error("El nombre es obligatorio.")
+                elif tarea_inicial.strip() == "":
+                    st.error("Debes indicar la tarea a realizar (¿A qué viene el cliente?).")
                 else:
                     nuevo_id = db.añadir_cliente(nombre, telefono, matricula, moto)
-                    
-                    if tarea_inicial.strip() != "":
-                        fecha_str = fecha_inicial.strftime("%Y-%m-%d")
-                        db.añadir_aviso(nuevo_id, fecha_str, tarea_inicial)
-                        st.success(f"¡Cliente '{nombre}' guardado y Tarea apuntada!")
-                    else:
-                        st.success(f"¡Cliente '{nombre}' guardado con éxito!")
+                    fecha_str = fecha_inicial.strftime("%Y-%m-%d")
+                    db.añadir_aviso(nuevo_id, fecha_str, tarea_inicial)
+                    st.success(f"¡Cliente '{nombre}' guardado y Tarea '{tarea_inicial}' apuntada!")
 
     with tab2:
         st.subheader("Listado de clientes")
