@@ -11,21 +11,24 @@ def crear_pdf_albaran(cliente, matricula, trabajo, fecha):
     pdf = FPDF()
     pdf.add_page()
     
-    # --- CABECERA CON LOGO ---
+    # --- CABECERA CON LOGO CENTRADO ---
     logo_path = "logo_transparent.png"
+    logo_w = 35 # Ancho del logo en mm
     if os.path.exists(logo_path):
-        pdf.image(logo_path, x=10, y=10, w=30) 
+        # Centrar el logo: (Ancho del papel 210 - Ancho del logo) / 2
+        x_logo = (210 - logo_w) / 2
+        pdf.image(logo_path, x=x_logo, y=10, w=logo_w) 
     
-    # Texto de la cabecera
+    # Bajamos el cursor debajo del logo para escribir los textos
+    pdf.set_y(45) 
+    
+    # --- TEXTO DE CABECERA CENTRADO ---
     pdf.set_font("Helvetica", "B", 16)
-    pdf.set_xy(45, 12) 
-    pdf.cell(0, 8, "TALLER OLIVARES 4T", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "TALLER OLIVARES 4T", align="C", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_x(45)
-    pdf.cell(0, 5, "C/ Ejemplo, 123 - Tel: 600 000 000", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_x(45)
-    pdf.cell(0, 5, "NIF: B-12345678", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "C/ Ejemplo, 123 - Tel: 600 000 000", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "NIF: B-12345678", align="C", new_x="LMARGIN", new_y="NEXT")
     
     # --- LÍNEA SEPARADORA ---
     pdf.ln(10)
@@ -64,7 +67,7 @@ def crear_pdf_albaran(cliente, matricula, trabajo, fecha):
     # --- PIE DE PÁGINA ---
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 10, "* Documento no válido como factura. Generado por Taller Olivares 4T.", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "* Documento no válido como factura. Generado por Taller Olivares 4T.", align="C", new_x="LMARGIN", new_y="NEXT")
     
     return bytes(pdf.output())
 
