@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}En planta{% endblock %}
+{% block content %}
+<h1>📊 Vehículos en planta</h1>
+<div class="kpi" id="kpis"></div>
+<div class="card">
+    <table>
+        <thead><tr><th>Vehículo</th><th>Empresa</th><th>Chofer</th><th>Área</th><th>Estado</th><th>Desde</th><th></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
+    </table>
+</div>
+<div class="modal-backdrop" id="modalAnular">
+    <div class="modal">
+        <h3>Anular orden</h3>
+        <p style="margin-bottom:12px;color:#64748b;">Orden <strong id="anular_num"></strong></p>
+        <div class="field"><label>Motivo</label><input type="text" id="anular_motivo" placeholder="Ej: camión se fue sin pesarse"></div>
+        <div class="actions">
+            <button class="btn-secondary" onclick="cerrarModal('modalAnular')">Cancelar</button>
+            <button class="btn-danger" onclick="confirmarAnular()">Anular</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let ordenAnular = null;
+async function refrescar() {
+    const r = await fetch('/api/en-planta');
+    const rows = await r.json();
+    const tbody = document.getElementById('tbody');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No hay vehículos en planta</td></tr>';
+    } else {
+        tbody.innerHTML = rows.map(o => {
+            const fecha = o.fecha_creacion ? new Date(o.fecha_creacion).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) : '';
+            return `<tr>
+                <td><strong>${o.matricula_snap || '—'}</strong></td>
+                <td>${o.empresa_nombre || '—'}</td>
+                <td>${o.chofer_nombre_snap || '—'}</td>
+                <td>${o.area_actual}</td>
+                <td><span class="badge badge-${o.estado}">${o.estado.replace('_',' ')}</span></td>
+                <td>${fecha}</td>
+                <td><button class="btn-danger btn-sm" onclick="abrirAnular('${o.numero_orden}')">Anular</button></td>
+            </tr>`;
+        }).join('');
+    }
+    const contar = st => rows.filter(r => r.estado === st).length;
+    document.getElementById('kpis').innerHTML = `
+        <div class="box"><div class="label">Total en planta</div><div class="value">${rows.length}</div></div>
+        <div class="box"><div class="label">En báscula</div><div class="value">${contar('en_bascula') + contar('creada')}</div></div>
+        <div class="box"><div class="label">Pend. albarán</div><div class="value">${contar('pendiente_albaran')}</div></div>
+        <div class="box"><div class="label">Albaranadas</div><div class="value">${contar('albaranada')}</div></div>`;
+}
+function abrirAnular(num) { ordenAnular = num; document.getElementById('anular_num').textContent = num; document.getElementById('anular_motivo').value = ''; abrirModal('modalAnular'); }
+async function confirmarAnular() {
+    const motivo = document.getElementById('anular_motivo').value || 'Sin motivo';
+    const form = new FormData(); form.append('motivo', motivo);
+    await fetch(`/orden/${ordenAnular}/anular`, { method: 'POST', body: form });
+    cerrarModal('modalAnular'); refrescar();
+}
+refrescar(); setInterval(refrescar, 5000);
+</script>
+{% endblock %}
