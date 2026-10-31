@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Salida{% endblock %}
+{% block content %}
+<h1>🚚 Salida · Confirmar</h1>
+<div class="card" style="max-width:600px;margin:0 auto;">
+    <form method="POST" id="formSalida" onsubmit="return confirmar(event)">
+        <div class="field"><label>Nº de Orden</label><input type="text" id="numero" class="big-input" placeholder="P-2026-0001" autofocus required></div>
+        <div style="text-align:center;margin-top:20px;"><button type="submit" class="btn-success" style="padding:14px 40px;font-size:16px;">✅ Confirmar salida</button></div>
+        <p style="text-align:center;color:#94a3b8;margin-top:16px;font-size:13px;">Escanea el QR del albarán o escribe el número</p>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function confirmar(e) {
+    const num = document.getElementById('numero').value.trim().toUpperCase();
+    if (!num) return false;
+    document.getElementById('formSalida').action = `/salida/${num}/confirmar`;
+    return true;
+}
+</script>
+{% endblock %}
