@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Portería{% endblock %}
+{% block content %}
+<h1>🚪 Portería · Nueva Orden</h1>
+<form method="POST" action="{{ url_for('nueva_orden') }}" class="card">
+    <div class="form-grid">
+        <div class="field"><label>Empresa *</label>
+            <div style="display:flex;gap:6px;">
+                <select name="empresa_id" id="empresa_id" required style="flex:1">
+                    <option value="">— Selecciona —</option>
+                    {% for e in empresas %}<option value="{{ e.id }}">{{ e.nombre }}</option>{% endfor %}
+                </select>
+                <button type="button" class="btn-secondary" onclick="abrirModal('modalEmpresa')">+</button>
+            </div>
+        </div>
+        <div class="field"><label>Vehículo *</label>
+            <div style="display:flex;gap:6px;">
+                <select name="vehiculo_id" id="vehiculo_id" required style="flex:1" onchange="autofillTara()"><option value="">— Empresa primero —</option></select>
+                <button type="button" class="btn-secondary" onclick="abrirModalVehiculo()">+</button>
+            </div>
+        </div>
+        <div class="field"><label>Chofer *</label>
+            <div style="display:flex;gap:6px;">
+                <select name="chofer_id" id="chofer_id" required style="flex:1" onchange="autofillDni()"><option value="">— Empresa primero —</option></select>
+                <button type="button" class="btn-secondary" onclick="abrirModalChofer()">+</button>
+            </div>
+        </div>
+        <div class="field"><label>DNI</label><input type="text" id="dni" readonly></div>
+        <div class="field"><label>Tara (kg)</label><input type="number" id="tara" step="0.01" readonly></div>
+        <div class="field"><label>Código LER</label><input type="text" name="codigo_ler" placeholder="20 01 01"></div>
+        <div class="field"><label>Tipo merma</label>
+            <select name="tipo_merma_id"><option value="">—</option>{% for tm in tipos_merma %}<option value="{{ tm.id }}">{{ tm.nombre }}</option>{% endfor %}</select>
+        </div>
+        <div class="field" style="grid-column:1/-1;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
+    </div>
+    <div style="margin-top:24px;text-align:right;"><button type="submit" class="btn-primary" style="padding:14px 32px;font-size:16px;">🎫 Generar Orden</button></div>
+</form>
+<div class="modal-backdrop" id="modalEmpresa">
+    <div class="modal"><h3>+ Nueva Empresa</h3>
+        <div class="field" style="margin-bottom:12px;"><label>Nombre *</label><input type="text" id="emp_nombre"></div>
+        <div class="field" style="margin-bottom:12px;"><label>CIF</label><input type="text" id="emp_cif"></div>
+        <div class="field" style="margin-bottom:12px;"><label>Teléfono</label><input type="text" id="emp_tel"></div>
+        <div class="field"><label>Email</label><input type="email" id="emp_email"></div>
+        <div class="actions"><button class="btn-secondary" onclick="cerrarModal('modalEmpresa')">Cancelar</button><button class="btn-primary" onclick="guardarEmpresa()">Guardar</button></div>
+    </div>
+</div>
+<div class="modal-backdrop" id="modalVehiculo">
+    <div class="modal"><h3>+ Nuevo Vehículo</h3>
+        <div class="field" style="margin-bottom:12px;"><label>Matrícula *</label><input type="text" id="veh_matricula" placeholder="1234 ABC" style="text-transform:uppercase;"></div>
+        <div class="field" style="margin-bottom:12px;"><label>Tipo</label><select id="veh_tipo">{% for tv in tipos_veh %}<option value="{{ tv.id }}">{{ tv.nombre }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Tara (kg) *</label><input type="number" id="veh_tara" step="0.01"></div>
+        <div class="actions"><button class="btn-secondary" onclick="cerrarModal('modalVehiculo')">Cancelar</button><button class="btn-primary" onclick="guardarVehiculo()">Guardar</button></div>
+    </div>
+</div>
+<div class="modal-backdrop" id="modalChofer">
+    <div class="modal"><h3>+ Nuevo Chofer</h3>
+        <div class="field" style="margin-bottom:12px;"><label>Nombre *</label><input type="text" id="cho_nombre"></div>
+        <div class="field"><label>DNI *</label><input type="text" id="cho_dni"></div>
+        <div class="actions"><button class="btn-secondary" onclick="cerrarModal('modalChofer')">Cancelar</button><button class="btn-primary" onclick="guardarChofer()">Guardar</button></div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const empresaSel = document.getElementById('empresa_id');
+const vehiculoSel = document.getElementById('vehiculo_id');
+const choferSel = document.getElementById('chofer_id');
+empresaSel.addEventListener('change', cargarVehiculosYChoferes);
+async function cargarVehiculosYChoferes() {
+    const id = empresaSel.value;
+    vehiculoSel.innerHTML = '<option value="">— Selecciona —</option>';
+    choferSel.innerHTML = '<option value="">— Selecciona —</option>';
+    document.getElementById('dni').value = ''; document.getElementById('tara').value = '';
+    if (!id) return;
+    const [vs, cs] = await Promise.all([
+        fetch(`/api/vehiculos/${id}`).then(r => r.json()),
+        fetch(`/api/choferes/${id}`).then(r => r.json()),
+    ]);
+    vs.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.textContent = `${v.matricula} · ${v.tara} kg`; o.dataset.tara = v.tara; vehiculoSel.appendChild(o); });
+    cs.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = `${c.nombre} · ${c.dni}`; o.dataset.dni = c.dni; choferSel.appendChild(o); });
+}
+function autofillTara() { const o = vehiculoSel.selectedOptions[0]; document.getElementById('tara').value = o?.dataset.tara || ''; }
+function autofillDni() { const o = choferSel.selectedOptions[0]; document.getElementById('dni').value = o?.dataset.dni || ''; }
+function abrirModalVehiculo() { if (!empresaSel.value) { alert('Selecciona una empresa primero'); return; } abrirModal('modalVehiculo'); }
+function abrirModalChofer() { if (!empresaSel.value) { alert('Selecciona una empresa primero'); return; } abrirModal('modalChofer'); }
+async function guardarEmpresa() {
+    const nombre = document.getElementById('emp_nombre').value.trim();
+    if (!nombre) { alert('Nombre obligatorio'); return; }
+    try {
+        const j = await postJSON('/maestro/empresa', { nombre, cif: document.getElementById('emp_cif').value, telefono: document.getElementById('emp_tel').value, email: document.getElementById('emp_email').value });
+        const o = document.createElement('option'); o.value = j.id; o.textContent = j.nombre; o.selected = true; empresaSel.appendChild(o);
+        cerrarModal('modalEmpresa'); cargarVehiculosYChoferes();
+    } catch(e) { alert(e.message); }
+}
+async function guardarVehiculo() {
+    const matricula = document.getElementById('veh_matricula').value.trim().toUpperCase();
+    const tara = parseFloat(document.getElementById('veh_tara').value);
+    if (!matricula || isNaN(tara)) { alert('Matrícula y tara obligatorias'); return; }
+    try {
+        const j = await postJSON('/maestro/vehiculo', { empresa_id: parseInt(empresaSel.value), matricula, tara, tipo_id: parseInt(document.getElementById('veh_tipo').value) });
+        const o = document.createElement('option'); o.value = j.id; o.textContent = `${j.matricula} · ${j.tara} kg`; o.dataset.tara = j.tara; o.selected = true; vehiculoSel.appendChild(o);
+        document.getElementById('tara').value = j.tara; cerrarModal('modalVehiculo');
+    } catch(e) { alert(e.message); }
+}
+async function guardarChofer() {
+    const nombre = document.getElementById('cho_nombre').value.trim();
+    const dni = document.getElementById('cho_dni').value.trim().toUpperCase();
+    if (!nombre || !dni) { alert('Nombre y DNI obligatorios'); return; }
+    try {
+        const j = await postJSON('/maestro/chofer', { empresa_id: parseInt(empresaSel.value), nombre, dni });
+        const o = document.createElement('option'); o.value = j.id; o.textContent = `${j.nombre} · ${j.dni}`; o.dataset.dni = j.dni; o.selected = true; choferSel.appendChild(o);
+        document.getElementById('dni').value = j.dni; cerrarModal('modalChofer');
+    } catch(e) { alert(e.message); }
+}
+</script>
+{% endblock %}
