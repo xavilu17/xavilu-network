@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Albarán {{ orden.numero_orden }}{% endblock %}
+{% block content %}
+<h1>📥 Emitir albarán · {{ orden.numero_orden }}</h1>
+<div class="card">
+    <h2 style="margin-bottom:16px;">Datos precargados</h2>
+    <div class="form-grid">
+        <div class="field"><label>Empresa</label><input type="text" value="{{ empresa.nombre }}" readonly></div>
+        <div class="field"><label>Vehículo</label><input type="text" value="{{ orden.matricula_snap }}" readonly></div>
+        <div class="field"><label>Chofer</label><input type="text" value="{{ orden.chofer_nombre_snap }}" readonly></div>
+        <div class="field"><label>DNI</label><input type="text" value="{{ orden.dni_snap }}" readonly></div>
+        <div class="field"><label>Peso Bruto</label><input type="text" value="{{ pesaje.peso_bruto }} kg" readonly></div>
+        <div class="field"><label>Tara</label><input type="text" value="{{ orden.tara_snap }} kg" readonly></div>
+        <div class="field"><label>Merma</label><input type="text" value="{{ pesaje.merma }} kg" readonly></div>
+        <div class="field"><label>Peso Neto</label><input type="text" value="{{ pesaje.peso_neto }} kg" readonly style="font-weight:800;color:#16a34a;"></div>
+        <div class="field"><label>Código LER</label><input type="text" value="{{ orden.codigo_ler or '—' }}" readonly></div>
+    </div>
+</div>
+<div class="card">
+    <form method="POST" action="{{ url_for('recepcion_emitir', numero=orden.numero_orden) }}">
+        <div class="form-grid">
+            <div class="field"><label>Usuario</label><input type="text" name="usuario" value="recepción"></div>
+            <div class="field" style="grid-column:1/-1;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
+        </div>
+        <div style="margin-top:24px;text-align:right;">
+            <a href="/recepcion" class="btn-secondary" style="text-decoration:none;display:inline-block;padding:10px 18px;margin-right:8px;">Cancelar</a>
+            <button type="submit" class="btn-success" style="padding:14px 32px;font-size:16px;">🧾 Emitir y entregar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
