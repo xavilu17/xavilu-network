@@ -1,0 +1,9 @@
+templates/
+├── base.html
+├── panel.html
+├── porteria.html
+├── orden_creada.html
+├── bascula.html
+├── recepcion.html
+├── recepcion_albaran.html
+└── salida.html
