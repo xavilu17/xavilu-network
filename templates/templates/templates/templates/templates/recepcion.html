@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Recepción{% endblock %}
+{% block content %}
+<h1>📥 Recepción · Pendientes de albarán</h1>
+<div class="card">
+    <table>
+        <thead><tr><th>Nº Orden</th><th>Vehículo</th><th>Empresa</th><th>Chofer</th><th>Neto</th><th>Hora</th><th></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
+    </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let ultimaLista = '';
+async function refrescar() {
+    const r = await fetch('/api/pendientes');
+    const rows = await r.json();
+    const tbody = document.getElementById('tbody');
+    const idsActuales = rows.map(o => o.numero_orden).join(',');
+    if (idsActuales !== ultimaLista && ultimaLista !== '') { beep(); }
+    ultimaLista = idsActuales;
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No hay órdenes pendientes ✓</td></tr>'; return; }
+    tbody.innerHTML = rows.map(o => {
+        const hora = o.fecha_pesaje ? new Date(o.fecha_pesaje).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) : '';
+        return `<tr>
+            <td><strong>${o.numero_orden}</strong></td>
+            <td>${o.matricula_snap || '—'}</td>
+            <td>${o.empresa_nombre || '—'}</td>
+            <td>${o.chofer_nombre_snap || '—'}</td>
+            <td><strong>${o.peso_neto ? o.peso_neto + ' kg' : '—'}</strong></td>
+            <td>${hora}</td>
+            <td><a href="/recepcion/${o.numero_orden}" class="btn-success btn-sm" style="text-decoration:none;display:inline-block;">Emitir albarán</a></td>
+        </tr>`;
+    }).join('');
+}
+refrescar(); setInterval(refrescar, 5000);
+</script>
+{% endblock %}
