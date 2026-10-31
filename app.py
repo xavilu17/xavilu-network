@@ -586,7 +586,7 @@ if st.session_state.sidebar_visible:
 else:
     modelo_seleccionado = "llama3.2:latest"
 
-macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "♻️ GESTIÓN PLANTAS", "🎵 MÚSICA Y ARTE"]
+macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR",  "🎵 MÚSICA Y ARTE"]
 macro_idx = custom_tabs(macro_names, "macro", 0)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
@@ -1173,15 +1173,9 @@ elif macro_idx == 6:
     st.info("Módulo de viajes, recetas de hogar y organización listo para expandir.")
 
 # ==========================================
-# CATEGORÍA 7: GESTIÓN PLANTAS
+
+# CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
 elif macro_idx == 7:
-    st.markdown("### ♻️ GESTIÓN PLANTAS")
-    st.info("Módulo de báscula, lotes y mantenimiento (SQLite) listo para expandir.")
-
-# ==========================================
-# CATEGORÍA 8: MÚSICA Y ARTE
-# ==========================================
-elif macro_idx == 8:
     st.markdown("### 🎵 MÚSICA Y ARTE")
     st.info("Módulo de letras, canciones y portadas listo para expandir.")
