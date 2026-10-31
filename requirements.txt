@@ -3,7 +3,8 @@ ollama
 edge-tts
 pypdf
 python-docx
-openpyxl
+openpyxlflask==3.0.0
+qrcode[pil]==7.4.2
 python-pptx
 Pillow
 fpdf2
