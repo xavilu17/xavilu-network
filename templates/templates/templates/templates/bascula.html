@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Báscula{% endblock %}
+{% block content %}
+<h1>⚖️ Báscula</h1>
+{% if not orden %}
+<div class="card" style="max-width:600px;margin:0 auto;">
+    <form method="POST" action="{{ url_for('bascula_cargar') }}">
+        <div class="field"><label>Nº de Orden</label><input type="text" name="numero_orden" class="big-input" placeholder="P-2026-0001" autofocus></div>
+        <div style="text-align:center;margin-top:20px;"><button type="submit" class="btn-primary" style="padding:14px 40px;font-size:16px;">🔍 Buscar</button></div>
+        <p style="text-align:center;color:#94a3b8;margin-top:16px;font-size:13px;">Escanea el QR o escribe el número</p>
+    </form>
+</div>
+{% else %}
+<div class="card">
+    <h2 style="margin-bottom:16px;">Datos de la orden <span style="color:#2563eb;">{{ orden.numero_orden }}</span></h2>
+    <div class="form-grid">
+        <div class="field"><label>Empresa</label><input type="text" value="{{ empresa.nombre }}" readonly></div>
+        <div class="field"><label>Vehículo</label><input type="text" value="{{ orden.matricula_snap }}" readonly></div>
+        <div class="field"><label>Chofer</label><input type="text" value="{{ orden.chofer_nombre_snap }}" readonly></div>
+        <div class="field"><label>DNI</label><input type="text" value="{{ orden.dni_snap }}" readonly></div>
+        <div class="field"><label>Tara (kg)</label><input type="text" value="{{ orden.tara_snap }}" readonly></div>
+        <div class="field"><label>Código LER</label><input type="text" value="{{ orden.codigo_ler or '—' }}" readonly></div>
+    </div>
+</div>
+<div class="card">
+    <h2 style="margin-bottom:16px;">Pesaje</h2>
+    <form method="POST" action="{{ url_for('bascula_pesar', numero=orden.numero_orden) }}">
+        <div class="form-grid">
+            <div class="field"><label>Peso Bruto (kg) *</label><input type="number" name="peso_bruto" id="bruto" step="0.01" required autofocus oninput="calcNeto()"></div>
+            <div class="field"><label>Merma (kg)</label><input type="number" name="merma" id="merma" step="0.01" value="0" oninput="calcNeto()"></div>
+            <div class="field"><label>Peso Neto (kg)</label><input type="number" id="neto" readonly style="font-size:22px;font-weight:800;color:#16a34a;"></div>
+        </div>
+        <div class="field" style="margin-top:16px;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
+        <div style="margin-top:24px;text-align:right;"><button type="submit" class="btn-success" style="padding:14px 32px;font-size:16px;">✅ Guardar pesaje</button></div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if orden %}
+<script>
+const TARA = {{ orden.tara_snap or 0 }};
+function calcNeto() {
+    const b = parseFloat(document.getElementById('bruto').value) || 0;
+    const m = parseFloat(document.getElementById('merma').value) || 0;
+    document.getElementById('neto').value = (b - TARA - m).toFixed(2);
+}
+</script>
+{% endif %}
+{% endblock %}
