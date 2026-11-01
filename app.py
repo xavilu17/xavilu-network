@@ -470,6 +470,7 @@ def obtener_ruta_fuente():
 def generar_pdf_pro(titulo: str, contenido: str) -> bytes:
     pdf = FPDF(); pdf.add_page()
     font_path = obtener_ruta_fuente()
+    
     try:
         url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Book cover for ' + titulo + ', cyberpunk')}?width=512&height=512&nologo=true"
         with urllib.request.urlopen(urllib.request.Request(url_img, headers={"User-Agent": "Mozilla/5.0"}), timeout=15) as response:
@@ -481,19 +482,29 @@ def generar_pdf_pro(titulo: str, contenido: str) -> bytes:
 
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True)
+        pdf.add_font("XaviFont", "B", font_path, uni=True)
+        pdf.add_font("XaviFont", "I", font_path, uni=True)
         pdf.set_font("XaviFont", size=11)
     else:
-        st.warning("No se encontró fuente Unicode. Pon 'DejaVuSans.ttf' junto al script.")
+        st.warning("No se encontró fuente Unicode. Usando Helvetica (puede perder acentos).")
         pdf.set_font("Helvetica", size=11)
 
-    pdf.set_font("Helvetica", "B", 24)
+    if font_path: pdf.set_font("XaviFont", "B", 24)
+    else: pdf.set_font("Helvetica", "B", 24)
+    
     pdf.multi_cell(0, 10, txt=titulo, align="C")
-    pdf.set_font("Helvetica", "I", 12)
+    
+    if font_path: pdf.set_font("XaviFont", "I", 12)
+    else: pdf.set_font("Helvetica", "I", 12)
+    
     pdf.cell(0, 10, txt="Generado por Xavilu Network", align="C", ln=True)
     pdf.set_draw_color(0, 240, 255); pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5); pdf.ln(15)
 
-    if font_path: pdf.set_font("XaviFont", size=11)
-    else: contenido = contenido.encode("latin-1", "replace").decode("latin-1")
+    if font_path: 
+        pdf.set_font("XaviFont", size=11)
+    else: 
+        contenido = contenido.encode("latin-1", "replace").decode("latin-1")
+        pdf.set_font("Helvetica", size=11)
 
     pdf.multi_cell(0, 8, txt=contenido)
     return bytes(pdf.output())
@@ -534,15 +545,23 @@ CONSEJOS PRO:
 """
     pdf = FPDF(); pdf.add_page()
     font_path = obtener_ruta_fuente()
+    
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True)
+        pdf.add_font("XaviFont", "B", font_path, uni=True)
         pdf.set_font("XaviFont", "B", 20)
     else:
         pdf.set_font("Helvetica", "B", 20)
+        
     pdf.multi_cell(0, 10, txt="Manual de Instrucciones - Xavilu Network", align="C")
     pdf.ln(10)
-    if font_path: pdf.set_font("XaviFont", size=12)
-    else: pdf.set_font("Helvetica", size=12); texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
+    
+    if font_path: 
+        pdf.set_font("XaviFont", size=12)
+    else: 
+        pdf.set_font("Helvetica", size=12)
+        texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
+        
     pdf.multi_cell(0, 7, txt=texto_manual)
     return bytes(pdf.output())
 
