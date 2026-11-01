@@ -15,6 +15,7 @@ from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
 import pandas as pd
 from youtube_transcript_api import YouTubeTranscriptApi
+from pydub import AudioSegment
 
 try: import cv2; HAS_CV2 = True
 except ImportError: HAS_CV2 = False
@@ -60,7 +61,7 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": []
+    "alex_chat_history": [], "letra_generada": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -318,7 +319,7 @@ def generar_pdf_pro(titulo: str, contenido: str) -> bytes:
     else: contenido = contenido.encode("latin-1", "replace").decode("latin-1"); pdf.set_font("Helvetica", size=11)
     pdf.multi_cell(0, 8, text=contenido); return bytes(pdf.output())
 def generar_manual_pdf() -> bytes:
-    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras y Poesía.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
+    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía y Canciones.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
     if font_path: pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.set_font("XaviFont", "B", 20)
     else: pdf.set_font("Helvetica", "B", 20)
@@ -366,8 +367,10 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
         with c3:
             if st.button("📲 Enviar a WhatsApp", key=f"wa_{key_u}", use_container_width=True):
                 num = st.session_state.get("whatsapp_number", "").strip()
-                if num:
-                    url_wa = f"https://wa.me/{num}?text={urllib.parse.quote(texto[:1500])}"
+                # AQUI ESTA LA MAGIA: Limpiamos el número dejando solo los dígitos
+                num_limpio = re.sub(r'[^0-9]', '', num)
+                if num_limpio:
+                    url_wa = f"https://wa.me/{num_limpio}?text={urllib.parse.quote(texto[:1500])}"
                     components.html(f"<script>window.open('{url_wa}', '_blank');</script>", height=0); st.success("✅ Abriendo WhatsApp...")
                 else: st.error("⚠️ Configura tu número en la barra lateral izquierda.")
 def run_async_safe(coro):
@@ -456,6 +459,33 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
                     st.session_state[s_key] = idx; st.rerun()
     return st.session_state[s_key]
 
+def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
+    try:
+        texto_limpio = re.sub(r"\[.*?\]", "", letra)
+        voz_bytes = generar_audio_sincrono(texto_limpio, voz)
+        if not voz_bytes: return None
+        voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
+        urls = {
+            "Rap / Hip-Hop": "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946bc9e7eb.mp3",
+            "Lo-Fi Chill": "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
+            "Épico / Trap": "https://cdn.pixabay.com/download/audio/2022/11/22/audio_1b6d6c0b34.mp3"
+        }
+        url_base = urls.get(estilo_base, urls["Rap / Hip-Hop"])
+        r = requests.get(url_base, headers={"User-Agent": "Mozilla/5.0"})
+        base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3")
+        base_audio = base_audio - 12
+        if len(voz_audio) > len(base_audio):
+            repeticiones = (len(voz_audio) // len(base_audio)) + 1
+            base_audio = base_audio * repeticiones
+        base_audio = base_audio[:len(voz_audio)]
+        cancion = base_audio.overlay(voz_audio)
+        out = BytesIO()
+        cancion.export(out, format="mp3")
+        return out.getvalue()
+    except Exception as e:
+        st.error(f"Error al mezclar el audio. Detalle: {e}")
+        return None
+
 if not st.session_state.sidebar_visible:
     st.markdown("<style>[data-testid=\"collapsedControl\"] {display: none !important;}</style>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
@@ -484,7 +514,7 @@ if st.session_state.sidebar_visible:
             st.session_state.api_key_together_manual = st.text_input("Together API Key", type="password", value=st.session_state.api_key_together_manual)
             st.session_state.api_key_cerebras_manual = st.text_input("Cerebras API Key", type="password", value=st.session_state.api_key_cerebras_manual)
         st.markdown("---")
-        st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
+        st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
         st.markdown("---"); st.download_button("📖 Descargar Manual (PDF)", generar_manual_pdf(), "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
         st.markdown("---")
         archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
@@ -1039,12 +1069,14 @@ elif macro_idx == 7:
     st.markdown("#### 🎵 Música y Arte")
     sub_names = ["🎤 LETRAS", "🖼️ PORTADAS", "📝 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    
     if sub_idx == 0:
         st.markdown("### Generador de Letras de Canciones")
         tema_cancion = st.text_input("¿De qué trata la canción?", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
         with c1: genero = st.selectbox("Género:", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
         with c2: artista_estilo = st.text_input("Estilo de artista (opcional):", placeholder="Ej: Bad Bunny...")
+        
         if st.button("🎤 Escribir Letra", type="primary") and tema_cancion:
             with st.spinner("Componiendo..."):
                 prompt = f"Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. "
@@ -1052,7 +1084,31 @@ elif macro_idx == 7:
                 prompt += "Incluye estructura (Intro, Verso 1, Coro, Verso 2, Coro, Puente, Outro) y añade indicaciones de producción entre corchetes."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
                 if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, "Letra_Cancion")
+                else: st.session_state.letra_generada = res
+                
+        if st.session_state.get("letra_generada"):
+            st.markdown("### 📜 Letra Generada")
+            st.text_area("Letra (puedes editarla):", key="letra_edit", height=250)
+            st.session_state.letra_generada = st.session_state.letra_edit
+            
+            botones_descarga(st.session_state.letra_generada, "Letra_Cancion")
+            
+            st.markdown("---")
+            st.markdown("### 🎵 Ponerle Música")
+            st.caption("Convierte tu letra en una canción con voz y una base musical de fondo.")
+            
+            c1, c2 = st.columns(2)
+            with c1: voz_cancion = st.selectbox("Voz principal:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+            with c2: beat_estilo = st.selectbox("Estilo de base musical:", ["Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap"])
+            
+            if st.button("🎶 Generar Canción (Voz + Base)", type="primary"):
+                with st.spinner("Grabando en el estudio... (esto puede tardar un poco)"):
+                    audio_final = generar_cancion_con_base(st.session_state.letra_generada, voz_cancion, beat_estilo)
+                    if audio_final:
+                        st.success("✅ ¡Canción lista! Dale al play.")
+                        st.audio(audio_final, format="audio/mp3")
+                        st.download_button("💾 Descargar Canción (MP3)", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
+
     elif sub_idx == 1:
         st.markdown("### Generador de Portadas de Álbum")
         prompt_portada = st.text_input("Describe la portada:", placeholder="Ej: Un astronauta llorando en Tokio..."); estilo_arte = st.selectbox("Estilo:", ["Fotorrealista", "Pintura al óleo", "Anime", "Surrealista", "Retro 80s", "Abstracto"])
