@@ -202,6 +202,13 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
 [data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.8) !important; border: 1px solid #FF007F !important; border-radius: 15px !important; padding: 10px; box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important; }
 .stAlert { border-radius: 10px; font-weight: bold; background-color: rgba(0, 240, 255, 0.1) !important; border-left: 5px solid #00f0ff !important; }
 [data-testid="stVerticalBlock"] > div { padding-bottom: 0.5rem !important; }
+
+@media (max-width: 600px) {
+    h1 { font-size: 2.2rem !important; letter-spacing: 1px !important; }
+    [data-testid="stWidgetLabel"] p { font-size: 11px !important; padding: 3px 8px !important; }
+    div.stButton > button { padding: 6px 10px !important; font-size: 12px !important; margin-bottom: 3px !important; }
+    .stTextArea textarea { font-size: 14px !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1288,22 +1295,138 @@ elif macro_idx == 3:
 # CATEGORÍA 4: MULTIMEDIA
 # ==========================================
 elif macro_idx == 4:
-    st.markdown("### 🎬 MULTIMEDIA")
-    st.info("Módulo de imagen, vídeo y generación visual listo para expandir.")
-    
+    st.markdown("#### 🎬 Multimedia")
+    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🎬 VIDEO (Pronto)"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+
+    if sub_idx == 0:
+        st.markdown("### Generador de Imágenes")
+        prompt_img = st.text_input("Describe la imagen que quieres crear:", key="img_gen_prompt")
+        estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
+        if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
+            with st.spinner("Generando imagen..."):
+                try:
+                    query = urllib.parse.quote(f"{prompt_img}, {estilo_img}, high quality, 8k")
+                    url = f"https://image.pollinations.ai/prompt/{query}?width=1024&height=1024&nologo=true"
+                    if url_segura(url):
+                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=30) as response:
+                            img_data = response.read()
+                        st.image(img_data, caption=prompt_img, use_container_width=True)
+                        st.download_button("📥 Descargar Imagen", img_data, "imagen_generada.png", "image/png")
+                except Exception as e:
+                    st.error(f"Error al generar la imagen: {e}")
+
+    elif sub_idx == 1:
+        st.markdown("### Texto a Voz (TTS)")
+        txt_tts = st.text_area("Escribe el texto que quieres escuchar:", height=150)
+        voz_tts = st.selectbox("Selecciona la voz:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+        if st.button("🔊 Generar Audio", type="primary") and txt_tts:
+            with st.spinner("Sintetizando voz..."):
+                aud = generar_audio_sincrono(txt_tts, voz_tts)
+                if aud:
+                    st.audio(aud, format="audio/mp3")
+                    st.download_button("💾 Descargar MP3", aud, "audio.mp3")
+
+
 # ==========================================
 # CATEGORÍA 5: ESTUDIO Y OFICIOS
 # ==========================================
 elif macro_idx == 5:
-    st.markdown("### 🎓 ESTUDIO Y OFICIOS")
-    st.info("Módulo de deberes, PRL, entrevistas y más listo para expandir.")
+    st.markdown("#### 🎓 Estudio y Oficios")
+    sub_names = ["📚 DEBERES", "👔 ENTREVISTA", "🛠️ PRL (Riesgos)"]
+    sub_idx = custom_tabs(sub_names, "study_sub", 0)
+
+    if sub_idx == 0:
+        st.markdown("### Resolver Deberes")
+        materia = st.selectbox("Materia:", ["Matemáticas", "Historia", "Ciencias", "Lengua", "Física y Química", "Inglés"])
+        pregunta = st.text_area("Escribe tu duda o pega el enunciado:", height=150)
+        if st.button("🔎 Resolver paso a paso", type="primary") and pregunta:
+            with st.spinner("Pensando..."):
+                prompt = f"Actúa como un profesor experto en {materia}. Resuelve el siguiente problema paso a paso, explicando cada parte de forma sencilla para que lo entienda:\n\n{pregunta}"
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Deberes_Resueltos", formatos_extra=True)
+
+    elif sub_idx == 1:
+        st.markdown("### Simulador de Entrevista de Trabajo")
+        puesto = st.text_input("¿A qué puesto aspiras?", placeholder="Ej: Camarero, Programador, Administrativo...")
+        if st.button("🤖 Empezar Entrevista", type="primary") and puesto:
+            st.session_state.entrevista_puesto = puesto
+            st.session_state.entrevista_historial = [{"role": "user", "content": f"Actúa como un reclutador de RRHH para el puesto de {puesto}. Preséntate y hazme la primera pregunta."}]
+            with st.spinner("El reclutador está pensando..."):
+                res = llamar_ia(modelo_seleccionado, st.session_state.entrevista_historial[0]["content"], st.session_state.api_key_gemini_manual)
+                st.session_state.entrevista_historial.append({"role": "assistant", "content": res})
+                st.rerun()
+
+        if "entrevista_historial" in st.session_state and st.session_state.entrevista_historial:
+            for msg in st.session_state.entrevista_historial:
+                if msg["role"] == "user" and "Actúa como" not in msg["content"]:
+                    st.chat_message("user").write(msg["content"])
+                elif msg["role"] == "assistant":
+                    st.chat_message("assistant").write(msg["content"])
+            
+            resp = chat_input_pro("entrevista_input", "Escribe tu respuesta...")
+            if resp:
+                st.session_state.entrevista_historial.append({"role": "user", "content": resp})
+                with st.spinner("Evaluando tu respuesta..."):
+                    contexto = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.entrevista_historial])
+                    prompt = f"Continúa la entrevista de trabajo para {st.session_state.entrevista_puesto}. Evalúa brevemente mi última respuesta y hazme la siguiente pregunta. Sé profesional.\n\nHistorial:\n{contexto}"
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    st.session_state.entrevista_historial.append({"role": "assistant", "content": res})
+                    st.rerun()
+
+    elif sub_idx == 2:
+        st.markdown("### Prevención de Riesgos Laborales (PRL)")
+        tarea = st.text_area("Describe la tarea o el entorno de trabajo:", placeholder="Ej: Trabajo en altura en una obra, o Manejo de productos químicos en laboratorio...")
+        if st.button("🦺 Analizar Riesgos", type="primary") and tarea:
+            with st.spinner("Analizando riesgos..."):
+                prompt = f"Actúa como un técnico de Prevención de Riesgos Laborales. Analiza la siguiente situación y dime: 1. Riesgos principales, 2. Medidas preventivas, 3. Equipos de Protección Individual (EPIs) necesarios:\n\n{tarea}"
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Informe_PRL", formatos_extra=True)
+
 
 # ==========================================
 # CATEGORÍA 6: VIAJES Y HOGAR
 # ==========================================
 elif macro_idx == 6:
-    st.markdown("### 🌍 VIAJES Y HOGAR")
-    st.info("Módulo de viajes, recetas de hogar y organización listo para expandir.")
+    st.markdown("#### 🌍 Viajes y Hogar")
+    sub_names = ["✈️ ITINERARIO", "🏠 COCINA"]
+    sub_idx = custom_tabs(sub_names, "travel_sub", 0)
+
+    if sub_idx == 0:
+        st.markdown("### Planificador de Viajes")
+        destino = st.text_input("¿A dónde quieres ir?", placeholder="Ej: Roma, Tokio, Nueva York...")
+        c1, c2 = st.columns(2)
+        with c1: dias = st.number_input("¿Cuántos días?", min_value=1, max_value=30, value=3)
+        with c2: tipo_viaje = st.selectbox("Estilo de viaje:", ["Cultural", "Gastronómico", "Aventura", "Relax", "Familiar", "Económico"])
+        
+        if st.button("🗺️ Crear Itinerario", type="primary") and destino:
+            with st.spinner("Planificando tu viaje..."):
+                prompt = f"Crea un itinerario detallado de {dias} días para viajar a {destino}. El estilo del viaje es {tipo_viaje}. Incluye qué ver cada día (mañana/tarde/noche), dónde comer y consejos prácticos. Usa un formato estructurado con títulos."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, f"Viaje_{destino}", formatos_extra=True)
+
+    elif sub_idx == 1:
+        st.markdown("### Recetas con lo que tengo en casa")
+        ingredientes = campo_con_ideas("Ingredientes en la nevera:", "hogar", "recetas de cocina", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Huevos, patatas, cebolla...")
+        if st.button("🍳 Crear Receta", type="primary") and ingredientes:
+            with st.spinner("Cocinando ideas..."):
+                prompt = f"Tengo estos ingredientes: {ingredientes}. Dame 2 recetas fáciles y rápidas de preparar. Incluye los pasos y el tiempo de preparación."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Recetas_Hogar")
+
 
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
