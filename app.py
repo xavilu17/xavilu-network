@@ -1,5 +1,5 @@
 """
-Xavilu Network Pro - Edición Final Corregida
+Xavilu Network Pro - Edición Final Corregida y Limpia
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -112,6 +112,22 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
 def inyectar_js_fixer():
     components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#ffffff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
+
+# --- NUEVA FUNCIÓN PARA LIMPIAR EL TEXTO ANTES DE LEERLO ---
+def limpiar_texto_para_voz(texto):
+    if not texto: return ""
+    # Quitar markdown
+    texto = re.sub(r'[\*\#\_\`]', '', texto)
+    # Quitar corchetes y su contenido (incluyendo saltos de línea)
+    texto = re.sub(r'\[.*?\]', '', texto, flags=re.DOTALL)
+    # Quitar paréntesis y su contenido (incluyendo saltos de línea)
+    texto = re.sub(r'\(.*?\)', '', texto, flags=re.DOTALL)
+    # Reemplazar saltos de línea por puntos para que la voz haga pausas
+    texto = texto.replace('\n', '. ')
+    # Limpiar espacios múltiples y puntos dobles
+    texto = re.sub(r'\.{2,}', '.', texto)
+    texto = re.sub(r'\s+', ' ', texto)
+    return texto.strip()
 
 def url_segura(url: str) -> bool:
     try:
@@ -404,19 +420,21 @@ def run_async_safe(coro):
     def _run(): return asyncio.run(coro)
     with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(_run).result()
 def generar_audio_sincrono(texto: str, voz: str) -> bytes:
+    # LIMPIAMOS EL TEXTO ANTES DE LEERLO
+    texto_limpio = limpiar_texto_para_voz(texto)
     async def _gen():
         buf = BytesIO()
-        async for chunk in edge_tts.Communicate(texto, voz).stream():
+        async for chunk in edge_tts.Communicate(texto_limpio, voz).stream():
             if chunk["type"] == "audio": buf.write(chunk["data"])
         return buf.getvalue()
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error TTS: {e}"); return None
 def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
     async def _gen():
-        buf = BytesIO(); texto = re.sub(r"\(risas\)|\[risas\]|\*risas\*", "jajaja", guion, flags=re.IGNORECASE)
-        texto = re.sub(r"\(pausa\)|\[pausa\]", "...", texto, flags=re.IGNORECASE); texto = re.sub(r"[*#_]", "", texto)
+        buf = BytesIO()
+        texto = guion.split("\n")
         voz_actual = v1
-        for linea in texto.split("\n"):
+        for linea in texto:
             linea = linea.strip()
             if not linea: continue
             m = re.search(r"^Locutor\s*(\d)", linea, re.IGNORECASE)
@@ -424,8 +442,11 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
                 num = int(m.group(1)); voz_actual = {1: v1, 2: v2, 3: v3}.get(num, v1)
                 linea = re.sub(r"^Locutor\s*\d\s*:?", "", linea, flags=re.IGNORECASE).strip()
             if not linea or linea.lower() in {"elvira", "jorge", "tomas", "carlos"}: continue
+            # LIMPIAMOS CADA LÍNEA
+            linea_limpia = limpiar_texto_para_voz(linea)
+            if not linea_limpia: continue
             try:
-                async for chunk in edge_tts.Communicate(linea + ", ", voz_actual).stream():
+                async for chunk in edge_tts.Communicate(linea_limpia + ", ", voz_actual).stream():
                     if chunk["type"] == "audio": buf.write(chunk["data"])
             except: continue
         return buf.getvalue()
@@ -488,12 +509,11 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
 
 def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
     try:
-        texto_limpio = re.sub(r"\[.*?\]", "", letra)
+        texto_limpio = limpiar_texto_para_voz(letra)
         voz_bytes = generar_audio_sincrono(texto_limpio, voz)
         if not voz_bytes: return None
         voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
         
-        # --- URLS 100% LIBRES DE BLOQUEOS (SoundHelix) ---
         urls = {
             "Reggaeton / Urbano": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
             "Pop / Alegre": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -508,7 +528,6 @@ def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
         url_base = urls.get(estilo_base, urls["Reggaeton / Urbano"])
         r = requests.get(url_base, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
         
-        # Verificamos si lo que ha descargado es un MP3 real (pesa más de 100kb) o un bloqueo (HTML)
         if len(r.content) < 100_000:
             st.error("❌ No se pudo descargar la música (el servidor devolvió un error). Prueba con otro estilo de base.")
             return None
