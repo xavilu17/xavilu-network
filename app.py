@@ -176,7 +176,7 @@ st.markdown("""
 header[data-testid="stHeader"] { background-color: #000000 !important; background: #000000 !important; }
 [data-testid="stAppDeployButton"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
-h1 { font-family: 'Orbitron', sans-serif !important; color: #FFD700 !important; text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700, 0 0 35px #FF8C00 !important; text-align: center; letter-spacing: 3px; }
+h1 { font-family: 'Orbitron', sans-serif !important; color: #FFD700 !important; text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700, 0 0 35px #FF8C00 !important; text-align: center; letter-spacing: 3px; margin-top: 0px !important; padding-top: 0px !important; }
 h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #ffffff !important; text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; text-align: center; letter-spacing: 3px; }
 h4 { font-family: 'Orbitron', sans-serif !important; color: #00f0ff !important; text-shadow: 0 0 8px #00f0ff, 0 0 15px #FF007F !important; letter-spacing: 1px; }
 [data-testid="stWidgetLabel"] p { color: #00f0ff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: bold !important; text-transform: uppercase !important; background: rgba(0, 240, 255, 0.1) !important; padding: 5px 10px !important; border-left: 4px solid #FF007F !important; border-radius: 4px !important; display: inline-block !important; margin-bottom: 8px !important; }
@@ -203,8 +203,15 @@ div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[d
 .stAlert { border-radius: 10px; font-weight: bold; background-color: rgba(0, 240, 255, 0.1) !important; border-left: 5px solid #00f0ff !important; }
 [data-testid="stVerticalBlock"] > div { padding-bottom: 0.5rem !important; }
 
+/* ELIMINAR HUECO SUPERIOR */
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
+
 @media (max-width: 600px) {
-    h1 { font-size: 2.2rem !important; letter-spacing: 1px !important; }
+    .block-container { padding-top: 0.5rem !important; }
+    h1 { font-size: 2.2rem !important; letter-spacing: 1px !important; margin-top: 0px !important; }
     [data-testid="stWidgetLabel"] p { font-size: 11px !important; padding: 3px 8px !important; }
     div.stButton > button { padding: 6px 10px !important; font-size: 12px !important; margin-bottom: 3px !important; }
     .stTextArea textarea { font-size: 14px !important; }
