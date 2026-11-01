@@ -1,5 +1,5 @@
 """
-Xavilu Network Pro - Edición Final Corregida y Limpia
+Xavilu Network Pro - Edición Final Definitiva (Modo Dúo)
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -113,18 +113,15 @@ def inyectar_js_fixer():
     components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#ffffff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
 
-# --- NUEVA FUNCIÓN PARA LIMPIAR EL TEXTO ANTES DE LEERLO ---
+# --- FUNCIÓN DEFINITIVA PARA LIMPIAR EL TEXTO ---
 def limpiar_texto_para_voz(texto):
     if not texto: return ""
-    # Quitar markdown
-    texto = re.sub(r'[\*\#\_\`]', '', texto)
-    # Quitar corchetes y su contenido (incluyendo saltos de línea)
+    texto = re.sub(r'[\*\#\_\`\~\"\']', '', texto)
     texto = re.sub(r'\[.*?\]', '', texto, flags=re.DOTALL)
-    # Quitar paréntesis y su contenido (incluyendo saltos de línea)
     texto = re.sub(r'\(.*?\)', '', texto, flags=re.DOTALL)
-    # Reemplazar saltos de línea por puntos para que la voz haga pausas
+    etiquetas = r'(?i)\b(Título|Intro|Verso|Coro|Puente|Outro|Producción|Instrumentos|Ritmo|Estilo|Género|Duración|Tema)\s*\d*\s*:?'
+    texto = re.sub(etiquetas, '', texto)
     texto = texto.replace('\n', '. ')
-    # Limpiar espacios múltiples y puntos dobles
     texto = re.sub(r'\.{2,}', '.', texto)
     texto = re.sub(r'\s+', ' ', texto)
     return texto.strip()
@@ -420,7 +417,6 @@ def run_async_safe(coro):
     def _run(): return asyncio.run(coro)
     with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(_run).result()
 def generar_audio_sincrono(texto: str, voz: str) -> bytes:
-    # LIMPIAMOS EL TEXTO ANTES DE LEERLO
     texto_limpio = limpiar_texto_para_voz(texto)
     async def _gen():
         buf = BytesIO()
@@ -442,7 +438,6 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
                 num = int(m.group(1)); voz_actual = {1: v1, 2: v2, 3: v3}.get(num, v1)
                 linea = re.sub(r"^Locutor\s*\d\s*:?", "", linea, flags=re.IGNORECASE).strip()
             if not linea or linea.lower() in {"elvira", "jorge", "tomas", "carlos"}: continue
-            # LIMPIAMOS CADA LÍNEA
             linea_limpia = limpiar_texto_para_voz(linea)
             if not linea_limpia: continue
             try:
@@ -507,13 +502,38 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
                     st.session_state[s_key] = idx; st.rerun()
     return st.session_state[s_key]
 
-def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
+# --- FUNCIÓN ACTUALIZADA PARA DÚOS ---
+def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str = None) -> bytes:
     try:
-        texto_limpio = limpiar_texto_para_voz(letra)
-        voz_bytes = generar_audio_sincrono(texto_limpio, voz)
+        # 1. Generar o preparar la voz
+        if voz2: # MODO DÚO
+            # Separar por estrofas (dobles saltos de línea o saltos simples si no los hay)
+            estrofas = [e.strip() for e in letra.split('\n\n') if e.strip()]
+            if len(estrofas) <= 1:
+                estrofas = [e.strip() for e in letra.split('\n') if e.strip()]
+                
+            async def _gen_dueto():
+                buf_total = BytesIO()
+                voz_actual = voz1
+                for estrofa in estrofas:
+                    estrofa_limpia = limpiar_texto_para_voz(estrofa)
+                    if not estrofa_limpia: continue
+                    try:
+                        async for chunk in edge_tts.Communicate(estrofa_limpia, voz_actual).stream():
+                            if chunk["type"] == "audio": buf_total.write(chunk["data"])
+                    except: pass
+                    # Alternar voces para la siguiente estrofa
+                    voz_actual = voz2 if voz_actual == voz1 else voz1
+                return buf_total.getvalue()
+            voz_bytes = run_async_safe(_gen_dueto())
+        else: # MODO SOLISTA
+            texto_limpio = limpiar_texto_para_voz(letra)
+            voz_bytes = generar_audio_sincrono(texto_limpio, voz1)
+            
         if not voz_bytes: return None
         voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
         
+        # 2. Descargar la base
         urls = {
             "Reggaeton / Urbano": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
             "Pop / Alegre": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -533,7 +553,6 @@ def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
             return None
             
         base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3")
-        
         base_audio = base_audio - 14 
         
         if len(voz_audio) > len(base_audio):
@@ -637,23 +656,31 @@ if macro_idx == 7:
             st.markdown("### 🎵 Ponerle Música")
             st.caption("Convierte tu letra en una canción con voz y una base musical de fondo.")
             
+            # --- NUEVA LÓGICA DE DÚO ---
+            hacer_dueto = st.checkbox("🎤 Hacer Dúo (Dos Voces alternando estrofas)")
+            
             c1, c2 = st.columns(2)
-            with c1: voz_cancion = st.selectbox("Voz principal:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+            with c1: voz_cancion1 = st.selectbox("Voz 1:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
             with c2: 
+                if hacer_dueto:
+                    voz_cancion2 = st.selectbox("Voz 2:", ["es-MX-JorgeNeural", "es-ES-ElviraNeural", "es-AR-TomasNeural"])
+                else:
+                    voz_cancion2 = None
+                    st.selectbox("Estilo de base musical:", [
+                        "Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", 
+                        "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"
+                    ], key="beat_select_solo")
+
+            if hacer_dueto:
+                st.info("💡 *El sistema alternará la Voz 1 y la Voz 2 cada vez que haya un salto de párrafo (estrofa).*")
                 beat_estilo = st.selectbox("Estilo de base musical:", [
-                    "Reggaeton / Urbano", 
-                    "Pop / Alegre", 
-                    "Balada / Acústico", 
-                    "Rap / Hip-Hop", 
-                    "Lo-Fi Chill", 
-                    "Épico / Trap", 
-                    "Rock", 
-                    "Electrónica / EDM"
-                ])
+                    "Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", 
+                    "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"
+                ], key="beat_select_duo")
             
             if st.button("🎶 Generar Canción (Voz + Base)", type="primary"):
                 with st.spinner("Grabando en el estudio... (esto puede tardar un poco)"):
-                    audio_final = generar_cancion_con_base(letra_final, voz_cancion, beat_estilo)
+                    audio_final = generar_cancion_con_base(letra_final, voz_cancion1, beat_estilo, voz_cancion2)
                     if audio_final:
                         st.success("✅ ¡Canción lista! Dale al play.")
                         st.audio(audio_final, format="audio/mp3")
@@ -1336,13 +1363,4 @@ elif macro_idx == 8:
         with c1:
             tipo_inc = st.selectbox("Tipo de problema:", ["Ruidos molestos", "Humedades / Filtraciones", "Suciedad en zonas comunes", "Daños en el portal/ascensor", "Mascotas", "Otro"])
         with c2:
-            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
-        
-        descripcion = st.text_area("Describe el problema con detalle:", placeholder="Ej: Desde el martes por la noche se escuchan ruidos de taladro en el 3ºB después de las 23:00h...")
-        
-        if st.button("📢 Generar Reclamación Formal", type="primary") and descripcion:
-            with st.spinner("Redactando reclamación..."):
-                prompt = f"Actúa como un abogado. Redacta una reclamación formal dirigida al Presidente de la Comunidad y al Administrador de Fincas por el siguiente problema: '{tipo_inc}'. Afecta a: {vecino_afectado}. Detalles del problema: {descripcion}. Exige una solución inmediata y cita el artículo de la LPH o las ordenanzas municipales que obligue a solucionarlo. Incluye un espacio para mi firma y DNI."
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, "Reclamacion_Comunidad", formatos_extra=True)
+            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="
