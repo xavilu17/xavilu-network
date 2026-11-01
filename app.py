@@ -1,7 +1,6 @@
 """
-Xavilu Network Pro - Fusión 3.0 (Completo)
-Interfaz unificada de asistentes IA, documentos, web y multimedia.
-Las API keys van en secrets.toml (Streamlit Cloud → Settings → Secrets).
+Xavilu Network Pro - Fusión 5.0 (Edición Javi)
+Asistente IA todo en uno con lector de facturas, entrenador y PRL.
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -86,7 +85,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-XAVILU_VERSION = "3.0 - Fusión general"
+XAVILU_VERSION = "5.0 - Edición Javi"
 MAX_FILE_MB = 100
 MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-2.0-flash"
@@ -105,7 +104,6 @@ def init_db():
             "(id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)"
         )
 
-
 def guardar_en_db(tipo, contenido):
     try:
         with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
@@ -116,7 +114,6 @@ def guardar_en_db(tipo, contenido):
     except sqlite3.Error as e:
         st.warning(f"DB historial (guardar): {e}")
 
-
 def obtener_de_db():
     try:
         with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
@@ -126,7 +123,6 @@ def obtener_de_db():
     except sqlite3.Error as e:
         st.warning(f"DB historial (leer): {e}")
         return []
-
 
 init_db()
 
@@ -236,41 +232,31 @@ inyectar_js_fixer()
 # 5. UTILIDADES Y SEGURIDAD
 # ==========================================
 def url_segura(url: str) -> bool:
-    """Bloquea SSRF: solo http/https, sin IPs privadas, loopback ni link-local."""
     try:
         p = urllib.parse.urlparse(url)
         if p.scheme not in ("http", "https") or not p.hostname:
             return False
         host = socket.gethostbyname(p.hostname)
         ip = ipaddress.ip_address(host)
-        return not (
-            ip.is_private or ip.is_loopback or ip.is_link_local
-            or ip.is_reserved or ip.is_multicast
-        )
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
     except Exception:
         return False
 
 def fetch_seguro(url: str, timeout: int = 15, headers: dict = None):
-    if not url_segura(url):
-        raise ValueError(f"URL bloqueada por seguridad: {url}")
-    h = {"User-Agent": "Mozilla/5.0 (compatible; Xavilu/3.0)"}
-    if headers:
-        h.update(headers)
+    if not url_segura(url): raise ValueError(f"URL bloqueada: {url}")
+    h = {"User-Agent": "Mozilla/5.0 (compatible; Xavilu/5.0)"}
+    if headers: h.update(headers)
     return requests.get(url, headers=h, timeout=timeout)
 
 def leer_archivo_universal(upload, modelo_ia: str) -> str:
-    if upload.size > MAX_FILE_MB * 1024 * 1024:
-        st.error(f"Archivo supera {MAX_FILE_MB} MB")
-        return ""
+    if upload.size > MAX_FILE_MB * 1024 * 1024: return ""
     nombre = upload.name.lower()
     try:
-        if nombre.endswith(".txt"):
-            return upload.read().decode("utf-8", errors="ignore")
+        if nombre.endswith(".txt"): return upload.read().decode("utf-8", errors="ignore")
         if nombre.endswith(".pdf"):
             reader = pypdf.PdfReader(BytesIO(upload.getvalue()))
             return "\n".join(p.extract_text() for p in reader.pages if p.extract_text())
-        if nombre.endswith(".docx"):
-            return "\n".join(p.text for p in Document(upload).paragraphs if p.text)
+        if nombre.endswith(".docx"): return "\n".join(p.text for p in Document(upload).paragraphs if p.text)
         if nombre.endswith(".xlsx"):
             df = pd.read_excel(upload, sheet_name=None)
             return "\n\n".join(f"=== {sheet} ===\n{data.to_csv(index=False)}" for sheet, data in df.items())
@@ -288,18 +274,14 @@ def buscar_en_internet(query: str):
     try:
         res = DDGS().text(query, region="es-es", max_results=5)
         return [{"titulo": r.get("title", ""), "url": r.get("href", ""), "resumen": r.get("body", "")} for r in res]
-    except Exception as e:
-        st.warning(f"Búsqueda web: {e}")
-        return []
+    except Exception: return []
 
 def buscar_noticias_deportivas(deporte: str, liga: str):
     if DDGS is None: return []
     try:
         res = DDGS().news(f"últimas noticias {deporte} {liga} hoy", max_results=5)
         return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in res]
-    except Exception as e:
-        st.warning(f"Noticias: {e}")
-        return []
+    except Exception: return []
 
 def extraer_youtube_id(url: str):
     if not url: return None
@@ -309,75 +291,37 @@ def extraer_youtube_id(url: str):
     return None
 
 def transcribir_audio_youtube(url: str, api_key_groq: str) -> str:
-    if not HAS_YTDLP or not HAS_OPENAI:
-        return "[ERROR] Faltan yt-dlp u openai instalados."
-    if not api_key_groq:
-        return "[ERROR] No hay Groq API Key."
-
-    cookies_path = None
-    try:
-        cookie_content = st.secrets.get("YT_COOKIES")
-        if cookie_content:
-            tmp_cookie = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
-            tmp_cookie.write(cookie_content)
-            tmp_cookie.close()
-            cookies_path = tmp_cookie.name
-    except Exception:
-        pass
-
+    if not HAS_YTDLP or not HAS_OPENAI or not api_key_groq: return "[ERROR] Faltan herramientas."
     tmp_dir = tempfile.mkdtemp()
     audio_path = None
     try:
-        ydl_opts = {
-            "format": "bestaudio[abr<=64]/worstaudio[abr<=64]/worstaudio",
-            "outtmpl": os.path.join(tmp_dir, "audio.%(ext)s"),
-            "quiet": True, "noplaylist": True,
-            "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "48"}],
-        }
-        if cookies_path:
-            ydl_opts["cookiefile"] = cookies_path
-
+        ydl_opts = {"format": "bestaudio[abr<=64]/worstaudio", "outtmpl": os.path.join(tmp_dir, "audio.%(ext)s"), "quiet": True, "noplaylist": True, "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "48"}]}
         try:
             ydl_opts["impersonate"] = "chrome"
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(url, download=True)
         except Exception:
             ydl_opts.pop("impersonate", None)
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(url, download=True)
         audio_path = ydl.prepare_filename(info)
         if not audio_path.endswith(".mp3"):
             base = os.path.splitext(audio_path)[0]
-            if os.path.exists(base + ".mp3"):
-                audio_path = base + ".mp3"
-
-        if not os.path.exists(audio_path):
-            return "[ERROR] No se generó el archivo de audio."
-
+            if os.path.exists(base + ".mp3"): audio_path = base + ".mp3"
         size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-        if size_mb > 24:
-            return f"[ERROR] Audio de {size_mb:.1f} MB, supera 25 MB de Groq."
-
+        if size_mb > 24: return f"[ERROR] Audio de {size_mb:.1f} MB, supera 25 MB."
         client = openai.OpenAI(api_key=api_key_groq, base_url="https://api.groq.com/openai/v1")
         with open(audio_path, "rb") as f:
             resp = client.audio.transcriptions.create(model="whisper-large-v3-turbo", file=f, response_format="text")
         return resp if isinstance(resp, str) else resp.text
-    except Exception as e:
-        return f"[ERROR] {e}"
+    except Exception as e: return f"[ERROR] {e}"
     finally:
         if audio_path and os.path.exists(audio_path):
             try: os.remove(audio_path)
-            except OSError: pass
-        if cookies_path and os.path.exists(cookies_path):
-            try: os.remove(cookies_path)
             except OSError: pass
         try: os.rmdir(tmp_dir)
         except OSError: pass
 
 def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key_groq: str) -> str:
-    if not HAS_OPENAI: return "[ERROR] Falta openai instalado."
-    if not api_key_groq: return "[ERROR] No hay Groq API Key."
+    if not HAS_OPENAI or not api_key_groq: return "[ERROR] Faltan herramientas."
     ext = os.path.splitext(nombre_archivo)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
         tmp.write(archivo_bytes)
@@ -387,8 +331,7 @@ def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key
         with open(audio_path, "rb") as f:
             resp = client.audio.transcriptions.create(model="whisper-large-v3-turbo", file=f, response_format="text")
         return resp if isinstance(resp, str) else resp.text
-    except Exception as e:
-        return f"[ERROR] {e}"
+    except Exception as e: return f"[ERROR] {e}"
     finally:
         if os.path.exists(audio_path):
             try: os.remove(audio_path)
@@ -434,8 +377,7 @@ def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: st
             return res
         parte = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
         return client.models.generate_content(model=GEMINI_MODEL, contents=[prompt, parte]).text
-    except Exception as e:
-        return f"[ERROR GEMINI] {e}"
+    except Exception as e: return f"[ERROR GEMINI] {e}"
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try: os.remove(tmp_path)
@@ -472,9 +414,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
             except Exception as e:
                 msg = str(e)
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg: break
-                if "503" in msg and intento < 1:
-                    time.sleep(2)
-                    continue
+                if "503" in msg and intento < 1: time.sleep(2); continue
                 break
 
     if key_groq and HAS_OPENAI:
@@ -511,21 +451,16 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         raw = re.sub(r"^```\w*\n", "", raw)
         raw = re.sub(r"\n```\s*$", "", raw)
         return raw.strip()
-    except Exception as e:
-        return f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}"
+    except Exception as e: return f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}"
 
 
 # ==========================================
-# 6. GENERADORES DE DOCUMENTOS
+# 6. GENERADORES DE DOCUMENTOS Y MANUAL
 # ==========================================
 def obtener_ruta_fuente():
     candidatos = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/DejaVuSans.ttf",
-        "/Library/Fonts/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:/Windows/Fonts/arial.ttf",
+        "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf",
         os.path.join(os.path.dirname(__file__), "DejaVuSans.ttf") if "__file__" in globals() else "",
     ]
     for ruta in candidatos:
@@ -533,34 +468,29 @@ def obtener_ruta_fuente():
     return None
 
 def generar_pdf_pro(titulo: str, contenido: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
+    pdf = FPDF(); pdf.add_page()
     font_path = obtener_ruta_fuente()
     try:
         url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Book cover for ' + titulo + ', cyberpunk')}?width=512&height=512&nologo=true"
         with urllib.request.urlopen(urllib.request.Request(url_img, headers={"User-Agent": "Mozilla/5.0"}), timeout=15) as response:
             img_data = response.read()
-        with open("temp_cover.jpg", "wb") as f:
-            f.write(img_data)
+        with open("temp_cover.jpg", "wb") as f: f.write(img_data)
         pdf.image("temp_cover.jpg", x=40, y=50, w=130)
-        pdf.ln(150)
-        os.remove("temp_cover.jpg")
+        pdf.ln(150); os.remove("temp_cover.jpg")
     except Exception: pass
 
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True)
         pdf.set_font("XaviFont", size=11)
     else:
-        st.warning("No se encontró fuente Unicode. Pon 'DejaVuSans.ttf' junto al script para evitar pérdida de acentos.")
+        st.warning("No se encontró fuente Unicode. Pon 'DejaVuSans.ttf' junto al script.")
         pdf.set_font("Helvetica", size=11)
 
     pdf.set_font("Helvetica", "B", 24)
     pdf.multi_cell(0, 10, txt=titulo, align="C")
     pdf.set_font("Helvetica", "I", 12)
     pdf.cell(0, 10, txt="Generado por Xavilu Network", align="C", ln=True)
-    pdf.set_draw_color(0, 240, 255)
-    pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5)
-    pdf.ln(15)
+    pdf.set_draw_color(0, 240, 255); pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5); pdf.ln(15)
 
     if font_path: pdf.set_font("XaviFont", size=11)
     else: contenido = contenido.encode("latin-1", "replace").decode("latin-1")
@@ -568,47 +498,81 @@ def generar_pdf_pro(titulo: str, contenido: str) -> bytes:
     pdf.multi_cell(0, 8, txt=contenido)
     return bytes(pdf.output())
 
+def generar_manual_pdf() -> bytes:
+    texto_manual = """
+¡Bienvenido a Xavilu Network Pro, Javi!
+
+Esta aplicación es tu centro de control personal. Imagina que tienes un equipo de asistentes súper inteligentes disponibles 24/7 para ayudarte con cualquier cosa. Aquí te explico cómo funciona todo de forma sencilla.
+
+¿CÓMO FUNCIONA LA MAGIA?
+La app no tiene "inteligencia" propia. Lo que hace es conectarse a los cerebros de Google (Gemini), Meta (Groq), o modelos abiertos. Cuando escribes algo, tu app se lo manda a esos cerebros, recibe la respuesta y te la muestra. Por eso necesitas las "API Keys" (son como las contraseñas para usar esos cerebros).
+
+LAS 8 GRANDES ZONAS:
+
+1. XaviWork: Es tu estudio personal. Le dices un tema y te crea mapas mentales, presentaciones para clase o trabajo, informes, y hasta te resume todo en tarjetas para estudiar.
+
+2. Chat y Asistentes: Aquí puedes hablar con la IA como si fuera ChatGPT. También puedes darle personalidad y crear tu propio "Agente", o generar guiones para un Podcast.
+
+3. Documentos y Texto: ¿Te llega un PDF largo? Lo subes y te lo resume. ¿Necesitas crear un Excel? Se lo pides y te lo descarga. También lee facturas y te extrae los datos.
+
+4. Web y Actualidad: Busca en internet, lee páginas web y resume artículos. Si le pegas un enlace de YouTube, te saca el texto de lo que se dice en el vídeo.
+
+5. Multimedia: Genera imágenes con IA solo describiéndolas, o convierte cualquier texto en un audio con voz de persona real.
+
+6. Estudio y Oficios: Tiene un modo "Deberes" para resolver problemas paso a paso, un simulador de entrevistas de trabajo, y el modo "PRL PRO" (con evaluación de riesgos y tests para preparar tus exámenes).
+
+7. Viajes y Hogar: Le dices a dónde quieres ir y te organiza el viaje entero. También te crea recetas con lo que tengas en la nevera.
+
+8. Música y Arte: Escribe letras de canciones, crea portadas de discos y genera poesía.
+
+CONSEJOS PRO:
+- Usa el "Cerebro Global" (en el menú de la izquierda) para subir un PDF y hacerle preguntas sobre él en cualquier pestaña.
+- Si una IA falla o se queda sin cuota, la app saltará automáticamente a otra.
+- Puedes descargar TODO: PDFs, Words, Excels, imágenes y audios.
+
+¡Disfruta creando!
+"""
+    pdf = FPDF(); pdf.add_page()
+    font_path = obtener_ruta_fuente()
+    if font_path:
+        pdf.add_font("XaviFont", "", font_path, uni=True)
+        pdf.set_font("XaviFont", "B", 20)
+    else:
+        pdf.set_font("Helvetica", "B", 20)
+    pdf.multi_cell(0, 10, txt="Manual de Instrucciones - Xavilu Network", align="C")
+    pdf.ln(10)
+    if font_path: pdf.set_font("XaviFont", size=12)
+    else: pdf.set_font("Helvetica", size=12); texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 7, txt=texto_manual)
+    return bytes(pdf.output())
+
 def generar_word(texto: str) -> bytes:
-    doc = Document()
-    doc.add_heading("Documento Xavilu", 0)
+    doc = Document(); doc.add_heading("Documento Xavilu", 0)
     for p in texto.split("\n"):
         if p.strip(): doc.add_paragraph(p.strip())
-    out = BytesIO()
-    doc.save(out)
-    return out.getvalue()
+    out = BytesIO(); doc.save(out); return out.getvalue()
 
 def generar_excel(texto_csv: str) -> bytes:
-    wb = openpyxl.Workbook()
-    ws = wb.active
+    wb = openpyxl.Workbook(); ws = wb.active
     csv_limpio = texto_csv.replace("```csv", "").replace("```", "").strip()
     for r_i, row in enumerate(csv.reader(csv_limpio.split("\n")), 1):
         for c_i, val in enumerate(row, 1):
             cell = ws.cell(row=r_i, column=c_i, value=val)
             if r_i == 1: cell.font = Font(bold=True)
-    out = BytesIO()
-    wb.save(out)
-    return out.getvalue()
+    out = BytesIO(); wb.save(out); return out.getvalue()
 
 def generar_pptx(titulo: str, texto: str) -> bytes:
-    prs = Presentation()
-    slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = titulo
+    prs = Presentation(); slide = prs.slides.add_slide(prs.slide_layouts[0]); slide.shapes.title.text = titulo
     for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
-        lineas = bloque.split("\n")
+        slide = prs.slides.add_slide(prs.slide_layouts[1]); lineas = bloque.split("\n")
         if slide.shapes.title: slide.shapes.title.text = lineas[0][:50]
         contenido = "\n".join(lineas[1:]) if len(lineas) > 1 else ""
         tiene_ph = False
         for shape in slide.placeholders:
-            if shape.placeholder_format.idx == 1:
-                shape.text = contenido
-                tiene_ph = True
+            if shape.placeholder_format.idx == 1: shape.text = contenido; tiene_ph = True
         if not tiene_ph:
-            tx = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(5))
-            tx.text_frame.text = contenido
-    out = BytesIO()
-    prs.save(out)
-    return out.getvalue()
+            tx = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(5)); tx.text_frame.text = contenido
+    out = BytesIO(); prs.save(out); return out.getvalue()
 
 def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos_extra: bool = False):
     if not texto: return
@@ -634,8 +598,7 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
                     url_wa = f"https://wa.me/{num}?text={urllib.parse.quote(texto[:1500])}"
                     components.html(f"<script>window.open('{url_wa}', '_blank');</script>", height=0)
                     st.success("✅ Abriendo WhatsApp...")
-                else:
-                    st.error("⚠️ Configura tu número en la barra lateral izquierda.")
+                else: st.error("⚠️ Configura tu número en la barra lateral izquierda.")
 
 
 # ==========================================
@@ -643,8 +606,7 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
 # ==========================================
 def run_async_safe(coro):
     def _run(): return asyncio.run(coro)
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return pool.submit(_run).result()
+    with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(_run).result()
 
 def generar_audio_sincrono(texto: str, voz: str) -> bytes:
     async def _gen():
@@ -653,9 +615,7 @@ def generar_audio_sincrono(texto: str, voz: str) -> bytes:
             if chunk["type"] == "audio": buf.write(chunk["data"])
         return buf.getvalue()
     try: return run_async_safe(_gen())
-    except Exception as e:
-        st.error(f"Error TTS: {e}")
-        return None
+    except Exception as e: st.error(f"Error TTS: {e}"); return None
 
 def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
     async def _gen():
@@ -679,9 +639,7 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
             except Exception: continue
         return buf.getvalue()
     try: return run_async_safe(_gen())
-    except Exception as e:
-        st.error(f"Error crítico en generación 3 voces: {e}")
-        return None
+    except Exception as e: st.error(f"Error crítico en generación 3 voces: {e}"); return None
 
 
 # ==========================================
@@ -690,24 +648,20 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
-
     def agregar_idea(idea):
         txt = st.session_state[input_key].strip()
         st.session_state[input_key] = f"{txt}\n\n{idea}" if txt else idea
         if f"{key_prefix}_sugs" in st.session_state: del st.session_state[f"{key_prefix}_sugs"]
-
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando ideas..."):
             prompt = f"Dame 3 ideas creativas para {contexto_ia}. Solo lista separada por saltos de línea, sin numeración."
             res = llamar_ia(modelo, prompt, api_key, api_key_openai=api_key_openai, api_key_anthropic=api_key_anthropic)
             st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
-
     if st.session_state.get(f"{key_prefix}_sugs"):
         st.markdown("✨ **Haz clic en una o varias ideas para añadirlas a tu texto:**")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
-            with cols[i]:
-                st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
+            with cols[i]: st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
     return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic="", widget_key=None):
@@ -731,11 +685,9 @@ def borrador_editable(state_key: str, widget_key: str, height: int = 300) -> str
 def chat_input_pro(key: str, placeholder: str = "Mensaje..."):
     t_k, m_k = f"{key}_txt", f"{key}_msg"
     if t_k not in st.session_state: st.session_state[t_k] = ""
-
     def _send():
         msg = st.session_state.get(t_k, "").strip()
         if msg: st.session_state[m_k] = msg; st.session_state[t_k] = ""
-
     c1, c2 = st.columns([6, 1])
     with c1: st.text_input("msg", placeholder=placeholder, key=t_k, label_visibility="collapsed")
     with c2: st.button("➤", key=f"{key}_btn", on_click=_send, use_container_width=True, type="primary")
@@ -745,14 +697,12 @@ def custom_tabs(tab_names, key_name, default_idx=0):
     s_key = f"tab_{key_name}"
     if s_key not in st.session_state: st.session_state[s_key] = default_idx
     for i in range(0, len(tab_names), 5):
-        chunk = tab_names[i:i + 5]
-        cols = st.columns(5)
+        chunk = tab_names[i:i + 5]; cols = st.columns(5)
         for j, name in enumerate(chunk):
             idx = i + j
             with cols[j]:
                 if st.button(name, key=f"btn_{key_name}_{idx}", use_container_width=True, type="primary" if st.session_state[s_key] == idx else "secondary"):
-                    st.session_state[s_key] = idx
-                    st.rerun()
+                    st.session_state[s_key] = idx; st.rerun()
     return st.session_state[s_key]
 
 
@@ -764,8 +714,7 @@ if not st.session_state.sidebar_visible:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True):
-            st.session_state.sidebar_visible = True
-            st.rerun()
+            st.session_state.sidebar_visible = True; st.rerun()
 
 st.markdown(f"<h1>XAVILU NETWORK</h1><p style='text-align:center; color:#FFD700; font-weight:bold; letter-spacing:2px; text-shadow: 0 0 10px #FFD700;'>● v{XAVILU_VERSION}</p>", unsafe_allow_html=True)
 
@@ -774,8 +723,7 @@ if st.session_state.sidebar_visible:
         try: st.image("logo.png", use_container_width=True)
         except Exception: st.markdown("### 🪐 PANEL DE CONTROL")
         if st.button("⛶ Ocultar Menú", use_container_width=True):
-            st.session_state.sidebar_visible = False
-            st.rerun()
+            st.session_state.sidebar_visible = False; st.rerun()
 
         st.markdown("---")
         modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
@@ -783,11 +731,9 @@ if st.session_state.sidebar_visible:
         st.markdown("#### 🔑 Estado de Conexiones")
         for prov in ["gemini", "groq", "silicon", "mistral", "openrouter"]:
             conectado = bool(_get_key(prov))
-            etiqueta = "✅" if conectado else "⚠️"
-            st.caption(f"{etiqueta} {prov.capitalize()}")
+            st.caption(f"{'✅' if conectado else '⚠️'} {prov.capitalize()}")
 
         with st.expander("⚙️ Keys manuales (solo si no usas secrets.toml)"):
-            st.caption("En Streamlit Cloud las keys van en **Settings → Secrets**.")
             st.session_state.api_key_gemini_manual = st.text_input("Gemini API Key", type="password", value=st.session_state.api_key_gemini_manual)
             st.session_state.api_key_groq_manual = st.text_input("Groq API Key", type="password", value=st.session_state.api_key_groq_manual)
             st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow API Key", type="password", value=st.session_state.api_key_silicon_manual)
@@ -796,19 +742,19 @@ if st.session_state.sidebar_visible:
 
         st.markdown("---")
         st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
+        
+        st.markdown("---")
+        st.download_button("📖 Descargar Manual (PDF)", generar_manual_pdf(), "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
+
         st.markdown("---")
         archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
         if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
             with st.spinner("Procesando..."):
                 st.session_state.global_context = leer_archivo_universal(archivo_global, modelo_seleccionado)[:5000]
-                st.session_state.global_file_name = archivo_global.name
-                st.success("✅ Memorizado.")
+                st.session_state.global_file_name = archivo_global.name; st.success("✅ Memorizado.")
         if st.session_state.get("global_file_name"):
             st.info(f"Activo: **{st.session_state.global_file_name}**")
-            if st.button("🗑️ Olvidar"):
-                st.session_state.global_context = ""
-                st.session_state.global_file_name = ""
-                st.rerun()
+            if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
 
         st.markdown("---")
         for h in obtener_de_db():
@@ -850,8 +796,7 @@ if macro_idx == 0:
 
     def _panel_borrador(nombre, prompt_gen, state_key, edit_key, superpowers, download_label=None):
         if st.button(f"✨ Generar {nombre}", key=f"btn_{state_key}", type="primary"):
-            if not st.session_state.xw_tema_input.strip():
-                st.warning("Define el tema arriba primero.")
+            if not st.session_state.xw_tema_input.strip(): st.warning("Define el tema arriba primero.")
             else:
                 with st.spinner(f"Generando {nombre}..."):
                     full = f"{contexto_xw}\n\n{prompt_gen}\n\nTEMA: {st.session_state.xw_tema_input}"
@@ -865,8 +810,7 @@ if macro_idx == 0:
             if n == 0: return
             cols = st.columns(n)
             for i, (label, prompt) in enumerate(superpowers):
-                with cols[i]:
-                    boton_superpoder_borrador(st.session_state[state_key], prompt, f"{state_key}_p{i}", modelo_seleccionado, st.session_state.api_key_gemini_manual, state_key, widget_key=edit_key)
+                with cols[i]: boton_superpoder_borrador(st.session_state[state_key], prompt, f"{state_key}_p{i}", modelo_seleccionado, st.session_state.api_key_gemini_manual, state_key, widget_key=edit_key)
             if download_label:
                 with cols[-1]:
                     if state_key == "xw_tabla": st.download_button(download_label, generar_excel(st.session_state[state_key]), "tabla.xlsx", key=f"dl_{state_key}", use_container_width=True)
@@ -1119,7 +1063,7 @@ elif macro_idx == 1:
 # CATEGORÍA 2: DOCUMENTOS Y TEXTO
 # ==========================================
 elif macro_idx == 2:
-    sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "📇 QR & CV", "📋 PORTAPAPELES"]
+    sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🧾 FACTURAS", "📇 QR & CV", "📋 PORTAPAPELES"]
     sub_idx = custom_tabs(sub_names, "doc_sub", 0)
 
     if sub_idx == 0:
@@ -1193,6 +1137,31 @@ elif macro_idx == 2:
             st.download_button("📥 Descargar PDF (con portada)", generar_pdf_pro(titulo, st.session_state.pdf_txt), f"{titulo}.pdf")
 
     elif sub_idx == 4:
+        st.markdown("#### 🧾 Lector Mágico de Facturas y Tickets")
+        st.caption("Sube una foto o PDF de tu factura. La IA leerá los datos y los convertirá en una tabla de Excel.")
+        arch_factura = st.file_uploader("Sube la factura (JPG, PNG o PDF):", type=["jpg", "jpeg", "png", "pdf"])
+        
+        if st.button("🪄 Extraer Datos", type="primary") and arch_factura:
+            with st.spinner("Escaneando factura con visión artificial..."):
+                prompt_factura = "Extrae los datos de esta factura. Devuelve ESTRICTAMENTE un formato CSV con las columnas: Proveedor, Fecha, Concepto, Base_Imponible, IVA, Total. Si falta algún dato, pon 0 o 'N/A'. No añadas markdown, solo el texto plano separado por comas."
+                
+                if arch_factura.name.lower().endswith(".pdf"):
+                    texto_pdf = leer_archivo_universal(arch_factura, modelo_seleccionado)
+                    res = llamar_ia(modelo_seleccionado, f"{prompt_factura}\n\nTexto extraído:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                else:
+                    res = analizar_archivo_con_gemini(arch_factura.getvalue(), "image/jpeg", prompt_factura, st.session_state.api_key_gemini_manual)
+                
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.success("✅ Factura procesada con éxito.")
+                    st.text_area("Datos extraídos (puedes editarlos):", value=res, height=150, key="factura_data")
+                    if st.button("📊 Descargar a Excel"):
+                        try:
+                            st.download_button("💾 Descargar Excel", generar_excel(st.session_state.factura_data), "factura.xlsx", use_container_width=True)
+                        except Exception as e:
+                            st.error("No se pudo generar el Excel. Revisa que el formato sea válido.")
+
+    elif sub_idx == 5:
         c1, c2 = st.columns(2)
         with c1:
             txt = st.text_input("Texto/URL QR:")
@@ -1205,7 +1174,7 @@ elif macro_idx == 2:
                 d, _, _ = cv2.QRCodeDetector().detectAndDecode(np.array(Image.open(img).convert('RGB')))
                 if d: st.success(d)
 
-    elif sub_idx == 5:
+    elif sub_idx == 6:
         st.markdown("#### Portapapeles")
         txt = st.text_area("Pega texto:")
         inst = campo_con_ideas("¿Qué hago?", "clip", "instrucciones", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Resume")
@@ -1337,11 +1306,11 @@ elif macro_idx == 4:
 
 
 # ==========================================
-# CATEGORÍA 5: ESTUDIO Y OFICIOS
+# CATEGORÍA 5: ESTUDIO Y OFICIOS (PRL)
 # ==========================================
 elif macro_idx == 5:
     st.markdown("#### 🎓 Estudio y Oficios")
-    sub_names = ["📚 DEBERES", "👔 ENTREVISTA", "🛠️ PRL (Riesgos)"]
+    sub_names = ["📚 DEBERES", "👔 ENTREVISTA", "🛠️ PRL PRO"]
     sub_idx = custom_tabs(sub_names, "study_sub", 0)
 
     if sub_idx == 0:
@@ -1386,24 +1355,71 @@ elif macro_idx == 5:
                     st.rerun()
 
     elif sub_idx == 2:
-        st.markdown("### Prevención de Riesgos Laborales (PRL)")
-        tarea = st.text_area("Describe la tarea o el entorno de trabajo:", placeholder="Ej: Trabajo en altura en una obra, o Manejo de productos químicos en laboratorio...")
-        if st.button("🦺 Analizar Riesgos", type="primary") and tarea:
-            with st.spinner("Analizando riesgos..."):
-                prompt = f"Actúa como un técnico de Prevención de Riesgos Laborales. Analiza la siguiente situación y dime: 1. Riesgos principales, 2. Medidas preventivas, 3. Equipos de Protección Individual (EPIs) necesarios:\n\n{tarea}"
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else:
-                    st.markdown(res)
-                    botones_descarga(res, "Informe_PRL", formatos_extra=True)
+        st.markdown("### 🦺 PRL PRO - Prevención de Riesgos Laborales")
+        
+        tabs_prl = st.tabs(["📊 Evaluación de Riesgos", "📝 Test de Examen", "📖 Normativa Básica"])
+        
+        with tabs_prl[0]:
+            st.markdown("#### Matriz de Evaluación de Riesgos")
+            puesto = st.text_input("Puesto de trabajo o tarea:", placeholder="Ej: Soldador en taller metalúrgico, Enfermera en urgencias...")
+            entorno = st.text_area("Describe el entorno o herramientas (opcional):", placeholder="Ej: Uso de amoladora, espacio confinado, turnos de noche...")
+            
+            if st.button("🔍 Generar Evaluación Completa", type="primary") and puesto:
+                with st.spinner("Analizando riesgos y normativa..."):
+                    prompt = f"""Actúa como un Técnico Superior en Prevención de Riesgos Laborales en España.
+                    Realiza una evaluación de riesgos para el puesto/tarea: '{puesto}'.
+                    Contexto adicional: '{entorno}'.
+                    
+                    Devuelve el resultado en formato de tabla Markdown con las siguientes columnas:
+                    | Riesgo Identificado | Probabilidad (Baja/Media/Alta) | Consecuencia (Leve/Grave/Mortal) | Nivel de Riesgo | Medidas Preventivas | EPIs Necesarios |
+                    
+                    Añade también un apartado final de 'Recomendaciones Generales'."""
+                    
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else:
+                        st.markdown(res)
+                        botones_descarga(res, f"Evaluacion_PRL_{puesto.replace(' ', '_')}", formatos_extra=True)
+
+        with tabs_prl[1]:
+            st.markdown("#### Test de Preparación para el Curso")
+            tema_test = st.selectbox("Selecciona el área de estudio:", 
+                                     ["Ley de Prevención de Riesgos Laborales (Ley 31/1995)", 
+                                      "Equipos de Protección Individual (EPIs)", 
+                                      "Primeros Auxilios y Evacuación",
+                                      "Riesgos Ergonómicos y Psicosociales",
+                                      "Seguridad en Máquinas y Herramientas"])
+            
+            if st.button("📝 Generar Examen de 10 Preguntas", type="primary"):
+                with st.spinner("Preparando el test..."):
+                    prompt = f"""Genera un test de 10 preguntas tipo test (con 4 opciones A, B, C, D) sobre: '{tema_test}'.
+                    Al final del test, incluye una sección de 'Soluciones' explicando por qué la respuesta correcta es la correcta.
+                    Basate en la normativa española de PRL."""
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else:
+                        st.markdown(res)
+                        botones_descarga(res, "Test_PRL", formatos_extra=True)
+
+        with tabs_prl[2]:
+            st.markdown("#### Resumen de Normativa Clave")
+            st.info("Pulsa el botón para generar un resumen de las leyes más importantes que entran en los exámenes de PRL.")
+            if st.button("📖 Generar Resumen de Leyes"):
+                with st.spinner("Resumiendo legislación..."):
+                    prompt = "Haz un resumen estructurado de la Ley 31/1995 de Prevención de Riesgos Laborales en España. Incluye: 1. Objeto y ámbito de aplicación, 2. Principios de la acción preventiva, 3. Derechos y obligaciones de los trabajadores. Hazlo fácil de memorizar para un examen."
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else:
+                        st.markdown(res)
+                        botones_descarga(res, "Resumen_Ley_PRL", formatos_extra=True)
 
 
 # ==========================================
-# CATEGORÍA 6: VIAJES Y HOGAR
+# CATEGORÍA 6: VIAJES Y HOGAR (ENTRENADOR)
 # ==========================================
 elif macro_idx == 6:
     st.markdown("#### 🌍 Viajes y Hogar")
-    sub_names = ["✈️ ITINERARIO", "🏠 COCINA"]
+    sub_names = ["✈️ ITINERARIO", "🏠 COCINA", "💪 ENTRENADOR"]
     sub_idx = custom_tabs(sub_names, "travel_sub", 0)
 
     if sub_idx == 0:
@@ -1434,10 +1450,88 @@ elif macro_idx == 6:
                     st.markdown(res)
                     botones_descarga(res, "Recetas_Hogar")
 
+    elif sub_idx == 2:
+        st.markdown("### 💪 Entrenador Personal IA")
+        c1, c2 = st.columns(2)
+        with c1:
+            edad = st.number_input("Edad:", min_value=14, max_value=99, value=25)
+            peso = st.number_input("Peso (kg):", min_value=40, max_value=200, value=75)
+            altura = st.number_input("Altura (cm):", min_value=130, max_value=220, value=175)
+        with c2:
+            objetivo = st.selectbox("Objetivo principal:", ["Perder grasa", "Ganar músculo", "Mantenerme en forma", "Mejorar resistencia"])
+            equipo = st.selectbox("¿Dónde entrenas?", ["Gimnasio completo", "En casa con mancuernas", "En casa sin material (calistenia)", "Al aire libre"])
+            dias_entreno = st.slider("Días a la semana que quieres entrenar:", 2, 6, 4)
+            
+        if st.button("📋 Generar Rutina y Dieta", type="primary"):
+            with st.spinner("Diseñando tu plan personalizado..."):
+                prompt = f"Actúa como un entrenador personal y nutricionista experto. Necesito un plan para un usuario de {edad} años, {peso} kg, {altura} cm. Su objetivo es: '{objetivo}'. Va a entrenar {dias_entreno} días a la semana en '{equipo}'. Genera: 1. Una rutina semanal detallada (ejercicios, series y repeticiones). 2. Consejos nutricionales básicos adaptados a su objetivo."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
+
 
 # ==========================================
 # CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
 elif macro_idx == 7:
-    st.markdown("### 🎵 MÚSICA Y ARTE")
-    st.info("Módulo de letras, canciones y portadas listo para expandir.")
+    st.markdown("#### 🎵 Música y Arte")
+    sub_names = ["🎤 LETRAS", "🖼️ PORTADAS", "📝 POESÍA"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
+
+    if sub_idx == 0:
+        st.markdown("### Generador de Letras de Canciones")
+        tema_cancion = st.text_input("¿De qué trata la canción?", placeholder="Ej: Un desamor en verano, la fiesta de mi pueblo...")
+        c1, c2 = st.columns(2)
+        with c1: genero = st.selectbox("Género musical:", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
+        with c2: artista_estilo = st.text_input("Estilo de artista (opcional):", placeholder="Ej: Bad Bunny, Quevedo, Rosalía...")
+        
+        if st.button("🎤 Escribir Letra", type="primary") and tema_cancion:
+            with st.spinner("Componiendo..."):
+                prompt = f"Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. "
+                if artista_estilo: prompt += f"Imita el estilo lírico de {artista_estilo}. "
+                prompt += "Incluye estructura (Intro, Verso 1, Coro, Verso 2, Coro, Puente, Outro) y añade algunas indicaciones de producción entre corchetes (ej: [Bajo pesado])."
+                
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Letra_Cancion")
+
+    elif sub_idx == 1:
+        st.markdown("### Generador de Portadas de Álbum")
+        prompt_portada = st.text_input("Describe la portada de tu disco:", placeholder="Ej: Un astronauta llorando en un neón de Tokio...")
+        estilo_arte = st.selectbox("Estilo visual:", ["Fotorrealista", "Pintura al óleo", "Ilustración Anime", "Surrealista", "Retro 80s", "Abstracto"])
+        
+        if st.button("🖼️ Crear Portada", type="primary") and prompt_portada:
+            with st.spinner("Diseñando portada..."):
+                try:
+                    query = urllib.parse.quote(f"Album cover art, {prompt_portada}, {estilo_arte}, high quality, no text")
+                    url = f"https://image.pollinations.ai/prompt/{query}?width=1024&height=1024&nologo=true"
+                    if url_segura(url):
+                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=30) as response:
+                            img_data = response.read()
+                        st.image(img_data, caption="Portada del Álbum", use_container_width=True)
+                        st.download_button("📥 Descargar Portada", img_data, "portada_album.png", "image/png")
+                except Exception as e:
+                    st.error(f"Error al generar la portada: {e}")
+
+    elif sub_idx == 2:
+        st.markdown("### Generador de Poesía y Rimas")
+        tema_poema = st.text_input("Tema del poema:", placeholder="Ej: La soledad, el mar, el paso del tiempo...")
+        estilo_poema = st.selectbox("Estilo:", ["Soneto clásico", "Verso libre", "Rima infantil", "Haiku", "Poesía del Siglo de Oro"])
+        
+        if st.button("📝 Crear Poema", type="primary") and tema_poema:
+            with st.spinner("Inspirando a las musas..."):
+                prompt = f"Escribe un poema sobre '{tema_poema}'. El estilo debe ser: {estilo_poema}. Cuida la métrica y las figuras literarias."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res)
+                    botones_descarga(res, "Poema")
+                    
+                    if st.button("🔊 Recitar Poema"):
+                        aud = generar_audio_sincrono(res, "es-ES-ElviraNeural")
+                        if aud: st.audio(aud, format="audio/mp3")
