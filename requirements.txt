@@ -21,3 +21,4 @@ duckduckgo-search
 google-genai
 openai
 anthropic
+pydub
