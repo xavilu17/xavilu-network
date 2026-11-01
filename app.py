@@ -1,5 +1,5 @@
 """
-Xavilu Network Pro - Edición Final
+Xavilu Network Pro - Edición Escribe tu Letra + FFmpeg de Bolsillo
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -15,7 +15,16 @@ from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
 import pandas as pd
 from youtube_transcript_api import YouTubeTranscriptApi
+
+# --- MAGIA PARA EL AUDIO ---
+import imageio_ffmpeg
 from pydub import AudioSegment
+try:
+    # Le decimos a pydub que use el FFmpeg que viene con python
+    AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
+    AudioSegment.ffprobe = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    pass
 
 try: import cv2; HAS_CV2 = True
 except ImportError: HAS_CV2 = False
@@ -61,7 +70,7 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": [], "letra_generada": "", "letra_edit": ""
+    "alex_chat_history": [], "letra_edit": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -302,7 +311,6 @@ def obtener_ruta_fuente():
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
     
-    # Si el usuario sube una foto, la usamos como portada principal en el centro
     if logo_bytes:
         try:
             with open("temp_custom_cover.jpg", "wb") as f: f.write(logo_bytes)
@@ -312,7 +320,6 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
         except Exception as e:
             st.error(f"Error al procesar la imagen subida: {e}")
     else:
-        # Si no, generamos la de la IA
         try:
             url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote('Book cover for ' + titulo + ', cyberpunk')}?width=512&height=512&nologo=true"
             with urllib.request.urlopen(urllib.request.Request(url_img, headers={"User-Agent": "Mozilla/5.0"}), timeout=15) as response: img_data = response.read()
@@ -504,27 +511,21 @@ def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
         r = requests.get(url_base, headers={"User-Agent": "Mozilla/5.0"})
         base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3")
         
-        # Bajar el volumen de la base para que la voz se escuche clara
         base_audio = base_audio - 14 
         
-        # Repetir la base si la letra es más larga
         if len(voz_audio) > len(base_audio):
             repeticiones = (len(voz_audio) // len(base_audio)) + 1
             base_audio = base_audio * repeticiones
             
         base_audio = base_audio[:len(voz_audio)]
         
-        # Mezclar
         cancion = base_audio.overlay(voz_audio)
         
         out = BytesIO()
         cancion.export(out, format="mp3")
         return out.getvalue()
     except Exception as e:
-        if "ffmpeg" in str(e).lower() or "winerror 2" in str(e).lower():
-            st.error("❌ Falta instalar FFmpeg. Abre la terminal y escribe: winget install ffmpeg, luego reinicia VS Code.")
-        else:
-            st.error(f"Error al mezclar el audio: {e}")
+        st.error(f"Error al mezclar el audio: {e}")
         return None
 
 if not st.session_state.sidebar_visible:
@@ -583,12 +584,18 @@ if macro_idx == 7:
     
     if sub_idx == 0:
         st.markdown("### Generador de Letras de Canciones")
-        tema_cancion = st.text_input("¿De qué trata la canción?", placeholder="Ej: Un desamor en verano...")
-        c1, c2 = st.columns(2)
-        with c1: genero = st.selectbox("Género:", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
-        with c2: artista_estilo = st.text_input("Estilo de artista (opcional):", placeholder="Ej: Bad Bunny...")
         
-        if st.button("🎤 Escribir Letra", type="primary") and tema_cancion:
+        # 1. Cuadro de texto para escribir tu propia letra
+        st.info("💡 **Puedes escribir tu propia letra aquí abajo** o dejar que la IA te ayude rellenando los datos y pulsando el botón.")
+        
+        if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
+        
+        tema_cancion = st.text_input("¿De qué trata la canción? (Solo para la IA)", placeholder="Ej: Un desamor en verano...")
+        c1, c2 = st.columns(2)
+        with c1: genero = st.selectbox("Género (IA):", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
+        with c2: artista_estilo = st.text_input("Estilo de artista (Opcional IA):", placeholder="Ej: Bad Bunny...")
+        
+        if st.button("🪄 Generar Letra Automática con IA", use_container_width=True) and tema_cancion:
             with st.spinner("Componiendo..."):
                 prompt = f"Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. "
                 if artista_estilo: prompt += f"Imita el estilo de {artista_estilo}. "
@@ -596,14 +603,14 @@ if macro_idx == 7:
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
                 if "[ERROR" in res: st.error(res)
                 else: 
-                    st.session_state.letra_generada = res
-                    if "letra_edit" in st.session_state: del st.session_state["letra_edit"] 
-                
-        if st.session_state.get("letra_generada"):
-            st.markdown("### 📜 Letra Generada")
-            borrador_editable("letra_generada", "letra_edit", height=250)
+                    st.session_state.letra_edit = res # Metemos la letra directamente en el cuadro de texto
+                    st.rerun()
+
+        # Este es el cuadro de texto que siempre estará visible
+        letra_final = st.text_area("📜 Letra de la canción (Editable):", key="letra_edit", height=300)
             
-            botones_descarga(st.session_state.letra_generada, "Letra_Cancion")
+        if letra_final.strip():
+            botones_descarga(letra_final, "Letra_Cancion")
             
             st.markdown("---")
             st.markdown("### 🎵 Ponerle Música")
@@ -625,7 +632,7 @@ if macro_idx == 7:
             
             if st.button("🎶 Generar Canción (Voz + Base)", type="primary"):
                 with st.spinner("Grabando en el estudio... (esto puede tardar un poco)"):
-                    audio_final = generar_cancion_con_base(st.session_state.letra_generada, voz_cancion, beat_estilo)
+                    audio_final = generar_cancion_con_base(letra_final, voz_cancion, beat_estilo)
                     if audio_final:
                         st.success("✅ ¡Canción lista! Dale al play.")
                         st.audio(audio_final, format="audio/mp3")
@@ -658,5 +665,5 @@ if macro_idx == 7:
                         aud = generar_audio_sincrono(res, "es-ES-ElviraNeural")
                         if aud: st.audio(aud, format="audio/mp3")
 
-# (El resto de pestañas como XaviWork, Documentos, etc. siguen exactamente igual que en el código anterior)
-# ... por brevedad, asumo que tienes el resto del código que te pasé anteriormente.
+# El resto del código (Categorías 0 a 6 y 8) sigue exactamente igual que en la versión anterior.
+# Para no hacer el mensaje infinito, asumo que mantienes el resto de bloques tal cual.
