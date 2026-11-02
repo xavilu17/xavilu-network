@@ -1,6 +1,3 @@
-"""
-Xavilu Network Pro - Edición Final (Suno + Multi-Presupuestos + PDF sin portada IA)
-"""
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_markmap import markmap
@@ -21,8 +18,7 @@ try:
     import imageio_ffmpeg
     AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
     AudioSegment.ffprobe = imageio_ffmpeg.get_ffmpeg_exe()
-except ImportError:
-    pass
+except ImportError: pass
 
 try: import cv2; HAS_CV2 = True
 except ImportError: HAS_CV2 = False
@@ -67,7 +63,7 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": [], "letra_edit": "", "suno_prompt": "", "suno_letra": ""
+    "alex_chat_history": [], "letra_edit": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -75,40 +71,28 @@ for _k, _v in _defaults.items():
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-.stApp { background-color: #000000 !important; background-image: radial-gradient(circle at 50% 50%, #111111 0%, #000000 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
-header[data-testid="stHeader"] { background-color: #000000 !important; }
+.stApp { background-color: #000 !important; background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%) !important; color: #f7dfa3 !important; font-family: 'Rajdhani', sans-serif !important; }
+header[data-testid="stHeader"] { background-color: #000 !important; }
 [data-testid="stAppDeployButton"], [data-testid="stDecoration"] { display: none !important; }
-h1 { font-family: 'Orbitron', sans-serif !important; color: #FFD700 !important; text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700, 0 0 35px #FF8C00 !important; text-align: center; letter-spacing: 3px; margin-top: 0px !important; padding-top: 0px !important; }
-h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #ffffff !important; text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff, 0 0 30px #FF007F !important; text-align: center; letter-spacing: 3px; }
-h4 { font-family: 'Orbitron', sans-serif !important; color: #00f0ff !important; text-shadow: 0 0 8px #00f0ff, 0 0 15px #FF007F !important; letter-spacing: 1px; }
+h1 { font-family: 'Orbitron', sans-serif !important; color: #FFD700 !important; text-shadow: 0 0 15px #FF8C00, 0 0 25px #FFD700 !important; text-align: center; letter-spacing: 3px; margin-top: 0px !important; padding-top: 0px !important; }
+h2, h3 { font-family: 'Orbitron', sans-serif !important; color: #fff !important; text-shadow: 0 0 10px #FF007F, 0 0 20px #00f0ff !important; text-align: center; }
 [data-testid="stWidgetLabel"] p { color: #00f0ff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: bold !important; text-transform: uppercase !important; background: rgba(0, 240, 255, 0.1) !important; padding: 5px 10px !important; border-left: 4px solid #FF007F !important; border-radius: 4px !important; display: inline-block !important; margin-bottom: 8px !important; }
-[data-testid="stSidebar"] { background-color: rgba(5, 5, 10, 0.98) !important; border-right: 2px solid #00f0ff !important; box-shadow: 5px 0 15px rgba(0, 240, 255, 0.2) !important; }
-[data-testid="stRadio"] > div[role="radiogroup"] label div p, [data-testid="stRadio"] > div[role="radiogroup"] label div span { color: #ffffff !important; font-size: 15px !important; font-weight: 600 !important; }
+[data-testid="stSidebar"] { background-color: rgba(5, 5, 10, 0.98) !important; border-right: 2px solid #00f0ff !important; }
 [data-testid="stFileUploader"], [data-testid="stExpander"] { background-color: #0a0a0a !important; border: 1px solid #00f0ff !important; border-radius: 8px !important; }
-[data-testid="stFileUploaderDropzone"] { background-color: #0a0a0a !important; color: #ffffff !important; }
-[data-testid="stFileUploaderDropzone"] p, [data-testid="stExpander"] summary { color: #00f0ff !important; font-weight: bold !important; }
-div.stButton > button[kind="secondary"] { background-color: #0a0a0a !important; color: #ffffff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: bold !important; border: 1px solid #00f0ff !important; border-radius: 25px !important; padding: 10px 15px !important; margin-bottom: 5px !important; transition: all 0.3s ease !important; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important; width: 100% !important; }
-div.stButton > button[kind="secondary"]:hover { background-color: rgba(0, 240, 255, 0.15) !important; color: #00f0ff !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.7) !important; transform: translateY(-2px) !important; }
-div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #00f0ff 0%, #FF007F 100%) !important; color: #000000 !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: 900 !important; border: 2px solid #ffffff !important; border-radius: 25px !important; padding: 10px 15px !important; margin-bottom: 5px !important; transition: all 0.3s ease !important; box-shadow: 0 0 18px rgba(0, 240, 255, 0.9), 0 0 32px rgba(255, 0, 127, 0.7) !important; transform: translateY(-1px) !important; width: 100% !important; }
-.stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"], .stNumberInput input { background-color: #0a0a0a !important; border: 1px solid #00f0ff !important; border-radius: 8px !important; color: #ffffff !important; font-size: 16px !important; box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1) !important; }
-.stTextArea textarea:focus, .stTextInput input:focus { border: 1px solid #FF007F !important; box-shadow: 0 0 15px rgba(255, 0, 127, 0.5) !important; }
-[data-testid="stTextInput"] div, [data-testid="stTextInput"] input { background-color: #0a0a0a !important; color: #ffffff !important; }
-[data-testid="stTextInput"] > div > div { border: none !important; box-shadow: none !important; }
-[data-testid="stTextInput"] input { caret-color: #00f0ff !important; border: 1px solid #00f0ff !important; border-radius: 10px !important; padding: 10px 14px !important; font-size: 15px !important; outline: none !important; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important; transition: all 0.3s ease !important; width: 100% !important; }
-[data-testid="stTextInput"] input:focus { border: 1px solid #FF007F !important; box-shadow: 0 0 18px rgba(255, 0, 127, 0.6) !important; }
-[data-testid="stTextInput"] input::placeholder { color: #888888 !important; opacity: 1 !important; }
-div.stButton > button:not([kind="primary"]):not([kind="secondary"]), div[data-testid="stDownloadButton"] > button { background: #0a0a0a !important; color: #00f0ff !important; border: 1px solid #00f0ff !important; border-radius: 25px !important; font-family: 'Orbitron', sans-serif !important; font-weight: bold !important; padding: 10px 20px !important; transition: all 0.3s !important; box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important; }
-div.stButton > button:not([kind="primary"]):not([kind="secondary"]):hover, div[data-testid="stDownloadButton"] > button:hover { background: linear-gradient(135deg, #FF007F 0%, #00f0ff 100%) !important; color: #000 !important; border: 1px solid #fff !important; transform: translateY(-2px); box-shadow: 0 0 20px rgba(255, 0, 127, 0.8) !important; }
-[data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.8) !important; border: 1px solid #FF007F !important; border-radius: 15px !important; padding: 10px; box-shadow: 0 0 15px rgba(255, 0, 127, 0.3) !important; }
+[data-testid="stFileUploaderDropzone"] { background-color: #0a0a0a !important; color: #fff !important; }
+div.stButton > button[kind="secondary"] { background-color: #0a0a0a !important; color: #fff !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; border: 1px solid #00f0ff !important; border-radius: 25px !important; transition: all 0.3s !important; width: 100% !important; }
+div.stButton > button[kind="secondary"]:hover { background-color: rgba(0, 240, 255, 0.15) !important; color: #00f0ff !important; }
+div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #00f0ff 0%, #FF007F 100%) !important; color: #000 !important; font-family: 'Orbitron', sans-serif !important; font-size: 13px !important; font-weight: 900 !important; border: 2px solid #fff !important; border-radius: 25px !important; width: 100% !important; }
+.stTextArea textarea, .stTextInput input, .stSelectbox [data-baseweb="select"] { background-color: #0a0a0a !important; border: 1px solid #00f0ff !important; border-radius: 8px !important; color: #fff !important; }
+[data-testid="stTextInput"] input { border: 1px solid #00f0ff !important; border-radius: 10px !important; color: #fff !important; background: #0a0a0a !important; }
+[data-testid="stChatMessage"] { background: rgba(10, 10, 15, 0.8) !important; border: 1px solid #FF007F !important; border-radius: 15px !important; }
 .stAlert { border-radius: 10px; font-weight: bold; background-color: rgba(0, 240, 255, 0.1) !important; border-left: 5px solid #00f0ff !important; }
-[data-testid="stVerticalBlock"] > div { padding-bottom: 0.5rem !important; }
 .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
-@media (max-width: 600px) { .block-container { padding-top: 0.5rem !important; } h1 { font-size: 2.2rem !important; letter-spacing: 1px !important; margin-top: 0px !important; } [data-testid="stWidgetLabel"] p { font-size: 11px !important; padding: 3px 8px !important; } div.stButton > button { padding: 6px 10px !important; font-size: 12px !important; margin-bottom: 3px !important; } .stTextArea textarea { font-size: 14px !important; } }
 </style>
 """, unsafe_allow_html=True)
 
 def inyectar_js_fixer():
-    components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#ffffff','important');}});}f();setInterval(f,300);})();</script>", height=0)
+    components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#fff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
 
 def limpiar_texto_para_voz(texto):
@@ -204,7 +188,7 @@ def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key
             except: pass
 
 def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
-    with st.expander("📎 Adjuntar archivo para esta acción (Opcional)"):
+    with st.expander("📎 Adjuntar archivo (Opcional)"):
         archivo = st.file_uploader("Sube PDF, Word, TXT o Imagen", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"], key=f"adj_{key_suffix}")
         if not archivo: return ""
         nombre = archivo.name.lower()
@@ -257,6 +241,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
         prompt_final = f"Historial:\n{contexto_chat}\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
     key_gemini, key_groq, key_silicon, key_mistral, key_openrouter = _get_key("gemini", api_key_gemini), _get_key("groq"), _get_key("silicon"), _get_key("mistral"), _get_key("openrouter")
     key_deepseek, key_together, key_cerebras = _get_key("deepseek"), _get_key("together"), _get_key("cerebras")
+    
     if key_gemini and HAS_GEMINI:
         for intento in range(2):
             try:
@@ -325,9 +310,6 @@ def obtener_ruta_fuente():
         if ruta and os.path.exists(ruta): return ruta
     return None
 
-# ============================================================
-# generar_pdf_pro: SIN portada IA. Solo foto del usuario o nada.
-# ============================================================
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente(); tmp_img = None
     if logo_bytes:
@@ -335,8 +317,7 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 tmp.write(logo_bytes); tmp_img = tmp.name
             pdf.image(tmp_img, x=40, y=50, w=130); pdf.ln(150)
-        except Exception as e:
-            st.warning(f"No se pudo usar la portada subida: {e}")
+        except Exception as e: st.warning(f"No se pudo usar la portada subida: {e}")
         finally:
             if tmp_img and os.path.exists(tmp_img):
                 try: os.remove(tmp_img)
@@ -352,8 +333,7 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
     pdf.cell(0, 10, text="Generado por Xavilu Network", align="C", ln=True)
     pdf.set_draw_color(0, 240, 255); pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5); pdf.ln(15)
     if font_path: pdf.set_font("XaviFont", size=11)
-    else:
-        contenido = contenido.encode("latin-1", "replace").decode("latin-1"); pdf.set_font("Helvetica", size=11)
+    else: contenido = contenido.encode("latin-1", "replace").decode("latin-1"); pdf.set_font("Helvetica", size=11)
     pdf.multi_cell(0, 8, text=contenido); return bytes(pdf.output())
 
 def generar_word(texto: str) -> bytes:
@@ -384,7 +364,7 @@ def generar_pptx(titulo: str, texto: str) -> bytes:
 def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos_extra: bool = False):
     if not texto: return
     st.markdown("---"); key_u = nombre_por_defecto.replace(" ", "_")
-    nombre_elegido = st.text_input("📝 Nombre del archivo (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
+    nombre_elegido = st.text_input("📝 Nombre del archivo:", value=nombre_por_defecto, key=f"name_{key_u}")
     nombre_limpio = re.sub(r"[^a-zA-Z0-9_\- ]", "", nombre_elegido).strip().replace(" ", "_") or nombre_por_defecto
     logo_bytes = None
     with st.expander("📸 Cambiar Portada (Sube tu propia foto)"):
@@ -462,8 +442,7 @@ def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str 
                     voz_actual = voz2 if voz_actual == voz1 else voz1
                 return buf_total.getvalue()
             voz_bytes = run_async_safe(_gen_dueto())
-        else:
-            voz_bytes = generar_audio_sincrono(limpiar_texto_para_voz(letra), voz1)
+        else: voz_bytes = generar_audio_sincrono(limpiar_texto_para_voz(letra), voz1)
         if not voz_bytes: return None
         voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
         urls = {
@@ -544,7 +523,6 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
                     st.session_state[s_key] = idx; st.rerun()
     return st.session_state[s_key]
 
-# ===== INTERFAZ =====
 if not st.session_state.sidebar_visible:
     st.markdown("<style>[data-testid=\"collapsedControl\"] {display: none !important;}</style>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
@@ -592,7 +570,6 @@ macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y 
 macro_idx = custom_tabs(macro_names, "macro", 0, cols_per_row=4)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
-# ============ CATEGORÍA 0: XAVIWORK ============
 if macro_idx == 0:
     st.markdown("#### 🛠️ XaviWork")
     contexto_xw = cajita_adjuntar_archivo("xw_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
@@ -686,7 +663,6 @@ if macro_idx == 0:
             st.image(st.session_state.xw_cover_img, use_container_width=True)
             st.download_button("📥 Descargar Imagen", st.session_state.xw_cover_img, "portada.png", "image/png", use_container_width=True)
 
-# ============ CATEGORÍA 1: CHAT ============
 elif macro_idx == 1:
     sub_names = ["🎙️ PODCAST", "💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️ AGENTES", "⚖️ DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"]
     sub_idx = custom_tabs(sub_names, "chat_sub", 0)
@@ -822,7 +798,6 @@ elif macro_idx == 1:
             if "[ERROR" in res: st.error(res)
             else: st.info(res); botones_descarga(res, "Traduccion")
 
-# ============ CATEGORÍA 2: DOCUMENTOS ============
 elif macro_idx == 2:
     sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🧾 FACTURAS", "📇 QR & CV", "📋 PORTAPAPELES"]
     sub_idx = custom_tabs(sub_names, "doc_sub", 0)
@@ -921,7 +896,6 @@ elif macro_idx == 2:
             if "[ERROR" in res: st.error(res)
             else: st.info(res)
 
-# ============ CATEGORÍA 3: WEB ============
 elif macro_idx == 3:
     sub_names = ["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR"]
     sub_idx = custom_tabs(sub_names, "web_sub", 0)
@@ -934,4 +908,366 @@ elif macro_idx == 3:
         if st.button("Noticias"):
             for n in buscar_noticias_deportivas(d, "Todas"): st.markdown(f"**{n['titulo']}** - {n['resumen']}")
     elif sub_idx == 2:
-        c = campo_con_ideas("Canal
+        c = campo_con_ideas("Canal:", "tv", "TV", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Telecinco")
+        if st.button("Programación") and c:
+            res = buscar_en_internet(c); r_ia = llamar_ia(modelo_seleccionado, f"Programación {c}: {res}", st.session_state.api_key_gemini_manual)
+            if "[ERROR" in r_ia: st.error(r_ia)
+            else: st.info(r_ia)
+    elif sub_idx == 3:
+        url = st.text_input("URL Tabla:")
+        if st.button("Extraer") and url:
+            try:
+                if url_segura(url):
+                    df = pd.read_html(url)[0]; st.dataframe(df)
+                    out = BytesIO(); df.to_excel(out); st.download_button("📥 Excel", out.getvalue(), "tabla.xlsx")
+                else: st.error("URL bloqueada.")
+            except: st.error("Fallo al leer.")
+    elif sub_idx == 4:
+        st.markdown("#### 🎥 YouTube / Audio")
+        fuente_tipo = st.radio("Método:", ["Subir archivo", "Enlace de YouTube"], horizontal=True)
+        archivo_subido = None; url = ""
+        if fuente_tipo == "Subir archivo": archivo_subido = st.file_uploader("Sube audio/vídeo:", type=["mp3","wav","m4a","mp4","mov"])
+        else: url = st.text_input("URL del vídeo:")
+        modo = st.radio("Acción:", ["Resumir", "Traducir al español"], horizontal=True)
+        if st.button("Ejecutar", type="primary") and (archivo_subido or url):
+            texto_original = ""; vid = extraer_youtube_id(url) if url else "local"; key_groq = _get_key("groq")
+            if archivo_subido:
+                with st.spinner("Transcribiendo..."): texto_original = transcribir_archivo_local(archivo_subido.getvalue(), archivo_subido.name, key_groq)
+            else:
+                if not vid: st.error("No hay ID válido."); st.stop()
+                try:
+                    with st.spinner("Buscando subtítulos..."): tr = YouTubeTranscriptApi.get_transcript(vid, languages=['es', 'en'])
+                    texto_original = " ".join([t['text'] for t in tr])
+                except:
+                    st.info("Sin subtítulos. Transcribiendo audio...")
+                    with st.spinner("Descargando y transcribiendo..."): texto_original = transcribir_audio_youtube(url, key_groq)
+            if texto_original.startswith("[ERROR]"): st.error(texto_original)
+            else:
+                with st.expander("Ver transcripción"): st.text_area("Texto:", value=texto_original, height=150, key=f"yt_orig_{vid}")
+                prompt = f"Resume esto en español:\n{texto_original[:8000]}" if modo == "Resumir" else f"Traduce al español:\n{texto_original[:8000]}"
+                with st.spinner("Procesando..."): res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.text_area("Resultado:", res, height=300); botones_descarga(res, f"YT_{vid}")
+    elif sub_idx == 5:
+        url = st.text_input("URL Web:")
+        if st.button("Leer") and url:
+            try:
+                if not url_segura(url): st.error("URL no permitida."); st.stop()
+                txt = " ".join(re.sub('<[^<]+?>', ' ', requests.get(url, headers={"User-Agent":"Mozilla/5.0"}).text).split())[:5000]
+                res = llamar_ia(modelo_seleccionado, f"Resume: {txt}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.text_area("Resumen:", res, height=200)
+            except Exception as e: st.error(f"Error: {e}")
+
+elif macro_idx == 4:
+    st.markdown("#### 🎬 Multimedia")
+    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🎬 VIDEO (Pronto)"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Generador de Imágenes")
+        prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
+        if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
+            with st.spinner("Generando..."):
+                try:
+                    query = urllib.parse.quote(f"{prompt_img}, {estilo_img}, high quality, 8k")
+                    url = f"https://image.pollinations.ai/prompt/{query}?width=1024&height=1024&nologo=true"
+                    if url_segura(url):
+                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=30) as response: img_data = response.read()
+                        st.image(img_data, caption=prompt_img, use_container_width=True); st.download_button("📥 Descargar Imagen", img_data, "imagen_generada.png", "image/png")
+                except Exception as e: st.error(f"Error: {e}")
+    elif sub_idx == 1:
+        st.markdown("### Texto a Voz (TTS)")
+        txt_tts = st.text_area("Texto:", height=150); voz_tts = st.selectbox("Voz:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+        if st.button("🔊 Generar Audio", type="primary") and txt_tts:
+            with st.spinner("Sintetizando..."):
+                aud = generar_audio_sincrono(txt_tts, voz_tts)
+                if aud: st.audio(aud, format="audio/mp3"); st.download_button("💾 Descargar MP3", aud, "audio.mp3")
+
+elif macro_idx == 5:
+    st.markdown("#### 🎓 Estudio y Oficios")
+    sub_names = ["📚 DEBERES", "👔 ENTREVISTA", "🛠️ PRL PRO"]
+    sub_idx = custom_tabs(sub_names, "study_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Resolver Deberes")
+        materia = st.selectbox("Materia:", ["Matemáticas", "Historia", "Ciencias", "Lengua", "Física y Química", "Inglés"]); pregunta = st.text_area("Duda:", height=150)
+        if st.button("🔎 Resolver", type="primary") and pregunta:
+            with st.spinner("Pensando..."):
+                res = llamar_ia(modelo_seleccionado, f"Profesor experto en {materia}. Resuelve paso a paso:\n\n{pregunta}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Deberes_Resueltos", formatos_extra=True)
+    elif sub_idx == 1:
+        st.markdown("### Simulador de Entrevista")
+        puesto = st.text_input("¿Puesto?", placeholder="Ej: Camarero...")
+        if st.button("🤖 Empezar", type="primary") and puesto:
+            st.session_state.entrevista_puesto = puesto
+            st.session_state.entrevista_historial = [{"role": "user", "content": f"Actúa como reclutador para {puesto}. Preséntate y haz la primera pregunta."}]
+            with st.spinner("Pensando..."):
+                res = llamar_ia(modelo_seleccionado, st.session_state.entrevista_historial[0]["content"], st.session_state.api_key_gemini_manual)
+                st.session_state.entrevista_historial.append({"role": "assistant", "content": res}); st.rerun()
+        if "entrevista_historial" in st.session_state and st.session_state.entrevista_historial:
+            for msg in st.session_state.entrevista_historial:
+                if msg["role"] == "user" and "Actúa como" not in msg["content"]: st.chat_message("user").write(msg["content"])
+                elif msg["role"] == "assistant": st.chat_message("assistant").write(msg["content"])
+            resp = chat_input_pro("entrevista_input", "Respuesta...")
+            if resp:
+                st.session_state.entrevista_historial.append({"role": "user", "content": resp})
+                with st.spinner("Evaluando..."):
+                    contexto = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.entrevista_historial])
+                    prompt = f"Continúa la entrevista. Evalúa brevemente mi respuesta y haz otra pregunta.\n\nHistorial:\n{contexto}"
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    st.session_state.entrevista_historial.append({"role": "assistant", "content": res}); st.rerun()
+    elif sub_idx == 2:
+        st.markdown("### 🦺 PRL PRO")
+        tabs_prl = st.tabs(["📊 Evaluación", "📝 Test", "📖 Normativa"])
+        with tabs_prl[0]:
+            puesto = st.text_input("Puesto:", placeholder="Ej: Soldador..."); entorno = st.text_area("Entorno:")
+            if st.button("🔍 Evaluar", type="primary") and puesto:
+                with st.spinner("Analizando..."):
+                    res = llamar_ia(modelo_seleccionado, f"Técnico PRL. Evalúa riesgos para '{puesto}'. Contexto: '{entorno}'.\nTabla Markdown: | Riesgo | Probabilidad | Consecuencia | Nivel | Medidas | EPIs |\nAñade 'Recomendaciones'.", st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else: st.markdown(res); botones_descarga(res, f"Evaluacion_PRL", formatos_extra=True)
+        with tabs_prl[1]:
+            tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios", "Ergonomía", "Máquinas"])
+            if st.button("📝 Generar Test", type="primary"):
+                with st.spinner("Preparando..."):
+                    res = llamar_ia(modelo_seleccionado, f"Test 10 preguntas (A,B,C,D) sobre '{tema_test}'. Incluye 'Soluciones'. Normativa española.", st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else: st.markdown(res); botones_descarga(res, "Test_PRL", formatos_extra=True)
+        with tabs_prl[2]:
+            if st.button("📖 Resumen Leyes"):
+                with st.spinner("Resumiendo..."):
+                    res = llamar_ia(modelo_seleccionado, "Resumen estructurado Ley 31/1995 PRL: 1. Objeto, 2. Principios, 3. Derechos y obligaciones.", st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(res)
+                    else: st.markdown(res); botones_descarga(res, "Resumen_Ley_PRL", formatos_extra=True)
+
+elif macro_idx == 6:
+    st.markdown("#### 🌍 Viajes y Hogar")
+    sub_names = ["✈️ ITINERARIO", "🏠 COCINA", "💪 ENTRENADOR"]
+    sub_idx = custom_tabs(sub_names, "travel_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Planificador de Viajes")
+        destino = st.text_input("Destino:"); c1, c2 = st.columns(2)
+        with c1: dias = st.number_input("Días:", min_value=1, max_value=30, value=3)
+        with c2: tipo_viaje = st.selectbox("Estilo:", ["Cultural", "Gastronómico", "Aventura", "Relax", "Familiar", "Económico"])
+        if st.button("🗺️ Crear", type="primary") and destino:
+            with st.spinner("Planificando..."):
+                res = llamar_ia(modelo_seleccionado, f"Itinerario {dias} días para {destino}. Estilo: {tipo_viaje}. Incluye qué ver, dónde comer y consejos.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, f"Viaje_{destino}", formatos_extra=True)
+    elif sub_idx == 1:
+        st.markdown("### Recetas")
+        ingredientes = campo_con_ideas("Ingredientes:", "hogar", "recetas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Huevos...")
+        if st.button("🍳 Crear", type="primary") and ingredientes:
+            with st.spinner("Cocinando..."):
+                res = llamar_ia(modelo_seleccionado, f"Tengo: {ingredientes}. Dame 2 recetas fáciles. Incluye pasos y tiempo.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Recetas_Hogar")
+    elif sub_idx == 2:
+        st.markdown("### 💪 Entrenador IA")
+        c1, c2 = st.columns(2)
+        with c1:
+            edad = st.number_input("Edad:", min_value=14, max_value=99, value=25); peso = st.number_input("Peso:", min_value=40, max_value=200, value=75); altura = st.number_input("Altura:", min_value=130, max_value=220, value=175)
+        with c2:
+            objetivo = st.selectbox("Objetivo:", ["Perder grasa", "Ganar músculo", "Mantenerme en forma", "Resistencia"])
+            equipo = st.selectbox("Material:", ["Gimnasio", "Mancuernas", "Sin material", "Aire libre"]); dias_entreno = st.slider("Días:", 2, 6, 4)
+        if st.button("📋 Generar Plan", type="primary"):
+            with st.spinner("Diseñando..."):
+                res = llamar_ia(modelo_seleccionado, f"Entrenador. Usuario: {edad}a, {peso}kg, {altura}cm. Objetivo: '{objetivo}'. Entrena {dias_entreno} días en '{equipo}'. Genera: 1. Rutina semanal. 2. Consejos nutricionales.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
+
+elif macro_idx == 7:
+    st.markdown("#### 🎵 Música y Arte")
+    sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Generador de Letras")
+        if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
+        tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
+        c1, c2 = st.columns(2)
+        with c1: genero = st.selectbox("Género:", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
+        with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...")
+        if st.button("🪄 Generar Letra IA", use_container_width=True) and tema_cancion:
+            with st.spinner("Componiendo..."):
+                prompt = f"Letra de canción {genero} sobre: '{tema_cancion}'. "
+                if artista_estilo: prompt += f"Estilo {artista_estilo}. "
+                prompt += "Estructura (Intro, Verso 1, Coro, etc.) y añade indicaciones de producción entre corchetes."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.session_state.letra_edit = res; st.rerun()
+        letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
+        if letra_final.strip():
+            botones_descarga(letra_final, "Letra_Cancion")
+            st.markdown("---"); st.markdown("### 🎵 Ponerle Música"); hacer_dueto = st.checkbox("🎤 Hacer Dúo")
+            c1, c2 = st.columns(2)
+            with c1: voz_cancion1 = st.selectbox("Voz 1:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+            with c2: 
+                if hacer_dueto: voz_cancion2 = st.selectbox("Voz 2:", ["es-MX-JorgeNeural", "es-ES-ElviraNeural", "es-AR-TomasNeural"])
+                else: voz_cancion2 = None; st.selectbox("Base:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_solo")
+            if hacer_dueto:
+                st.info("💡 *El sistema alternará voces por párrafo.*")
+                beat_estilo = st.selectbox("Base:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_duo")
+            if st.button("🎶 Generar Canción", type="primary"):
+                with st.spinner("Grabando..."):
+                    audio_final = generar_cancion_con_base(letra_final, voz_cancion1, beat_estilo, voz_cancion2)
+                    if audio_final:
+                        st.success("✅ ¡Lista!"); st.audio(audio_final, format="audio/mp3"); st.download_button("💾 MP3", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
+    elif sub_idx == 1:
+        st.markdown("### 🌞 Generador de Prompts para Suno AI")
+        st.caption("Suno AI canta de verdad. Genera el texto perfecto para pegarlo en su web.")
+        c1, c2 = st.columns(2)
+        with c1:
+            st_tema = st.text_input("Tema:", placeholder="Ej: Marta y Luz en el campamento...")
+            st_genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica"])
+            st_voz = st.selectbox("Voz:", ["Dúo (Hombre y Mujer)", "Masculina", "Femenina", "Coro"])
+        with c2:
+            st_instr = st.text_input("Instrumentos:", placeholder="Ej: Guitarra, marimba...")
+            st_artista = st.text_input("Artista similar:", placeholder="Ej: Romeo Santos...")
+        if st.button("✨ Generar Prompt para Suno", type="primary") and st_tema:
+            with st.spinner("Preparando el prompt..."):
+                prompt_ia = f"Actúa como experto en Suno AI. Tema: '{st_tema}'. Género: {st_genero}. Voz: {st_voz}. Instrumentos: {st_instr}. Artista similar: {st_artista}. Devuelve un JSON con dos campos: 'style_prompt' (en inglés, máximo 200 caracteres, describiendo estilo, instrumentos y voz) y 'lyrics' (letra en español con etiquetas [Verse], [Chorus], etc.)."
+                res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.success("✅ Prompt generado.")
+                    st.text_area("Copia esto en el apartado 'Style of Music':", value=res.split("'lyrics':")[0].replace("{", "").replace("'style_prompt':", "").replace('"', '').strip(), height=100)
+                    st.text_area("Copia esto en 'Lyrics' (Custom Mode):", value=res.split("'lyrics':")[1].replace("}", "").replace('"', '').strip() if "'lyrics':" in res else res, height=250)
+                    st.markdown("[🚀 Ir a Suno AI a crear la canción](https://suno.com/create)")
+    elif sub_idx == 2:
+        st.markdown("### 🖼️ Portadas")
+        prompt_img = st.text_input("Describe la portada:")
+        if st.button("Generar") and prompt_img:
+            with st.spinner("Pintando..."):
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_img + ', album cover, high quality')}?width=1024&height=1024&nologo=true"
+                if url_segura(url):
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=30) as response: img_data = response.read()
+                    st.image(img_data, use_container_width=True); st.download_button("📥 Descargar", img_data, "portada.png", "image/png")
+    elif sub_idx == 3:
+        st.markdown("### 📝 Poesía")
+        tema_poema = st.text_input("Tema del poema:")
+        if st.button("Escribir Poema") and tema_poema:
+            with st.spinner("Escribiendo..."):
+                res = llamar_ia(modelo_seleccionado, f"Escribe un poema profundo sobre: {tema_poema}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Poema")
+
+elif macro_idx == 8:
+    st.markdown("#### 🏢 Gestor de Comunidad PRO")
+    sub_names = ["🚨 INCIDENCIAS", "📜 NORMATIVA", "🧾 ANALIZAR PRESUPUESTOS", "📊 ACTAS", "📝 CITACIONES"]
+    sub_idx = custom_tabs(sub_names, "vecinos_sub", 0)
+    
+    if sub_idx == 0:
+        st.markdown("### 🚨 Gestión de Incidencias")
+        c1, c2 = st.columns(2)
+        with c1:
+            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "Otro"])
+            urgencia = st.selectbox("Urgencia:", ["Baja", "Media", "Alta", "Urgente"])
+        with c2:
+            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
+            ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB")
+        
+        descripcion_inc = st.text_area("Describe lo ocurrido:", height=150)
+        
+        if st.button("📝 Redactar Reclamación", type="primary") and descripcion_inc:
+            with st.spinner("Redactando..."):
+                prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+                
+    elif sub_idx == 1:
+        st.markdown("### 📜 Normativa y Leyes")
+        consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: ¿Puedo poner cámara en el rellano?")
+        if st.button("🔎 Consultar") and consulta:
+            with st.spinner("Buscando en la Ley..."):
+                res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Consulta_Normativa")
+
+    elif sub_idx == 2:
+        st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
+        st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. La IA los analizará y generará una tabla comparativa final.")
+        
+        arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
+        
+        if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
+            resultados_individuales = []
+            progreso = st.progress(0)
+            status_text = st.empty()
+            
+            for i, arch in enumerate(arch_presupuestos):
+                status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
+                prompt_individual = "Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. Sé conciso."
+                
+                try:
+                    if arch.name.lower().endswith(".pdf"):
+                        texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
+                        res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                    else:
+                        res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
+                    
+                    resultados_individuales.append({"nombre": arch.name, "analisis": res})
+                except Exception as e:
+                    resultados_individuales.append({"nombre": arch.name, "analisis": f"Error: {e}"})
+                
+                progreso.progress((i + 1) / len(arch_presupuestos))
+            
+            status_text.text("✅ Análisis individual completado. Generando comparativa final...")
+            
+            if len(resultados_individuales) > 0:
+                texto_para_comparar = ""
+                for r in resultados_individuales:
+                    texto_para_comparar += f"\n--- PRESUPUESTO: {r['nombre']} ---\n{r['analisis']}\n"
+                
+                prompt_comparativa = f"""Actúa como un Administrador de Fincas. Aquí tienes el análisis de {len(resultados_individuales)} presupuestos:
+{texto_para_comparar}
+
+Genera un informe final que contenga:
+1. Una TABLA COMPARATIVA en formato Markdown con las columnas: Proveedor, Precio, Qué incluye, Qué falta, y Valoración.
+2. Un párrafo final de RECOMENDACIÓN explicando cuál es la mejor opción calidad/precio para la comunidad y por qué.
+"""
+                res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
+                status_text.empty()
+                progreso.empty()
+                
+                if "[ERROR" not in res_comparativa:
+                    st.success("✅ Informe comparativo generado con éxito.")
+                    st.markdown("### 🏆 Comparativa y Recomendación Final")
+                    st.markdown(res_comparativa)
+                    botones_descarga(res_comparativa, "Comparativa_Presupuestos", formatos_extra=True)
+                    
+                    st.markdown("---")
+                    st.markdown("### 📂 Descargar Análisis Individuales")
+                    for idx, r in enumerate(resultados_individuales):
+                        with st.expander(f"📄 Análisis: {r['nombre']}"):
+                            st.markdown(r['analisis'])
+                            st.download_button(
+                                label=f"📥 Descargar análisis de {r['nombre']}",
+                                data=r['analisis'].encode('utf-8'),
+                                file_name=f"Analisis_{r['nombre'].split('.')[0]}.txt",
+                                mime="text/plain",
+                                key=f"dl_ind_{idx}"
+                            )
+                else:
+                    st.error("Error al generar la comparativa final.")
+
+    elif sub_idx == 3:
+        st.markdown("### 📊 Redactar Acta")
+        puntos_tratados = st.text_area("Puntos tratados:", height=200, placeholder="1. Aprobación de cuentas...\n2. Cambio de ascensor...")
+        if st.button("Generar Acta", type="primary") and puntos_tratados:
+            with st.spinner("Redactando..."):
+                res = llamar_ia(modelo_seleccionado, f"Acta de Junta de Vecinos formal. Puntos: {puntos_tratados}. Añade fórmulas de aprobación y firmas.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.text_area("Acta:", value=res, height=300); botones_descarga(res, "Acta_Reunion")
+
+    elif sub_idx == 4:
+        st.markdown("### 📝 Convocar Junta")
+        motivo = st.text_input("Motivo:", placeholder="Ej: Obras de fachada")
+        fecha = st.text_input("Fecha y hora:", placeholder="Ej: 15 de Noviembre a las 19:00")
+        if st.button("Generar Citación", type="primary") and motivo:
+            with st.spinner("Redactando..."):
+                res = llamar_ia(modelo_seleccionado, f"Citación formal para junta de vecinos. Motivo: {motivo}. Fecha: {fecha}. Incluye orden del día y firma del presidente.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Junta")
