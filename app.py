@@ -63,7 +63,7 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": [], "letra_edit": ""
+    "alex_chat_history": [], "letra_edit": "", "presu_resultados": None, "presu_comparativa": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -1126,13 +1126,44 @@ elif macro_idx == 7:
             st_artista = st.text_input("Artista similar:", placeholder="Ej: Romeo Santos...")
         if st.button("✨ Generar Prompt para Suno", type="primary") and st_tema:
             with st.spinner("Preparando el prompt..."):
-                prompt_ia = f"Actúa como experto en Suno AI. Tema: '{st_tema}'. Género: {st_genero}. Voz: {st_voz}. Instrumentos: {st_instr}. Artista similar: {st_artista}. Devuelve un JSON con dos campos: 'style_prompt' (en inglés, máximo 200 caracteres, describiendo estilo, instrumentos y voz) y 'lyrics' (letra en español con etiquetas [Verse], [Chorus], etc.)."
+                prompt_ia = f"""Actúa como un experto en ingeniería de prompts para Suno AI.
+                Tema: "{st_tema}"
+                Género: {st_genero}
+                Voz: {st_voz}
+                Instrumentos: {st_instr}
+                Artista similar: {st_artista}
+
+                Tu tarea es generar EXCLUSIVAMENTE el texto listo para copiar y pegar en Suno AI.
+                REGLAS ESTRICTAS:
+                1. NO escribas saludos, introducciones ni comentarios (ej: "Aquí tienes...").
+                2. NO uses bloques de código markdown (```) ni formato JSON.
+                3. Sigue el formato exacto usando los separadores que se indican a continuación.
+
+                Formato de salida:
+
+                ---STYLE---
+                [Aquí va el prompt de estilo en inglés, máximo 200 caracteres, describiendo género, instrumentos y voz]
+
+                ---LYRICS---
+                [Aquí va la letra en español con las etiquetas [Verse], [Chorus], [Bridge], etc.]
+                """
                 res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: 
+                    st.error(res)
                 else:
-                    st.success("✅ Prompt generado.")
-                    st.text_area("Copia esto en el apartado 'Style of Music':", value=res.split("'lyrics':")[0].replace("{", "").replace("'style_prompt':", "").replace('"', '').strip(), height=100)
-                    st.text_area("Copia esto en 'Lyrics' (Custom Mode):", value=res.split("'lyrics':")[1].replace("}", "").replace('"', '').strip() if "'lyrics':" in res else res, height=250)
+                    st.success("✅ Prompt generado. Listo para copiar.")
+                    res_limpia = res.replace("```markdown", "").replace("```", "").strip()
+                    if "---STYLE---" in res_limpia and "---LYRICS---" in res_limpia:
+                        partes = res_limpia.split("---LYRICS---")
+                        style_part = partes[0].replace("---STYLE---", "").strip()
+                        lyrics_part = partes[1].strip()
+                        st.markdown("### 🎧 Estilo de Música (Copia y pega en 'Style of Music'):")
+                        st.code(style_part, language="text")
+                        st.markdown("### 📜 Letra (Copia y pega en 'Lyrics' con Custom Mode activado):")
+                        st.code(lyrics_part, language="text")
+                    else:
+                        st.warning("La IA no siguió el formato exacto, pero aquí tienes el texto limpio:")
+                        st.text_area("Copia esto:", value=res_limpia, height=300)
                     st.markdown("[🚀 Ir a Suno AI a crear la canción](https://suno.com/create)")
     elif sub_idx == 2:
         st.markdown("### 🖼️ Portadas")
@@ -1167,16 +1198,13 @@ elif macro_idx == 8:
         with c2:
             vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
             ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB")
-        
         descripcion_inc = st.text_area("Describe lo ocurrido:", height=150)
-        
         if st.button("📝 Redactar Reclamación", type="primary") and descripcion_inc:
             with st.spinner("Redactando..."):
                 prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
-                
     elif sub_idx == 1:
         st.markdown("### 📜 Normativa y Leyes")
         consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: ¿Puedo poner cámara en el rellano?")
@@ -1188,92 +1216,100 @@ elif macro_idx == 8:
 
     elif sub_idx == 2:
         st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
-        st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. La IA los analizará y generará una tabla comparativa final.")
+        st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. Los análisis se guardarán en la memoria hasta que reinicies o limpies.")
         
         arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
         
-        if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
-            resultados_individuales = []
-            progreso = st.progress(0)
-            status_text = st.empty()
-            
-            # 1. ANÁLISIS INDIVIDUAL EN BUCLE
-            for i, arch in enumerate(arch_presupuestos):
-                status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
+            if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
+                resultados_individuales = []
+                progreso = st.progress(0)
+                status_text = st.empty()
                 
-                # Pedimos a la IA que devuelva un JSON con el nombre de la empresa
-                prompt_individual = """Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. 
-                IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
-                1. "empresa": (Solo el nombre corto de la empresa que presenta el presupuesto, ej: "Pinturas Pepe")
-                2. "analisis": (El texto detallado con los precios, lo que incluye y lo que falta).
-                No añadas markdown ni texto extra, solo el JSON puro."""
-                
-                try:
-                    if arch.name.lower().endswith(".pdf"):
-                        texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
-                        res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
-                    else:
-                        res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
+                for i, arch in enumerate(arch_presupuestos):
+                    status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
                     
-                    # Limpiamos el JSON por si la IA añade ```json
-                    res_limpia = res.replace("```json", "").replace("```", "").strip()
+                    prompt_individual = """Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. 
+                    IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
+                    1. "empresa": (Solo el nombre corto de la empresa que presenta el presupuesto, ej: "Pinturas Pepe")
+                    2. "analisis": (El texto detallado con los precios, lo que incluye y lo que falta).
+                    No añadas markdown ni texto extra, solo el JSON puro."""
                     
                     try:
-                        data_json = json.loads(res_limpia)
-                        nombre_empresa = data_json.get("empresa", arch.name)
-                        texto_analisis = data_json.get("analisis", res)
-                    except json.JSONDecodeError:
-                        # Si la IA falla y no devuelve JSON, usamos el nombre del archivo como respaldo
-                        nombre_empresa = arch.name
-                        texto_analisis = res
+                        if arch.name.lower().endswith(".pdf"):
+                            texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
+                            res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                        else:
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
                         
-                    resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
-                except Exception as e:
-                    resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
+                        res_limpia = res.replace("```json", "").replace("```", "").strip()
+                        try:
+                            data_json = json.loads(res_limpia)
+                            nombre_empresa = data_json.get("empresa", arch.name)
+                            texto_analisis = data_json.get("analisis", res)
+                        except json.JSONDecodeError:
+                            nombre_empresa = arch.name
+                            texto_analisis = res
+                            
+                        resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
+                    except Exception as e:
+                        resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
+                    
+                    progreso.progress((i + 1) / len(arch_presupuestos))
                 
-                progreso.progress((i + 1) / len(arch_presupuestos))
-            
-            status_text.text("✅ Análisis individual completado. Generando comparativa final...")
-            
-            # 2. COMPARATIVA FINAL
-            if len(resultados_individuales) > 0:
-                texto_para_comparar = ""
-                for r in resultados_individuales:
-                    texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
+                status_text.text("✅ Análisis individual completado. Generando comparativa final...")
                 
-                prompt_comparativa = f"""Actúa como un Administrador de Fincas. Aquí tienes el análisis de {len(resultados_individuales)} presupuestos:
+                if len(resultados_individuales) > 0:
+                    texto_para_comparar = ""
+                    for r in resultados_individuales:
+                        texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
+                    
+                    prompt_comparativa = f"""Actúa como un Administrador de Fincas. Aquí tienes el análisis de {len(resultados_individuales)} presupuestos:
 {texto_para_comparar}
 
 Genera un informe final que contenga:
 1. Una TABLA COMPARATIVA en formato Markdown con las columnas: Proveedor, Precio, Qué incluye, Qué falta, y Valoración.
 2. Un párrafo final de RECOMENDACIÓN explicando cuál es la mejor opción calidad/precio para la comunidad y por qué.
 """
-                res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
-                status_text.empty()
-                progreso.empty()
-                
-                if "[ERROR" not in res_comparativa:
-                    st.success("✅ Informe comparativo generado con éxito.")
-                    st.markdown("### 🏆 Comparativa y Recomendación Final")
-                    st.markdown(res_comparativa)
-                    botones_descarga(res_comparativa, "Comparativa_Presupuestos", formatos_extra=True)
+                    res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
+                    status_text.empty()
+                    progreso.empty()
                     
-                    st.markdown("---")
-                    st.markdown("### 📂 Descargar Análisis Individuales")
-                    # 3. DESPLEGABLES CON ANÁLISIS Y DESCARGA INDIVIDUAL
-                    for idx, r in enumerate(resultados_individuales):
-                        with st.expander(f"📄 Análisis: {r['empresa']}"):
-                            st.caption(f"Archivo original: {r['archivo']}")
-                            st.markdown(r['analisis'])
-                            st.download_button(
-                                label=f"📥 Descargar análisis de {r['empresa']}",
-                                data=r['analisis'].encode('utf-8'),
-                                file_name=f"Analisis_{r['empresa'].replace(' ', '_')}.txt",
-                                mime="text/plain",
-                                key=f"dl_ind_{idx}"
-                            )
-                else:
-                    st.error("Error al generar la comparativa final.")
+                    if "[ERROR" not in res_comparativa:
+                        st.session_state["presu_resultados"] = resultados_individuales
+                        st.session_state["presu_comparativa"] = res_comparativa
+                        st.success("✅ Informe generado y guardado en memoria.")
+                        st.rerun()
+                    else:
+                        st.error("Error al generar la comparativa final.")
+        
+        with c_btn2:
+            if st.session_state["presu_resultados"]:
+                if st.button("🗑️ Limpiar Análisis Guardados", use_container_width=True):
+                    st.session_state["presu_resultados"] = None
+                    st.session_state["presu_comparativa"] = ""
+                    st.rerun()
+
+        if st.session_state["presu_resultados"]:
+            st.markdown("---")
+            st.markdown("### 🏆 Comparativa y Recomendación Final")
+            st.markdown(st.session_state["presu_comparativa"])
+            botones_descarga(st.session_state["presu_comparativa"], "Comparativa_Presupuestos", formatos_extra=True)
+            
+            st.markdown("---")
+            st.markdown("### 📂 Descargar Análisis Individuales")
+            for idx, r in enumerate(st.session_state["presu_resultados"]):
+                with st.expander(f"📄 Análisis: {r['empresa']}"):
+                    st.caption(f"Archivo original: {r['archivo']}")
+                    st.markdown(r['analisis'])
+                    st.download_button(
+                        label=f"📥 Descargar análisis de {r['empresa']}",
+                        data=r['analisis'].encode('utf-8'),
+                        file_name=f"Analisis_{r['empresa'].replace(' ', '_')}.txt",
+                        mime="text/plain",
+                        key=f"dl_ind_{idx}"
+                    )
 
     elif sub_idx == 3:
         st.markdown("### 📊 Redactar Acta")
