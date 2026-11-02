@@ -153,6 +153,9 @@ _defaults = {
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
+# ============================================================
+# 🔐 SISTEMA DE LOGIN Y ROLES
+# ============================================================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -180,9 +183,63 @@ def inyectar_js_fixer():
     components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#fff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
 
+def check_login():
+    if "rol" not in st.session_state:
+        st.markdown("<h2 style='text-align: center; margin-top: 50px;'>🔐 Acceso Restringido</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Introduce tu contraseña para entrar a Xavilu Network.</p>", unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns([1, 1, 1])
+        with c2:
+            pwd = st.text_input("Contraseña:", type="password", key="login_pwd")
+            if st.button("Entrar", use_container_width=True, type="primary"):
+                try:
+                    pwd_admin = st.secrets.get("PASSWORD", "")
+                    pwd_ninos = st.secrets.get("PASSWORD_NINOS", "")
+                except Exception:
+                    st.error("⚠️ Error: No se encuentra el archivo secrets.toml.")
+                    st.stop()
+
+                if pwd and pwd == pwd_admin:
+                    st.session_state["rol"] = "admin"
+                    st.rerun()
+                elif pwd and pwd == pwd_ninos:
+                    st.session_state["rol"] = "ninos"
+                    st.rerun()
+                elif pwd:
+                    st.error("❌ Contraseña incorrecta.")
+        st.stop() # Detiene la app hasta que te loguees
+
+check_login()
+
 # ============================================================
 # FUNCIONES CORE
 # ============================================================
+def mensaje_error_amigable(texto: str) -> str:
+    """Convierte errores técnicos de las IAs en mensajes claros para el usuario final."""
+    if not texto or "[ERROR" not in texto:
+        return texto
+
+    t = texto.upper()
+    mapa = [
+        ("API KEY",           "🔑 Revisa tu API Key: no es válida o no está configurada en el panel lateral."),
+        ("API_KEY",           "🔑 Revisa tu API Key: no es válida o no está configurada en el panel lateral."),
+        ("PERMISSION",        "🚫 La API Key no tiene permisos para este modelo. Revisa tu cuenta."),
+        ("RESOURCE_EXHAUSTED","💳 Se agotó la cuota (429). Cambia de proveedor en el panel lateral."),
+        ("QUOTA",             "💳 Se agotó la cuota gratuita. Espera unos minutos o usa otro proveedor."),
+        ("429",               "💳 Demasiadas peticiones seguidas (429). Espera 1 minuto y reintenta."),
+        ("503",               "🛠️ El servidor de IA está saturado (503). Reintenta en unos segundos."),
+        ("TIMEOUT",           "⏱️ La IA tardó demasiado. Prueba con un texto más corto."),
+        ("CONNECTION",        "🌐 Sin conexión con el servidor de IA. Revisa tu internet."),
+        ("OLLAMA",            "🖥️ Ollama no responde. ¿Está arrancado en localhost:11434?"),
+        ("MEMORY",            "📦 El archivo es demasiado grande. Prueba con uno más pequeño."),
+        ("TOKEN",             "📏 El texto supera el límite del modelo. Resúmelo o divídelo."),
+        ("GEMINI",            "🤖 Gemini falló. Revisa la API Key o cambia de proveedor."),
+    ]
+    for clave, msg in mapa:
+        if clave in t:
+            return f"{msg}\n\n_Detalle técnico: {texto[:180]}_"
+    return f"⚠️ Algo salió mal con la IA.\n\n_Detalle técnico: {texto[:180]}_"
+
 def limpiar_texto_para_voz(texto):
     if not texto: return ""
     texto = re.sub(r'[\*\#\_\`\~\"\']', '', texto)
@@ -336,7 +393,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         raw = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"]
         return re.sub(r"\n```\s*$", "", re.sub(r"^```\w*\n", "", raw)).strip()
-    except Exception as e: return f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}"
+    except Exception as e: return mensaje_error_amigable(f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}")
 
 def render_mermaid(mermaid_code):
     components.html(f"<div class='mermaid'>{mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';mermaid.initialize({{ startOnLoad: true, theme: 'dark', securityLevel: 'loose' }});</script>", height=600, scrolling=True)
@@ -535,7 +592,7 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando..."):
             res = llamar_ia(modelo, f"Dame 3 ideas creativas para {contexto_ia}. Solo lista por líneas.", api_key)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
     if st.session_state.get(f"{key_prefix}_sugs"):
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
@@ -548,7 +605,7 @@ def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_k
         if not texto_base: return
         with st.spinner("Aplicando..."):
             res = llamar_ia(modelo, f"{instruccion}. Devuelve SOLO el texto mejorado:\n\n{texto_base}", api_key)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else:
                 st.session_state[state_key] = res
                 if widget_key and widget_key in st.session_state: del st.session_state[widget_key]
@@ -590,52 +647,65 @@ st.markdown("<h1 style='margin-bottom: 0;'>XAVILU NETWORK</h1>", unsafe_allow_ht
 
 if st.session_state.sidebar_visible:
     with st.sidebar:
-        try: st.image("logo.png", use_container_width=True)
-        except: st.markdown("### 🪐 PANEL DE CONTROL")
-        if st.button("⛶ Ocultar Menú", use_container_width=True): st.session_state.sidebar_visible = False; st.rerun()
+        st.markdown(f"👤 **Rol:** `{st.session_state.get('rol', 'N/A').upper()}`")
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+            del st.session_state["rol"]
+            st.rerun()
         st.markdown("---")
-        modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
-        st.markdown("#### 🔑 Conexiones")
-        for prov in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]:
-            st.caption(f"{'✅' if _get_key(prov) else '⚠️'} {prov.capitalize()}")
-        with st.expander("⚙️ Keys manuales"):
-            st.session_state.api_key_gemini_manual = st.text_input("Gemini", type="password", value=st.session_state.api_key_gemini_manual)
-            st.session_state.api_key_groq_manual = st.text_input("Groq", type="password", value=st.session_state.api_key_groq_manual)
-            st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow", type="password", value=st.session_state.api_key_silicon_manual)
-            st.session_state.api_key_mistral_manual = st.text_input("Mistral", type="password", value=st.session_state.api_key_mistral_manual)
-            st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter", type="password", value=st.session_state.api_key_openrouter_manual)
-            st.session_state.api_key_deepseek_manual = st.text_input("DeepSeek", type="password", value=st.session_state.api_key_deepseek_manual)
-            st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
-            st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
-        st.markdown("---")
-        st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
-        st.markdown("---")
+        
+        if st.session_state.get("rol") == "admin":
+            try: st.image("logo.png", use_container_width=True)
+            except: st.markdown("### 🪐 PANEL DE CONTROL")
+            if st.button("⛶ Ocultar Menú", use_container_width=True): st.session_state.sidebar_visible = False; st.rerun()
+            st.markdown("---")
+            modelo_seleccionado = st.selectbox("Ollama Local", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
+            st.markdown("#### 🔑 Conexiones")
+            for prov in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]:
+                st.caption(f"{'✅' if _get_key(prov) else '⚠️'} {prov.capitalize()}")
+            with st.expander("⚙️ Keys manuales"):
+                st.session_state.api_key_gemini_manual = st.text_input("Gemini", type="password", value=st.session_state.api_key_gemini_manual)
+                st.session_state.api_key_groq_manual = st.text_input("Groq", type="password", value=st.session_state.api_key_groq_manual)
+                st.session_state.api_key_silicon_manual = st.text_input("SiliconFlow", type="password", value=st.session_state.api_key_silicon_manual)
+                st.session_state.api_key_mistral_manual = st.text_input("Mistral", type="password", value=st.session_state.api_key_mistral_manual)
+                st.session_state.api_key_openrouter_manual = st.text_input("OpenRouter", type="password", value=st.session_state.api_key_openrouter_manual)
+                st.session_state.api_key_deepseek_manual = st.text_input("DeepSeek", type="password", value=st.session_state.api_key_deepseek_manual)
+                st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
+                st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
+            st.markdown("---")
+            st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
+            st.markdown("---")
 
-        _manual_bytes = generar_manual_pdf()
-        guardar_descarga("Manual_Xavilu.pdf", _manual_bytes)
-        st.download_button("📖 Descargar Manual (PDF)", _manual_bytes, "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
+            _manual_bytes = generar_manual_pdf()
+            guardar_descarga("Manual_Xavilu.pdf", _manual_bytes)
+            st.download_button("📖 Descargar Manual (PDF)", _manual_bytes, "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
 
-        _guia_bytes = generar_guia_pdf(version="1.0")
-        guardar_descarga("Guia_Rapida_Xavilu.pdf", _guia_bytes)
-        st.download_button("⚡ Descargar Guía Rápida (PDF)", _guia_bytes, "Guia_Rapida_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_guia_pdf")
-        st.link_button("💬 Compartir guía por WhatsApp", wa_url(MENSAJES_WA["guia"]), use_container_width=True)
-        st.caption(f"📁 Copia en `{CARPETA_DESCARGAS}/`.")
+            _guia_bytes = generar_guia_pdf(version="1.0")
+            guardar_descarga("Guia_Rapida_Xavilu.pdf", _guia_bytes)
+            st.download_button("⚡ Descargar Guía Rápida (PDF)", _guia_bytes, "Guia_Rapida_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_guia_pdf")
+            st.link_button("💬 Compartir guía por WhatsApp", wa_url(MENSAJES_WA["guia"]), use_container_width=True)
+            st.caption(f"📁 Copia en `{CARPETA_DESCARGAS}/`.")
 
-        st.markdown("---")
-        archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
-        if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
-            with st.spinner("Procesando..."):
-                st.session_state.global_context = leer_archivo_universal(archivo_global, modelo_seleccionado)[:5000]
-                st.session_state.global_file_name = archivo_global.name; st.success("✅ Memorizado.")
-        if st.session_state.get("global_file_name"):
-            st.info(f"Activo: **{st.session_state.global_file_name}**")
-            if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
-        st.markdown("---")
-        for h in obtener_de_db():
-            with st.expander(f"{h[1]} - {h[0][:10]}"): st.caption(h[2][:200] + "...")
+            st.markdown("---")
+            archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
+            if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
+                with st.spinner("Procesando..."):
+                    st.session_state.global_context = leer_archivo_universal(archivo_global, modelo_seleccionado)[:5000]
+                    st.session_state.global_file_name = archivo_global.name; st.success("✅ Memorizado.")
+            if st.session_state.get("global_file_name"):
+                st.info(f"Activo: **{st.session_state.global_file_name}**")
+                if st.button("🗑️ Olvidar"): st.session_state.global_context = ""; st.session_state.global_file_name = ""; st.rerun()
+            st.markdown("---")
+            for h in obtener_de_db():
+                with st.expander(f"{h[1]} - {h[0][:10]}"): st.caption(h[2][:200] + "...")
+        else:
+            st.info("👋 ¡Hola! Estás en el modo Niños. Disfruta de las herramientas seguras.")
+            modelo_seleccionado = "llama3.2:latest"
 else: modelo_seleccionado = "llama3.2:latest"
 
-macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "🎵 MÚSICA Y ARTE", "🏢 GESTOR VECINOS"]
+macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y TEXTO", "🌐 WEB Y ACTUALIDAD", "🎬 MULTIMEDIA", "🎓 ESTUDIO Y OFICIOS", "🌍 VIAJES Y HOGAR", "🎵 MÚSICA Y ARTE"]
+if st.session_state.get("rol") == "admin":
+    macro_names.append("🏢 GESTOR VECINOS")
+
 macro_idx = custom_tabs(macro_names, "macro", 0, cols_per_row=4)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
@@ -649,7 +719,7 @@ if macro_idx == 0:
         if st.button("💡 3 Ideas Base", use_container_width=True):
             with st.spinner("Pensando..."):
                 res = llamar_ia(modelo_seleccionado, f"3 ideas sobre: '{st.session_state.xw_tema_input}'. Por líneas.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state["xw_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
         def _xw_add(idea):
             actual = st.session_state["xw_tema_input"].strip(); st.session_state["xw_tema_input"] = f"{actual}\n{idea}" if actual else idea; st.session_state["xw_sugs"] = []
@@ -663,7 +733,7 @@ if macro_idx == 0:
             else:
                 with st.spinner(f"Generando {nombre}..."):
                     res = llamar_ia(modelo_seleccionado, f"{contexto_xw}\n\n{prompt_gen}\n\nTEMA: {st.session_state.xw_tema_input}", st.session_state.api_key_gemini_manual)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.session_state[state_key] = res.replace("```markdown","").replace("```csv","").replace("```mermaid","").replace("```","").strip() if state_key in ("xw_mapa","xw_tabla","xw_conceptual") else res
         if st.session_state.get(state_key):
             if state_key != "xw_conceptual": borrador_editable(state_key, edit_key, height=250)
@@ -746,7 +816,7 @@ elif macro_idx == 1:
         if st.button("✨ Crear Guion", type="primary", key="btn_pod") and st.session_state["pod_tema_input"]:
             with st.spinner("Escribiendo..."):
                 res = llamar_ia(modelo_seleccionado, f"{contexto}\n\nGuion podcast {dur} min. Tema: '{st.session_state['pod_tema_input']}'. Estilo: {estilo}. 3 locutores. Formato 'Locutor 1: [texto]'.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state.podcast_script = res
         if st.session_state.get("podcast_script"):
             st.markdown("### 📜 Guion"); borrador_editable("podcast_script", "pod_edit", height=300)
@@ -777,7 +847,7 @@ elif macro_idx == 1:
             st.session_state.chat_history.append({"role":"user","content":p}); st.chat_message("user").write(p)
             with st.spinner("Pensando..."):
                 res = llamar_ia(modelo_seleccionado, f"{ctx}\n\n{p}", st.session_state.api_key_gemini_manual, st.session_state.chat_history)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state.chat_history.append({"role":"assistant","content":res}); st.chat_message("assistant").write(res)
             st.rerun()
     elif sub_idx == 2:
@@ -798,7 +868,7 @@ elif macro_idx == 1:
                 st.session_state.pdf_chat_history.append({"role":"user","content":p})
                 with st.spinner("Buscando..."):
                     res = llamar_ia(modelo_seleccionado, f"Contexto:\n{texto}\n\nPregunta: {p}", st.session_state.api_key_gemini_manual, st.session_state.pdf_chat_history)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.session_state.pdf_chat_history.append({"role":"assistant","content":res}); st.rerun()
     elif sub_idx == 4:
         st.markdown("#### Agentes")
@@ -813,14 +883,14 @@ elif macro_idx == 1:
                 st.session_state.agente_chat_history.append({"role":"user","content":p})
                 with st.spinner("Pensando..."):
                     res = llamar_ia(modelo_seleccionado, f"ERES: {ag['rol']}\nUsuario: {p}", st.session_state.api_key_gemini_manual, st.session_state.agente_chat_history)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.session_state.agente_chat_history.append({"role":"assistant","content":res}); st.rerun()
     elif sub_idx == 5:
         st.markdown("#### Debate")
         t = campo_con_ideas("Tema:", "deb", "temas de debate", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Coche eléctrico")
         if st.button("Iniciar") and t:
             res = llamar_ia(modelo_seleccionado, f"Debate {t}: 3 a favor, 3 en contra, conclusión.", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.markdown(res); botones_descarga(res, "Debate")
     elif sub_idx == 6:
         st.markdown("#### Cocina")
@@ -830,12 +900,12 @@ elif macro_idx == 1:
         with c1:
             if st.button("Receta") and ing:
                 res = llamar_ia(modelo_seleccionado, f"Receta con {ing}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.info(res)
         with c2:
             if st.button("Menú") and pref:
                 res = llamar_ia(modelo_seleccionado, f"Menú semanal {pref}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.info(res)
     elif sub_idx == 7:
         st.markdown("#### Cuentos")
@@ -843,7 +913,7 @@ elif macro_idx == 1:
         l = campo_con_ideas("Lugar:", "c2", "lugares mágicos", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Bosque")
         if st.button("Crear") and p and l:
             res = llamar_ia(modelo_seleccionado, f"Cuento sobre {p} en {l}.", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else:
                 st.text_area("Cuento:", res, height=300); botones_descarga(res, "Cuento")
                 if st.button("Leer"):
@@ -854,7 +924,7 @@ elif macro_idx == 1:
         req = campo_con_ideas("Código:", "code", "scripts", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Renombrar archivos")
         if st.button("Procesar") and req:
             res = llamar_ia(modelo_seleccionado, f"Programador senior. Explica o mejora:\n{req}", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.code(res, language="python")
     elif sub_idx == 9:
         st.markdown("#### Traductor")
@@ -864,7 +934,7 @@ elif macro_idx == 1:
         with c2: d = st.selectbox("Destino:", ["Español","Inglés","Francés"], key="d")
         if st.button("Traducir") and txt:
             res = llamar_ia(modelo_seleccionado, f"Traduce del {o} al {d}:\n{txt}", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.info(res); botones_descarga(res, "Traduccion")
 
 elif macro_idx == 2:
@@ -879,7 +949,7 @@ elif macro_idx == 2:
                 texto = leer_archivo_universal(arch, modelo_seleccionado)
                 prompt = {"Resumen Ejecutivo": f"Resumen:\n{texto}", "Extraer Fechas y Cifras": f"Fechas:\n{texto}", "Buscar Errores": f"Errores:\n{texto}", "Crear Test": f"Test 5 preguntas:\n{texto}", "Traducir al Inglés": f"Traduce al inglés:\n{texto}"}[opc]
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resultado:", res, height=400); botones_descarga(res, "Analisis")
     elif sub_idx == 1:
         st.markdown("#### Comparador")
@@ -888,7 +958,7 @@ elif macro_idx == 2:
             with st.spinner("Buscando..."):
                 ta = leer_archivo_universal(a, modelo_seleccionado); tb = leer_archivo_universal(b, modelo_seleccionado)
                 res = llamar_ia(modelo_seleccionado, f"Diferencias:\nA:\n{ta[:10000]}\nB:\n{tb[:10000]}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Diferencias:", res, height=400); botones_descarga(res, "Comparativa")
     elif sub_idx == 2:
         st.markdown("#### Crear Documentos")
@@ -902,7 +972,7 @@ elif macro_idx == 2:
                     if formato == "PowerPoint": prompt_ia += "\n\nFormatea para diapositivas con doble salto."
                     elif formato == "Excel": prompt_ia += "\n\nDevuelve CSV."
                     res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.session_state.office_borrador = res
             else: st.warning("Escribe un prompt.")
         if st.session_state.get("office_borrador"):
@@ -923,7 +993,7 @@ elif macro_idx == 2:
         if st.button("✨ Generar PDF", type="primary", key="btn_pdf_gen") and titulo and contenido:
             with st.spinner("Generando..."):
                 res = llamar_ia(modelo_seleccionado, f"{contexto}\n\n{contenido}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state.pdf_borrador = res
         if st.session_state.get("pdf_borrador"):
             st.markdown("### 📝 Borrador"); borrador_editable("pdf_borrador", "pdf_txt", height=350)
@@ -941,7 +1011,7 @@ elif macro_idx == 2:
                     texto_pdf = leer_archivo_universal(arch_factura, modelo_seleccionado)
                     res = llamar_ia(modelo_seleccionado, f"{prompt_factura}\n\n{texto_pdf}", st.session_state.api_key_gemini_manual)
                 else: res = analizar_archivo_con_gemini(arch_factura.getvalue(), "image/jpeg", prompt_factura, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else:
                     st.success("✅ Listo."); st.text_area("Datos:", value=res, height=150, key="factura_data")
                     st.download_button("📊 Excel", generar_excel(st.session_state.factura_data), "factura.xlsx", use_container_width=True)
@@ -962,7 +1032,7 @@ elif macro_idx == 2:
         txt = st.text_area("Texto:"); inst = campo_con_ideas("¿Qué hago?", "clip", "instrucciones", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Resume")
         if st.button("Procesar") and txt and inst:
             res = llamar_ia(modelo_seleccionado, f"{inst}:\n{txt}", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in res: st.error(res)
+            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.info(res)
 
 elif macro_idx == 3:
@@ -980,7 +1050,7 @@ elif macro_idx == 3:
         c = campo_con_ideas("Canal:", "tv", "TV", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Telecinco")
         if st.button("Programación") and c:
             res = buscar_en_internet(c); r_ia = llamar_ia(modelo_seleccionado, f"Programación {c}: {res}", st.session_state.api_key_gemini_manual)
-            if "[ERROR" in r_ia: st.error(r_ia)
+            if "[ERROR" in r_ia: st.error(mensaje_error_amigable(r_ia))
             else: st.info(r_ia)
     elif sub_idx == 3:
         url = st.text_input("URL Tabla:")
@@ -1010,12 +1080,12 @@ elif macro_idx == 3:
                 except:
                     st.info("Sin subtítulos. Transcribiendo audio...")
                     with st.spinner("Descargando y transcribiendo..."): texto_original = transcribir_audio_youtube(url, key_groq)
-            if texto_original.startswith("[ERROR]"): st.error(texto_original)
+            if texto_original.startswith("[ERROR]"): st.error(mensaje_error_amigable(texto_original))
             else:
                 with st.expander("Ver transcripción"): st.text_area("Texto:", value=texto_original, height=150, key=f"yt_orig_{vid}")
                 prompt = f"Resume esto en español:\n{texto_original[:8000]}" if modo == "Resumir" else f"Traduce al español:\n{texto_original[:8000]}"
                 with st.spinner("Procesando..."): res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resultado:", res, height=300); botones_descarga(res, f"YT_{vid}")
     elif sub_idx == 5:
         url = st.text_input("URL Web:")
@@ -1024,15 +1094,15 @@ elif macro_idx == 3:
                 if not url_segura(url): st.error("URL no permitida."); st.stop()
                 txt = " ".join(re.sub('<[^<]+?>', ' ', requests.get(url, headers={"User-Agent":"Mozilla/5.0"}).text).split())[:5000]
                 res = llamar_ia(modelo_seleccionado, f"Resume: {txt}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-    elif macro_idx == 4:
-        st.markdown("#### 🎬 Multimedia y Conversor PRO")
-        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
-        if sub_idx == 0:
-            st.markdown("### Generador de Imágenes")
+elif macro_idx == 4:
+    st.markdown("#### 🎬 Multimedia y Conversor PRO")
+    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Generador de Imágenes")
         prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
         if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
             with st.spinner("Generando..."):
@@ -1126,7 +1196,7 @@ elif macro_idx == 3:
             if arch_audio and st.button("Transcribir", type="primary"):
                 with st.spinner("Transcribiendo con IA (Whisper)..."):
                     texto = transcribir_archivo_local(arch_audio.getvalue(), arch_audio.name, _get_key("groq"))
-                    if "[ERROR]" in texto: st.error(texto)
+                    if "[ERROR]" in texto: st.error(mensaje_error_amigable(texto))
                     else:
                         nuevo_nombre = st.text_input("📝 Renombrar archivo:", value=f"Transcripcion_{arch_audio.name.split('.')[0]}")
                         st.text_area("Texto detectado:", value=texto, height=250)
@@ -1152,7 +1222,7 @@ elif macro_idx == 5:
         if st.button("🔎 Resolver", type="primary") and pregunta:
             with st.spinner("Pensando..."):
                 res = llamar_ia(modelo_seleccionado, f"Profesor experto en {materia}. Resuelve paso a paso:\n\n{pregunta}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, "Deberes_Resueltos", formatos_extra=True)
     elif sub_idx == 1:
         st.markdown("### Simulador de Entrevista")
@@ -1183,20 +1253,20 @@ elif macro_idx == 5:
             if st.button("🔍 Evaluar", type="primary") and puesto:
                 with st.spinner("Analizando..."):
                     res = llamar_ia(modelo_seleccionado, f"Técnico PRL. Evalúa riesgos para '{puesto}'. Contexto: '{entorno}'.\nTabla Markdown: | Riesgo | Probabilidad | Consecuencia | Nivel | Medidas | EPIs |\nAñade 'Recomendaciones'.", st.session_state.api_key_gemini_manual)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.markdown(res); botones_descarga(res, f"Evaluacion_PRL", formatos_extra=True)
         with tabs_prl[1]:
             tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios", "Ergonomía", "Máquinas"])
             if st.button("📝 Generar Test", type="primary"):
                 with st.spinner("Preparando..."):
                     res = llamar_ia(modelo_seleccionado, f"Test 10 preguntas (A,B,C,D) sobre '{tema_test}'. Incluye 'Soluciones'. Normativa española.", st.session_state.api_key_gemini_manual)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.markdown(res); botones_descarga(res, "Test_PRL", formatos_extra=True)
         with tabs_prl[2]:
             if st.button("📖 Resumen Leyes"):
                 with st.spinner("Resumiendo..."):
                     res = llamar_ia(modelo_seleccionado, "Resumen estructurado Ley 31/1995 PRL: 1. Objeto, 2. Principios, 3. Derechos y obligaciones.", st.session_state.api_key_gemini_manual)
-                    if "[ERROR" in res: st.error(res)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.markdown(res); botones_descarga(res, "Resumen_Ley_PRL", formatos_extra=True)
 
 elif macro_idx == 6:
@@ -1211,7 +1281,7 @@ elif macro_idx == 6:
         if st.button("🗺️ Crear", type="primary") and destino:
             with st.spinner("Planificando..."):
                 res = llamar_ia(modelo_seleccionado, f"Itinerario {dias} días para {destino}. Estilo: {tipo_viaje}. Incluye qué ver, dónde comer y consejos.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, f"Viaje_{destino}", formatos_extra=True)
     elif sub_idx == 1:
         st.markdown("### Recetas")
@@ -1219,7 +1289,7 @@ elif macro_idx == 6:
         if st.button("🍳 Crear", type="primary") and ingredientes:
             with st.spinner("Cocinando..."):
                 res = llamar_ia(modelo_seleccionado, f"Tengo: {ingredientes}. Dame 2 recetas fáciles. Incluye pasos y tiempo.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, "Recetas_Hogar")
     elif sub_idx == 2:
         st.markdown("### 💪 Entrenador IA")
@@ -1232,45 +1302,80 @@ elif macro_idx == 6:
         if st.button("📋 Generar Plan", type="primary"):
             with st.spinner("Diseñando..."):
                 res = llamar_ia(modelo_seleccionado, f"Entrenador. Usuario: {edad}a, {peso}kg, {altura}cm. Objetivo: '{objetivo}'. Entrena {dias_entreno} días en '{equipo}'. Genera: 1. Rutina semanal. 2. Consejos nutricionales.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
 
 elif macro_idx == 7:
     st.markdown("#### 🎵 Música y Arte")
     sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    
     if sub_idx == 0:
         st.markdown("### Generador de Letras")
         if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
+        
+        # --- BLOQUE 1: CONFIGURACIÓN INICIAL ---
         tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
-        with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"])
-        with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...")
-        if st.button("🪄 Generar Letra IA", use_container_width=True) and tema_cancion:
+        with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"], key="gen_letra")
+        with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...", key="art_letra")
+        
+        st.markdown("#### ⚙️ Ajustes de Voz y Música (Elige antes de generar)")
+        hacer_dueto = st.checkbox("🎤 Hacer Dúo")
+        
+        voces_disponibles = ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"]
+        bases_disponibles = ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"]
+        
+        cv1, cv2, cb = st.columns(3)
+        with cv1: voz_config1 = st.selectbox("Voz 1:", voces_disponibles, key="vc_v1")
+        with cv2: 
+            if hacer_dueto: voz_config2 = st.selectbox("Voz 2:", voces_disponibles, index=1, key="vc_v2")
+            else: 
+                voz_config2 = None
+                st.selectbox("Voz 2:", ["(Desactivado)"], disabled=True, key="vc_v2_off")
+        with cb: base_config = st.selectbox("Base musical:", bases_disponibles, key="vc_base")
+
+        if st.button("🪄 Generar Letra IA", use_container_width=True, type="primary") and tema_cancion:
             with st.spinner("Componiendo..."):
                 prompt = f"Letra de canción {genero} sobre: '{tema_cancion}'. "
                 if artista_estilo: prompt += f"Estilo {artista_estilo}. "
                 prompt += "Estructura (Intro, Verso 1, Coro, etc.) y añade indicaciones de producción entre corchetes."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state.letra_edit = res; st.rerun()
-        letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
-        if letra_final.strip():
+
+        # --- BLOQUE 2: EDICIÓN Y AUDIO FINAL ---
+        if st.session_state.letra_edit.strip():
+            st.markdown("---")
+            letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
             botones_descarga(letra_final, "Letra_Cancion")
-            st.markdown("---"); st.markdown("### 🎵 Ponerle Música"); hacer_dueto = st.checkbox("🎤 Hacer Dúo")
-            c1, c2 = st.columns(2)
-            with c1: voz_cancion1 = st.selectbox("Voz 1:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
-            with c2: 
-                if hacer_dueto: voz_cancion2 = st.selectbox("Voz 2:", ["es-MX-JorgeNeural", "es-ES-ElviraNeural", "es-AR-TomasNeural"])
-                else: voz_cancion2 = None; st.selectbox("Base:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_solo")
-            if hacer_dueto:
-                st.info("💡 *El sistema alternará voces por párrafo.*")
-                beat_estilo = st.selectbox("Base:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_duo")
-            if st.button("🎶 Generar Canción", type="primary"):
+            
+            st.markdown("### 🎵 Ponerle Música")
+            st.info("💡 Puedes cambiar las voces o la base musical aquí abajo antes de generar el audio final.")
+            
+            ca1, ca2, ca3 = st.columns(3)
+            with ca1: 
+                idx_v1 = voces_disponibles.index(voz_config1) if voz_config1 in voces_disponibles else 0
+                voz_final1 = st.selectbox("Voz 1 Final:", voces_disponibles, index=idx_v1, key="vf_v1")
+            with ca2: 
+                if hacer_dueto:
+                    idx_v2 = voces_disponibles.index(voz_config2) if voz_config2 in voces_disponibles else 1
+                    voz_final2 = st.selectbox("Voz 2 Final:", voces_disponibles, index=idx_v2, key="vf_v2")
+                else: 
+                    voz_final2 = None
+                    st.selectbox("Voz 2 Final:", ["(Desactivado)"], disabled=True, key="vf_v2_off")
+            with ca3: 
+                idx_b = bases_disponibles.index(base_config) if base_config in bases_disponibles else 0
+                base_final = st.selectbox("Base Final:", bases_disponibles, index=idx_b, key="vf_base")
+
+            if st.button("🎶 Generar Canción Completa", type="primary", use_container_width=True):
                 with st.spinner("Grabando..."):
-                    audio_final = generar_cancion_con_base(letra_final, voz_cancion1, beat_estilo, voz_cancion2)
+                    audio_final = generar_cancion_con_base(letra_final, voz_final1, base_final, voz_final2)
                     if audio_final:
-                        st.success("✅ ¡Lista!"); st.audio(audio_final, format="audio/mp3"); st.download_button("💾 MP3", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
+                        st.success("✅ ¡Lista!")
+                        st.audio(audio_final, format="audio/mp3")
+                        st.download_button("💾 Descargar MP3", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
+
     elif sub_idx == 1:
         st.markdown("### 🌞 Generador de Prompts para Suno AI")
         st.caption("Suno AI canta de verdad. Genera el texto perfecto para pegarlo en su web.")
@@ -1307,7 +1412,7 @@ elif macro_idx == 7:
                 """
                 res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual)
                 if "[ERROR" in res: 
-                    st.error(res)
+                    st.error(mensaje_error_amigable(res))
                 else:
                     st.success("✅ Prompt generado. Listo para copiar.")
                     res_limpia = res.replace("```markdown", "").replace("```", "").strip()
@@ -1339,7 +1444,7 @@ elif macro_idx == 7:
         if st.button("Escribir Poema") and tema_poema:
             with st.spinner("Escribiendo..."):
                 res = llamar_ia(modelo_seleccionado, f"Escribe un poema profundo sobre: {tema_poema}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, "Poema")
 
 elif macro_idx == 8:
@@ -1361,7 +1466,7 @@ elif macro_idx == 8:
             with st.spinner("Redactando..."):
                 prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
     elif sub_idx == 1:
         st.markdown("### 📜 Normativa y Leyes")
@@ -1369,7 +1474,7 @@ elif macro_idx == 8:
         if st.button("🔎 Consultar") and consulta:
             with st.spinner("Buscando en la Ley..."):
                 res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.markdown(res); botones_descarga(res, "Consulta_Normativa")
 
     elif sub_idx == 2:
@@ -1531,5 +1636,28 @@ elif macro_idx == 8:
             st.markdown("---")
             st.markdown("### 📂 Informes Periciales Individuales")
             for idx, r in enumerate(st.session_state["presu_resultados"]):
+                with st.expander(f"📄 {r['empresa']} (Archivo: {r['archivo']})"):
+                    st.markdown(r['analisis'])
+                    botones_descarga(r['analisis'], f"Analisis_{r['empresa'].replace(' ', '_')}", formatos_extra=True)
+
+    elif sub_idx == 3:
+        st.markdown("### 📊 Actas de Comunidad")
+        puntos_dia = st.text_area("Puntos del día a tratar (uno por línea):", height=150)
+        if st.button("📝 Redactar Acta", type="primary") and puntos_dia:
+            with st.spinner("Redactando..."):
+                prompt = f"Actúa como Secretario-Administrador de Fincas. Redacta un Acta de Reunión formal para una comunidad de vecinos. Los puntos del día a tratar son:\n{puntos_dia}\n\nSigue el formato legal español: Encabezado, Asistentes (deja espacio), Orden del día, Deliberaciones y Acuerdos, Cierre y Firmas."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Acta Redactada:", value=res, height=400); botones_descarga(res, "Acta_Comunidad")
                 
-                                _texto_raw = str(r['analisis']).replace('[', '').replace(']', '').replace('"', '').replace("'", "").replace(', ', ' ') 
+    elif sub_idx == 4:
+        st.markdown("### 📝 Citaciones y Notificaciones")
+        motivo = st.text_input("Motivo de la citación:", placeholder="Ej: Reunión extraordinaria por derrama...")
+        fecha_hora = st.text_input("Fecha y Hora:", placeholder="Ej: 15 de Noviembre a las 19:00h")
+        lugar = st.text_input("Lugar:", value="Portal del edificio o Sala de juntas")
+        if st.button("📝 Redactar Citación", type="primary") and motivo:
+            with st.spinner("Redactando..."):
+                prompt = f"Actúa como Administrador de Fincas. Redacta una notificación formal para los vecinos. Motivo: {motivo}. Fecha y hora: {fecha_hora}. Lugar: {lugar}. Incluye un lenguaje formal, la obligación de asistencia o delegación de voto, y espacio para la firma."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Vecinos")
