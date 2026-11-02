@@ -6,9 +6,9 @@ from pathlib import Path
 from docx import Document
 from openpyxl.styles import Font
 from pptx import Presentation
-from pptx.util import InchesA
+from pptx.util import Inches
 from io import BytesIO
-import textwrapA
+import textwrap
 from PIL import Image
 from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
@@ -1197,7 +1197,7 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-elif macro_idx == 4:
+                elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
@@ -1356,4 +1356,4 @@ elif macro_idx == 5:
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.markdown(res); botones_descarga(res, f"Evaluacion_PRL", formatos_extra=True)
         with tabs_prl[1]:
-            tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios",
+            tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios",)
