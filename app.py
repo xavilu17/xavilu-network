@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_markmap import markmap
-import ollama, asyncio, edge_tts, pypdf, openpyxl, csv, os, re, requests, tempfile, time, qrcode, numpy as np, sqlite3, datetime, concurrent.futures
+import ollama, asyncio, edge_tts, pypdf, openpyxl, csv, os, re, requests, tempfile, time, qrcode, numpy as np, sqlite3, datetime, concurrent.futures, json
 from docx import Document
 from openpyxl.styles import Font
 from pptx import Presentation
@@ -1197,9 +1197,16 @@ elif macro_idx == 8:
             progreso = st.progress(0)
             status_text = st.empty()
             
+            # 1. ANÁLISIS INDIVIDUAL EN BUCLE
             for i, arch in enumerate(arch_presupuestos):
                 status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
-                prompt_individual = "Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. Sé conciso."
+                
+                # Pedimos a la IA que devuelva un JSON con el nombre de la empresa
+                prompt_individual = """Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. 
+                IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
+                1. "empresa": (Solo el nombre corto de la empresa que presenta el presupuesto, ej: "Pinturas Pepe")
+                2. "analisis": (El texto detallado con los precios, lo que incluye y lo que falta).
+                No añadas markdown ni texto extra, solo el JSON puro."""
                 
                 try:
                     if arch.name.lower().endswith(".pdf"):
@@ -1208,18 +1215,31 @@ elif macro_idx == 8:
                     else:
                         res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
                     
-                    resultados_individuales.append({"nombre": arch.name, "analisis": res})
+                    # Limpiamos el JSON por si la IA añade ```json
+                    res_limpia = res.replace("```json", "").replace("```", "").strip()
+                    
+                    try:
+                        data_json = json.loads(res_limpia)
+                        nombre_empresa = data_json.get("empresa", arch.name)
+                        texto_analisis = data_json.get("analisis", res)
+                    except json.JSONDecodeError:
+                        # Si la IA falla y no devuelve JSON, usamos el nombre del archivo como respaldo
+                        nombre_empresa = arch.name
+                        texto_analisis = res
+                        
+                    resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
                 except Exception as e:
-                    resultados_individuales.append({"nombre": arch.name, "analisis": f"Error: {e}"})
+                    resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
                 
                 progreso.progress((i + 1) / len(arch_presupuestos))
             
             status_text.text("✅ Análisis individual completado. Generando comparativa final...")
             
+            # 2. COMPARATIVA FINAL
             if len(resultados_individuales) > 0:
                 texto_para_comparar = ""
                 for r in resultados_individuales:
-                    texto_para_comparar += f"\n--- PRESUPUESTO: {r['nombre']} ---\n{r['analisis']}\n"
+                    texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
                 
                 prompt_comparativa = f"""Actúa como un Administrador de Fincas. Aquí tienes el análisis de {len(resultados_individuales)} presupuestos:
 {texto_para_comparar}
@@ -1240,13 +1260,15 @@ Genera un informe final que contenga:
                     
                     st.markdown("---")
                     st.markdown("### 📂 Descargar Análisis Individuales")
+                    # 3. DESPLEGABLES CON ANÁLISIS Y DESCARGA INDIVIDUAL
                     for idx, r in enumerate(resultados_individuales):
-                        with st.expander(f"📄 Análisis: {r['nombre']}"):
+                        with st.expander(f"📄 Análisis: {r['empresa']}"):
+                            st.caption(f"Archivo original: {r['archivo']}")
                             st.markdown(r['analisis'])
                             st.download_button(
-                                label=f"📥 Descargar análisis de {r['nombre']}",
+                                label=f"📥 Descargar análisis de {r['empresa']}",
                                 data=r['analisis'].encode('utf-8'),
-                                file_name=f"Analisis_{r['nombre'].split('.')[0]}.txt",
+                                file_name=f"Analisis_{r['empresa'].replace(' ', '_')}.txt",
                                 mime="text/plain",
                                 key=f"dl_ind_{idx}"
                             )
