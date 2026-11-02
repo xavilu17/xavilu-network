@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_markmap import markmap
-import ollama, asyncio, edge_tts, pypdf, openpyxl, csv, os, re, requests, tempfile, time, qrcode, numpy as np, sqlite3, datetime, concurrent.futures, json, subprocess
+import ollama, asyncio, edge_tts, pypdf, openpyxl, csv, os, re, requests, tempfile, time, qrcode, numpy as np, sqlite3, datetime, concurrent.futures, json, subprocess, base64
 from pathlib import Path
 from docx import Document
 from openpyxl.styles import Font
@@ -31,15 +31,13 @@ try: from ddgs import DDGS
 except ImportError:
     try: from duckduckgo_search import DDGS
     except ImportError: DDGS = None
-try: from google import genai; from google.genai import types; HAS_GEMINI = True
-except ImportError: HAS_GEMINI = False
 try: import openai; HAS_OPENAI = True
 except ImportError: HAS_OPENAI = False
 
 st.set_page_config(page_title="Xavilu Network", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 MAX_FILE_MB = 200
 MAX_TEXTO_IA = 60_000
-GEMINI_MODEL = "gemini-1.5-flash"  # <--- CORREGIDO AQUÍ
+
 if os.name == "nt": asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # ============================================================
@@ -347,6 +345,7 @@ def mensaje_error_amigable(texto: str) -> str:
         ("MEMORY",            "📦 El archivo es demasiado grande. Prueba con uno más pequeño."),
         ("TOKEN",             "📏 El texto supera el límite del modelo. Resúmelo o divídelo."),
         ("GEMINI",            "🤖 Gemini falló. Revisa la API Key o cambia de proveedor."),
+        ("404",               "🔍 El modelo de Gemini no está disponible en tu cuenta."),
     ]
     for clave, msg in mapa:
         if clave in t:
@@ -379,9 +378,6 @@ def leer_archivo_universal(upload, modelo_ia: str) -> str:
         if nombre.endswith(".xlsx"): return "\n\n".join(f"=== {s} ===\n{d.to_csv(index=False)}" for s, d in pd.read_excel(upload, sheet_name=None).items())
     except Exception as e: st.warning(f"No pude leer '{upload.name}': {e}")
     return ""
-
-@st.cache_resource(show_spinner=False)
-def get_gemini_client(api_key: str): return genai.Client(api_key=api_key)
 
 def buscar_en_internet(query: str):
     if DDGS is None: return []
@@ -445,28 +441,43 @@ def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
         texto = leer_archivo_universal(archivo, modelo)
         st.success(f"✅ Archivo '{archivo.name}' leído."); return f"\n[CONTENIDO DE '{archivo.name}']:\n{texto[:10000]}\n"
 
+def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, mime_type: str = None) -> str:
+    modelos = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+    versiones = ["v1", "v1beta"]
+    
+    for version in versiones:
+        for modelo in modelos:
+            url = f"https://generativelanguage.googleapis.com/{version}/models/{modelo}:generateContent?key={api_key}"
+            headers = {'Content-Type': 'application/json'}
+            
+            if archivo_bytes and mime_type:
+                b64_data = base64.b64encode(archivo_bytes).decode('utf-8')
+                contents = [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": mime_type, "data": b64_data}}
+                    ]
+                }]
+            else:
+                contents = [{"parts": [{"text": prompt}]}]
+                
+            payload = {"contents": contents}
+            
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=60)
+                if response.status_code == 200:
+                    res_json = response.json()
+                    return res_json['candidates'][0]['content']['parts'][0]['text']
+                elif response.status_code == 400:
+                    continue
+            except Exception:
+                continue
+                
+    return "[ERROR GEMINI] No se pudo conectar con Google. Revisa tu API Key o tu conexión."
+
 def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str) -> str:
-    if not HAS_GEMINI or not api_key_gemini: return "[ERROR] Falta google-genai o API key."
-    size_mb = len(archivo_bytes) / (1024 * 1024); tmp_path = None
-    try:
-        client = get_gemini_client(api_key_gemini)
-        if size_mb > 15:
-            ext = mime_type.split("/")[-1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp: tmp.write(archivo_bytes); tmp_path = tmp.name
-            uploaded = client.files.upload(file=tmp_path)
-            while uploaded.state.name == "PROCESSING": time.sleep(3); uploaded = client.files.get(name=uploaded.name)
-            if uploaded.state.name == "FAILED": return "[ERROR] Gemini no pudo procesar el archivo."
-            res = client.models.generate_content(model=GEMINI_MODEL, contents=[prompt, uploaded]).text
-            try: client.files.delete(name=uploaded.name)
-            except: pass
-            return res
-        parte = types.Part.from_bytes(data=archivo_bytes, mime_type=mime_type)
-        return client.models.generate_content(model=GEMINI_MODEL, contents=[prompt, parte]).text
-    except Exception as e: return f"[ERROR GEMINI] {e}"
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try: os.remove(tmp_path)
-            except: pass
+    if not api_key_gemini: return "[ERROR] Falta la API Key de Gemini."
+    return llamar_gemini_rest(prompt, api_key_gemini, archivo_bytes, mime_type)
 
 def _get_key(nombre: str, arg_directo: str = "") -> str:
     manual = st.session_state.get(f"api_key_{nombre.lower()}_manual", "").strip()
@@ -479,22 +490,21 @@ def _get_key(nombre: str, arg_directo: str = "") -> str:
 
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     prompt_final = prompt[:MAX_TEXTO_IA]
-    if st.session_state.get("global_context"): prompt_final = f"[ARCHIVO ADJUNTO: {st.session_state.global_file_name}]\nCONTENIDO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN]:\n{prompt_final}"
-    if historial_chat: prompt_final = f"Historial:\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in historial_chat[-10:]) + f"\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
+    if st.session_state.get("global_context"): 
+        prompt_final = f"[ARCHIVO ADJUNTO: {st.session_state.global_file_name}]\nCONTENIDO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN]:\n{prompt_final}"
+    if historial_chat: 
+        prompt_final = f"Historial:\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in historial_chat[-10:]) + f"\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
     
     keys = {k: _get_key(k, api_key_gemini if k=="gemini" else "") for k in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]}
     
-    if keys["gemini"] and HAS_GEMINI:
-        for intento in range(2):
-            try:
-                res = get_gemini_client(keys["gemini"]).models.generate_content(model=GEMINI_MODEL, contents=prompt_final).text
-                if res: return res
-            except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e): break
-                if "503" in str(e) and intento < 1: time.sleep(2); continue
-                break
+    if keys["gemini"]:
+        res = llamar_gemini_rest(prompt_final, keys["gemini"])
+        if "[ERROR" not in res:
+            return res
+            
     urls = {"groq": "https://api.groq.com/openai/v1", "silicon": "https://api.siliconflow.cn/v1", "mistral": "https://api.mistral.ai/v1", "openrouter": "https://openrouter.ai/api/v1", "deepseek": "https://api.deepseek.com/v1", "together": "https://api.together.xyz/v1", "cerebras": "https://api.cerebras.ai/v1"}
     models = {"groq": "llama-3.3-70b-versatile", "silicon": "Qwen/Qwen2.5-7B-Instruct", "mistral": "mistral-small-latest", "openrouter": "deepseek/deepseek-r1:free", "deepseek": "deepseek-chat", "together": "meta-llama/Llama-3-70b-chat-hf", "cerebras": "llama3.1-70b"}
+    
     for prov in ["groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]:
         if keys[prov] and HAS_OPENAI:
             try:
@@ -502,11 +512,13 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
                 res = client.chat.completions.create(model=models[prov], messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
                 if res: return res
             except: pass
+            
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         raw = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"]
         return re.sub(r"\n```\s*$", "", re.sub(r"^```\w*\n", "", raw)).strip()
-    except Exception as e: return mensaje_error_amigable(f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}")
+    except Exception as e: 
+        return mensaje_error_amigable(f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}")
 
 def render_mermaid(mermaid_code):
     components.html(f"<div class='mermaid'>{mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';mermaid.initialize({{ startOnLoad: true, theme: 'dark', securityLevel: 'loose' }});</script>", height=600, scrolling=True)
