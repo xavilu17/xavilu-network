@@ -125,35 +125,49 @@ def generar_manual_sencillo_pdf() -> bytes:
     else:
         font_name = "Helvetica"
 
+    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
+
     pdf.set_font(font_name, "B", 24)
     pdf.set_text_color(255, 140, 0)
-    pdf.multi_cell(w=0, h=20, text="XAVILU NETWORK PRO", align="C")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=20, text="XAVILU NETWORK PRO", align="C")
     
     pdf.set_font(font_name, "I", 14)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(w=0, h=10, text="Tu centro de trabajo y diversion todo en uno", align="C")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=10, text="Tu centro de trabajo y diversion todo en uno", align="C")
     pdf.ln(10)
     
     pdf.set_font(font_name, "", 12)
     intro = ("Imagina que tienes una oficina entera dentro de tu ordenador. Xavilu Network es una aplicacion "
              "que reune a los mejores asistentes virtuales (Inteligencias Artificiales) para ayudarte con las "
              "tareas del dia a dia, los deberes, el trabajo o para crear musica. Todo desde una sola pantalla.")
-    pdf.multi_cell(w=0, h=7, text=intro)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text=intro)
     pdf.ln(10)
 
     pdf.set_font(font_name, "B", 14)
     pdf.set_text_color(200, 0, 150)
-    pdf.multi_cell(w=0, h=10, text="1. COMO ENTRAR")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=10, text="1. COMO ENTRAR")
+    
     pdf.set_font(font_name, "", 12)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(w=0, h=7, text="Al abrir la aplicacion, lo primero que veras es una pantalla oscura que te pedira una Contrasena.")
-    pdf.cell(w=0, h=7, text="- Adultos (Administrador): Acceso a absolutamente todo.", ln=True)
-    pdf.cell(w=0, h=7, text="- Ninos: La app escondera las herramientas delicadas y dejara solo lo divertido.", ln=True)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="Al abrir la aplicacion, lo primero que veras es una pantalla oscura que te pedira una Contrasena.")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- Adultos (Administrador): Acceso a absolutamente todo.")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- Ninos: La app escondera las herramientas delicadas y dejara solo lo divertido.")
     pdf.ln(8)
 
     pdf.set_font(font_name, "B", 14)
     pdf.set_text_color(200, 0, 150)
-    pdf.multi_cell(w=0, h=10, text="2. EL MENU DE ARRIBA (Tus herramientas)")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=10, text="2. EL MENU DE ARRIBA (Tus herramientas)")
+    
     pdf.set_font(font_name, "", 11)
     pdf.set_text_color(0, 0, 0)
     
@@ -171,29 +185,43 @@ def generar_manual_sencillo_pdf() -> bytes:
     
     for nombre, desc in herramientas:
         pdf.set_font(font_name, "B", 11)
+        pdf.set_x(pdf.l_margin)
         pdf.cell(w=0, h=6, text=nombre, ln=True)
+        
         pdf.set_font(font_name, "", 11)
-        pdf.set_x(15)
-        pdf.multi_cell(w=0, h=6, text=desc)
+        pdf.set_x(pdf.l_margin + 5)
+        pdf.multi_cell(w=ancho_util - 5, h=6, text=desc)
         pdf.ln(2)
 
     pdf.ln(5)
 
     pdf.set_font(font_name, "B", 14)
     pdf.set_text_color(200, 0, 150)
-    pdf.multi_cell(w=0, h=10, text="3. COMO GUARDAR LO QUE CREO")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=10, text="3. COMO GUARDAR LO QUE CREO")
+    
     pdf.set_font(font_name, "", 12)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(w=0, h=7, text="Cuando pides a la IA que escriba algo, justo debajo apareceran unos botones de colores para descargarlo:")
-    pdf.cell(w=0, h=7, text="- TXT: Solo el texto.", ln=True)
-    pdf.cell(w=0, h=7, text="- PDF: Un documento listo para imprimir.", ln=True)
-    pdf.cell(w=0, h=7, text="- Word / Excel: Para abrirlo en los programas de toda la vida.", ln=True)
-    pdf.cell(w=0, h=7, text="- WhatsApp: Para enviartelo al movil.", ln=True)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="Cuando pides a la IA que escriba algo, justo debajo apareceran unos botones de colores para descargarlo:")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- TXT: Solo el texto.")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- PDF: Un documento listo para imprimir.")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- Word / Excel: Para abrirlo en los programas de toda la vida.")
+    
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="- WhatsApp: Para enviartelo al movil.")
     
     pdf.ln(10)
     pdf.set_font(font_name, "I", 12)
     pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(w=0, h=7, text="Consejo: No tengas miedo, no puedes romper nada. Cuanto mas detalle le des a la IA, mejor sera el resultado.")
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(w=ancho_util, h=7, text="Consejo: No tengas miedo, no puedes romper nada. Cuanto mas detalle le des a la IA, mejor sera el resultado.")
 
     resultado = pdf.output(dest="S")
     return resultado.encode("latin-1") if isinstance(resultado, str) else bytes(resultado)
@@ -741,6 +769,8 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
                     st.session_state[f"tab_{key_name}"] = i+j; st.rerun()
     return st.session_state[f"tab_{key_name}"]
 
+if "sidebar_visible" not in st.session_state: st.session_state.sidebar_visible = True
+
 if not st.session_state.sidebar_visible:
     st.markdown("<style>[data-testid=\"collapsedControl\"] {display: none !important;}</style>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
@@ -1207,6 +1237,7 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
+
 elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
@@ -1424,7 +1455,6 @@ elif macro_idx == 7:
         st.markdown("### Generador de Letras")
         if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
         
-        # --- BLOQUE 1: CONFIGURACIÓN INICIAL ---
         tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
         with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"], key="gen_letra")
@@ -1454,7 +1484,6 @@ elif macro_idx == 7:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.session_state.letra_edit = res; st.rerun()
 
-        # --- BLOQUE 2: EDICIÓN Y AUDIO FINAL ---
         if st.session_state.letra_edit.strip():
             st.markdown("---")
             letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
@@ -1566,4 +1595,279 @@ elif macro_idx == 8:
         st.markdown("### 🚨 Gestión de Incidencias")
         c1, c2 = st.columns(2)
         with c1:
-            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "
+            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "Otro"])
+            urgencia = st.selectbox("Urgencia:", ["Baja", "Media", "Alta", "Urgente"])
+        with c2:
+            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
+            ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB")
+        descripcion_inc = st.text_area("Describe lo ocurrido:", height=150)
+        if st.button("📝 Redactar Reclamación", type="primary") and descripcion_inc:
+            with st.spinner("Redactando..."):
+                prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+                
+    elif sub_idx == 1:
+        st.markdown("### 📜 Normativa y Leyes")
+        consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: ¿Puedo poner cámara en el rellano?")
+        if st.button("🔎 Consultar") and consulta:
+            with st.spinner("Buscando en la Ley..."):
+                res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, "Consulta_Normativa")
+
+    elif sub_idx == 2:
+        st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
+        st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. Los análisis se guardarán en la memoria hasta que reinicies o limpies.")
+        
+        arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
+        
+        instrucciones_extra = st.text_area(
+            "📝 ¿En qué quieres que se fije la IA? (Opcional):", 
+            placeholder="Ej: Céntrate en los plazos de entrega, busca si incluyen limpieza o gestión de escombros, revisa las garantías...", 
+            height=80
+        )
+        
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
+            if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
+                resultados_individuales = []
+                progreso = st.progress(0)
+                status_text = st.empty()
+                
+                for i, arch in enumerate(arch_presupuestos):
+                    status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
+                    
+                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto. 
+                    Tu objetivo es redactar un INFORME PERICIAL Y DE EVALUACIÓN TÉCNICA de este presupuesto para proteger los intereses de la comunidad de vecinos.
+                    
+                    IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
+                    1. "empresa": (Solo el nombre corto de la empresa, ej: "Pinturas Pepe").
+                    2. "analisis": (El informe técnico redactado en texto plano, estructurado y muy profesional).
+                    
+                    En el texto del "analisis", DEBES seguir estrictamente esta estructura formal, usando guiones o números para las listas:
+                    
+                    INFORME TÉCNICO DE EVALUACIÓN
+                    
+                    1. RESUMEN EJECUTIVO: Un párrafo de 2 o 3 líneas con el veredicto general sobre la oferta (viabilidad, riesgos principales).
+                    
+                    2. ANÁLISIS ECONÓMICO: 
+                    - Precio Total y desglose del IVA (si lo lleva o está exento).
+                    - Advertencia sobre posibles partidas ocultas, sobrecostes o falta de desglose.
+                    
+                    3. CUMPLIMIENTO NORMATIVO Y LICENCIAS:
+                    - Evaluación de las licencias de obra/actividad y tasas municipales. ¿Se encarga la empresa o lo deja a la comunidad?
+                    
+                    4. SEGURIDAD Y SALUD (PRL) Y RESIDUOS:
+                    - ¿Incluye Plan de Seguridad y Salud o Estudio Básico? (Obligatorio).
+                    - ¿Se especifica la gestión y retirada de escombros/residuos?
+                    
+                    5. PLAZOS Y GARANTÍAS:
+                    - Plazos de ejecución.
+                    - Garantías ofrecidas por escrito (seguro, años de garantía).
+                    
+                    6. LA LETRA PEQUEÑA (PUNTOS CRÍTICOS):
+                    - Lista de carencias, ambigüedades o cosas que NO incluye el presupuesto y que el presidente de la comunidad debería exigir antes de firmar.
+                    
+                    7. RECOMENDACIONES DEL PERITO:
+                    - 2 o 3 acciones concretas a tomar antes de contratar a esta empresa.
+                    
+                    No añadas markdown extra (como asteriscos) ni símbolos raros. Redacta con un tono serio, formal y jurídico."""
+                    
+                    if instrucciones_extra.strip():
+                        prompt_individual += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA:\n{instrucciones_extra}\n"
+                    
+                    try:
+                        if arch.name.lower().endswith(".pdf"):
+                            texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
+                            res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                        else:
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
+                        
+                        res_limpia = res.replace("```json", "").replace("```", "").strip()
+                        try:
+                            data_json = json.loads(res_limpia)
+                            nombre_empresa = data_json.get("empresa", arch.name)
+                            texto_analisis = data_json.get("analisis", res)
+                        except json.JSONDecodeError:
+                            nombre_empresa = arch.name
+                            texto_analisis = res
+                        
+                        status_text.text(f"Buscando reputación online de {nombre_empresa}...")
+                        res_busqueda = buscar_en_internet(f"{nombre_empresa} opiniones trabajos realizados")
+                        
+                        info_web = ""
+                        if res_busqueda:
+                            info_web = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_busqueda])
+                            prompt_rep = f"Analiza la reputación de '{nombre_empresa}' basándote en estos resultados de búsqueda en internet:\n{info_web}\n\nDevuelve un resumen de máximo 3 líneas. Si no hay información clara o es de otra empresa, di 'No hay información relevante en internet'."
+                            
+                            with st.spinner(f"Consultando web para {nombre_empresa}..."):
+                                rep_ia = llamar_ia(modelo_seleccionado, prompt_rep, st.session_state.api_key_gemini_manual)
+                                
+                            if "[ERROR" not in rep_ia:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {rep_ia}"
+                            else:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {info_web[:300]}..."
+                        else:
+                            texto_analisis += "\n\n[REPUTACIÓN ONLINE]: No se encontraron resultados en internet."
+                            
+                        resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
+                    except Exception as e:
+                        resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
+                    
+                    progreso.progress((i + 1) / len(arch_presupuestos))
+                
+                status_text.text("✅ Análisis individual completado. Generando comparativa final...")
+                
+                if len(resultados_individuales) > 0:
+                    texto_para_comparar = ""
+                    for r in resultados_individuales:
+                        texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
+                    
+                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior. 
+                    Aquí tienes los informes periciales de {len(resultados_individuales)} presupuestos para una comunidad de vecinos:
+                    
+                    {texto_para_comparar}
+                    
+                    Tu tarea es redactar un INFORME COMPARATIVO FINAL EXTREMADAMENTE DETALLADO. No resumas demasiado. Sigue esta estructura exacta:
+                    
+                    1. TABLA COMPARATIVA DETALLADA
+                    Crea una tabla en Markdown con estas columnas: Proveedor, Presupuesto (€), IVA Desglosado (Sí/No), Licencias/PRL (Sí/No), Garantías (Sí/No), Valoración Técnica y Nivel de Riesgo (Bajo/Medio/Alto).
+                    
+                    2. ANÁLISIS PORMENORIZADO POR EMPRESA
+                    Haz un pequeño párrafo para cada empresa (usando su nombre como título). Explica qué ofrece, cuáles son sus puntos fuertes y qué carencias graves tiene respecto al resto.
+                    
+                    3. ANÁLISIS DE RIESGOS (SEMÁFORO)
+                    - RIESGOS CRÍTICOS: ¿Alguna empresa tiene un precio anormalmente bajo que sugiera "bicicleta" o falta de calidad? ¿Falta PRL obligatoria?
+                    - RIESGOS MODERADOS: ¿Faltan detalles de garantías o licencias?
+                    - PUNTOS A FAVOR: ¿Qué empresa da más confianza técnica?
+                    
+                    4. RECOMENDACIÓN FINAL DEL PERITO
+                    Explica con argumentos técnicos y jurídicos cuál es la mejor opción calidad/precio. Justifica si merece la pena pagar más por una empresa que cumpla estrictamente con la normativa.
+                    
+                    5. ACCIONES ANTES DE FIRMAR
+                    Lista de 3 a 5 exigencias que la comunidad debe pedir por escrito a la empresa ganadora antes de dar el visto bueno (ej: "Exigir el Plan de Seguridad y Salud", "Aclarar quién paga la tasa de escombros", etc.).
+                    
+                    IMPORTANTE: Usa un tono formal, serio y profesional. No uses emojis ni símbolos raros. Formatea el texto para que sea fácil de leer en un PDF.
+                    """
+                    
+                    if instrucciones_extra.strip():
+                        prompt_comparativa += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA EN LA COMPARATIVA:\n{instrucciones_extra}\n"
+                    
+                    res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
+                    status_text.empty()
+                    progreso.empty()
+                    
+                    if "[ERROR" not in res_comparativa:
+                        st.session_state["presu_resultados"] = resultados_individuales
+                        st.session_state["presu_comparativa"] = res_comparativa
+                        st.success("✅ Informe generado y guardado en memoria.")
+                        st.rerun()
+                    else:
+                        st.error("Error al generar la comparativa final.")
+        
+        with c_btn2:
+            if st.session_state["presu_resultados"]:
+                if st.button("🗑️ Limpiar Análisis Guardados", use_container_width=True):
+                    st.session_state["presu_resultados"] = None
+                    st.session_state["presu_comparativa"] = ""
+                    st.rerun()
+
+        if st.session_state["presu_resultados"]:
+            st.markdown("---")
+            st.markdown("### 🏆 Comparativa y Recomendación Final")
+            st.markdown(st.session_state["presu_comparativa"])
+            botones_descarga(st.session_state["presu_comparativa"], "Comparativa_Presupuestos", formatos_extra=True)
+
+            st.link_button(
+                "💬 Compartir comparativa por WhatsApp",
+                wa_url(MENSAJES_WA["presupuesto"]),
+                use_container_width=True,
+            )
+            
+            st.markdown("---")
+            st.markdown("### 📂 Informes Periciales Individuales")
+            for idx, r in enumerate(st.session_state["presu_resultados"]):
+                with st.expander(f"📄 {r['empresa']} (Archivo: {r['archivo']})"):
+                    st.markdown(r['analisis'])
+                    botones_descarga(r['analisis'], f"Analisis_{r['empresa'].replace(' ', '_')}", formatos_extra=True)
+
+    elif sub_idx == 3:
+        st.markdown("### 📊 Actas de Comunidad")
+        tab_act = st.tabs(["📝 Crear Nueva", "🔍 Analizar / Preguntar"])
+        
+        with tab_act[0]:
+            puntos_dia = st.text_area("Puntos del día a tratar (uno por línea):", height=150)
+            if st.button("📝 Redactar Acta", type="primary") and puntos_dia:
+                with st.spinner("Redactando..."):
+                    prompt = f"Actúa como Secretario-Administrador de Fincas. Redacta un Acta de Reunión formal para una comunidad de vecinos. Los puntos del día a tratar son:\n{puntos_dia}\n\nSigue el formato legal español: Encabezado, Asistentes (deja espacio), Orden del día, Deliberaciones y Acuerdos, Cierre y Firmas."
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.text_area("Acta Redactada:", value=res, height=400); botones_descarga(res, "Acta_Comunidad")
+                    
+        with tab_act[1]:
+            st.markdown("Sube un acta (foto o PDF) y pregúntale a la IA lo que necesites.")
+            arch_acta = st.file_uploader("Sube el documento:", type=["pdf", "jpg", "jpeg", "png"], key="up_acta")
+            pregunta_acta = st.text_area("¿Qué quieres saber sobre esta acta?", placeholder="Ej: Resume los acuerdos, ¿qué se aprobó sobre la derrama?, mejora la redacción...", height=100)
+            
+            if arch_acta and st.button("🔍 Analizar Documento", type="primary", key="btn_analizar_acta"):
+                with st.spinner("Analizando el documento..."):
+                    prompt_analisis = f"Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).\n\nINSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}\n\nSé formal y preciso."
+                    
+                    if arch_acta.name.lower().endswith(".pdf"):
+                        texto_pdf = leer_archivo_universal(arch_acta, modelo_seleccionado)
+                        res = llamar_ia(modelo_seleccionado, f"{prompt_analisis}\n\nTexto del documento:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                    else:
+                        res = analizar_archivo_con_gemini(arch_acta.getvalue(), "image/jpeg", prompt_analisis, st.session_state.api_key_gemini_manual)
+                        
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: 
+                        st.markdown(res)
+                        botones_descarga(res, "Analisis_Acta", formatos_extra=True)
+
+    elif sub_idx == 4:
+        st.markdown("### 📝 Citaciones y Notificaciones")
+        tab_cit = st.tabs(["📝 Crear Nueva", "🔍 Analizar / Preguntar"])
+        
+        with tab_cit[0]:
+            motivo = st.text_input("Motivo de la citación:", placeholder="Ej: Reunión extraordinaria por derrama...")
+            fecha_hora = st.text_input("Fecha y Hora:", placeholder="Ej: 15 de Noviembre a las 19:00h")
+            lugar = st.text_input("Lugar:", value="Portal del edificio o Sala de juntas")
+            if st.button("📝 Redactar Citación", type="primary", key="btn_redactar_cit") and motivo:
+                with st.spinner("Redactando..."):
+                    prompt = f"Actúa como Administrador de Fincas. Redacta una notificación formal para los vecinos. Motivo: {motivo}. Fecha y hora: {fecha_hora}. Lugar: {lugar}. Incluye un lenguaje formal, la obligación de asistencia o delegación de voto, y espacio para la firma."
+                    res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Vecinos")
+                    
+        with tab_cit[1]:
+            st.markdown("Sube una citación o notificación (foto o PDF) para que la IA la revise en busca de defectos de forma o errores legales.")
+            arch_citacion = st.file_uploader("Sube el documento:", type=["pdf", "jpg", "jpeg", "png"], key="up_citacion")
+            pregunta_cit = st.text_area("¿Qué quieres saber sobre esta citación?", placeholder="Ej: ¿Falta el orden del día?, ¿Es válida legalmente?, redáctala de nuevo corrigiendo errores...", height=100)
+            
+            if arch_citacion and st.button("🔍 Revisar Documento", type="primary", key="btn_analizar_cit"):
+                with st.spinner("Analizando el documento..."):
+                    prompt_revision = f"""Actúa como un Administrador de Fincas y Abogado experto en propiedad horizontal en España.
+                    Tu objetivo es revisar la siguiente citación o notificación enviada a los vecinos de una comunidad.
+                    
+                    Debes analizar si tiene DEFECTOS DE FORMA (falta de fecha, lugar, hora, orden del día, falta de firma, lenguaje inadecuado, etc.).
+                    
+                    INSTRUCCIÓN DEL USUARIO: {pregunta_cit if pregunta_cit.strip() else 'Analiza los defectos de forma y propón una versión corregida.'}
+                    
+                    Devuelve un informe estructurado con:
+                    1. VEREDICTO: ¿Es válida o tiene fallos graves?
+                    2. ANÁLISIS DE FORMA: Lista de errores o carencias detectadas.
+                    3. PROPUESTA DE MEJORA: Redacta una versión corregida y formal del documento con los datos que aparecen en él.
+                    """
+                    
+                    if arch_citacion.name.lower().endswith(".pdf"):
+                        texto_pdf = leer_archivo_universal(arch_citacion, modelo_seleccionado)
+                        res = llamar_ia(modelo_seleccionado, f"{prompt_revision}\n\nTexto del documento:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                    else:
+                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, st.session_state.api_key_gemini_manual)
+                        
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: 
+                        st.markdown(res)
+                        botones_descarga(res, "Revision_Citacion", formatos_extra=True)
