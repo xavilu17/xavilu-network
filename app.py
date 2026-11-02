@@ -1237,7 +1237,6 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-
 elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
@@ -1813,11 +1812,14 @@ elif macro_idx == 8:
             
             if arch_acta and st.button("🔍 Analizar Documento", type="primary", key="btn_analizar_acta"):
                 with st.spinner("Analizando el documento..."):
-                    prompt_analisis = f"Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).\n\nINSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}\n\nSé formal y preciso."
+                    prompt_analisis = f"""Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).
+                    IMPORTANTE: Responde de forma clara y concisa a la instrucción del usuario. No inventes información que no esté en el documento.
+                    
+                    INSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}
+                    """
                     
                     if arch_acta.name.lower().endswith(".pdf"):
-                        texto_pdf = leer_archivo_universal(arch_acta, modelo_seleccionado)
-                        res = llamar_ia(modelo_seleccionado, f"{prompt_analisis}\n\nTexto del documento:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                        res = analizar_archivo_con_gemini(arch_acta.getvalue(), "application/pdf", prompt_analisis, st.session_state.api_key_gemini_manual)
                     else:
                         res = analizar_archivo_con_gemini(arch_acta.getvalue(), "image/jpeg", prompt_analisis, st.session_state.api_key_gemini_manual)
                         
@@ -1849,21 +1851,23 @@ elif macro_idx == 8:
             if arch_citacion and st.button("🔍 Revisar Documento", type="primary", key="btn_analizar_cit"):
                 with st.spinner("Analizando el documento..."):
                     prompt_revision = f"""Actúa como un Administrador de Fincas y Abogado experto en propiedad horizontal en España.
-                    Tu objetivo es revisar la siguiente citación o notificación enviada a los vecinos de una comunidad.
-                    
-                    Debes analizar si tiene DEFECTOS DE FORMA (falta de fecha, lugar, hora, orden del día, falta de firma, lenguaje inadecuado, etc.).
+                    Tu objetivo es revisar la siguiente citación. 
                     
                     INSTRUCCIÓN DEL USUARIO: {pregunta_cit if pregunta_cit.strip() else 'Analiza los defectos de forma y propón una versión corregida.'}
                     
-                    Devuelve un informe estructurado con:
-                    1. VEREDICTO: ¿Es válida o tiene fallos graves?
-                    2. ANÁLISIS DE FORMA: Lista de errores o carencias detectadas.
-                    3. PROPUESTA DE MEJORA: Redacta una versión corregida y formal del documento con los datos que aparecen en él.
+                    REGLAS ESTRICTAS:
+                    1. NO TE INVENTES FALLOS. Si el documento tiene fecha, hora, lugar y orden del día, indica que es correcto.
+                    2. Si el usuario te ha pedido algo concreto, responde a eso.
+                    3. Si propones una versión corregida, usa exactamente los datos que aparecen en el documento.
+                    
+                    Estructura tu respuesta así:
+                    VEREDICTO: (Es válido o tiene fallos reales)
+                    ANÁLISIS DE FORMA: (Puntos clave que sí tiene o que faltan de verdad)
+                    PROPUESTA DE MEJORA: (Si es necesario, redacta la versión final con los datos del documento)
                     """
                     
                     if arch_citacion.name.lower().endswith(".pdf"):
-                        texto_pdf = leer_archivo_universal(arch_citacion, modelo_seleccionado)
-                        res = llamar_ia(modelo_seleccionado, f"{prompt_revision}\n\nTexto del documento:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "application/pdf", prompt_revision, st.session_state.api_key_gemini_manual)
                     else:
                         res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, st.session_state.api_key_gemini_manual)
                         
