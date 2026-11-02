@@ -2,11 +2,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_markmap import markmap
 import ollama, asyncio, edge_tts, pypdf, openpyxl, csv, os, re, requests, tempfile, time, qrcode, numpy as np, sqlite3, datetime, concurrent.futures, json, subprocess
+from pathlib import Path
 from docx import Document
 from openpyxl.styles import Font
 from pptx import Presentation
 from pptx.util import Inches
 from io import BytesIO
+import textwrap
 from PIL import Image
 from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
@@ -40,6 +42,88 @@ MAX_TEXTO_IA = 60_000
 GEMINI_MODEL = "gemini-2.0-flash"
 if os.name == "nt": asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+# ============================================================
+# 🔧 HELPERS
+# ============================================================
+CARPETA_DESCARGAS = Path("descargas_xavilu")
+CARPETA_DESCARGAS.mkdir(exist_ok=True)
+
+def guardar_descarga(nombre_archivo: str, datos):
+    sello = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = Path(nombre_archivo)
+    destino = CARPETA_DESCARGAS / f"{base.stem}_{sello}{base.suffix}"
+    try:
+        if isinstance(datos, str): destino.write_text(datos, encoding="utf-8")
+        else: destino.write_bytes(datos)
+    except Exception: pass
+    return destino
+
+def limpiar_texto_analisis(texto: str) -> str:
+    if not texto: return ""
+    t = str(texto)
+    t = re.sub(r"[*_`#>]+", "", t)
+    t = re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]", "", t)
+    t = re.sub(r"[ \t]+", " ", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+def generar_guia_pdf(version: str = "1.0") -> bytes:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Guia rapida - Xavilu Network Pro", ln=True)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", size=11)
+    contenido = f"""1. QUE ES
+Xavilu Network Pro es tu centro de trabajo para gestionar presupuestos,
+generar prompts de musica con IA y convertir audio/video, todo desde una
+misma app.
+
+2. PRESUPUESTOS
+- Crea varios presupuestos y comparalos.
+- Descarga cada presupuesto de forma individual.
+- Revisa el analisis individual antes de enviarlo.
+
+3. PROMPTS PARA SUNO AI
+- Rellena estilo, ambiente y estructura.
+- Copia el prompt y pegalo en Suno AI.
+
+4. CONVERSOR PRO (AUDIO/VIDEO)
+- Sube tu archivo (MP3, WAV, MP4...).
+- Elige formato y opciones.
+- Descarga el resultado al terminar.
+
+5. COMPARTIR
+- Descarga el PDF o el analisis en .txt.
+- Pulsa "Compartir por WhatsApp" y adjunta el archivo.
+
+6. SOPORTE
+Manual completo disponible en la app.
+Version {version}"""
+    for linea in contenido.split("\n"):
+        linea = linea.strip()
+        if not linea:
+            pdf.ln(3)
+            continue
+        for fragmento in textwrap.wrap(linea, width=85, break_long_words=True, break_on_hyphens=True) or [""]:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(w=pdf.w - pdf.l_margin - pdf.r_margin, h=6, text=fragmento)
+    resultado = pdf.output(dest="S")
+    return resultado.encode("latin-1") if isinstance(resultado, str) else bytes(resultado)
+
+import urllib.parse as _urlparse
+MENSAJES_WA = {
+    "guia": "Hola, te comparto la guia rapida de Xavilu Network Pro. Te adjunto el PDF. Cualquier duda, aqui estoy.",
+    "presupuesto": "Hola, te envio la comparativa de presupuestos de Xavilu Network Pro. Te adjunto el detalle. Cualquier duda, aqui estoy.",
+    "analisis": "Hola, te envio el analisis individual de {nombre}. Te adjunto el archivo de texto. Cualquier duda, aqui estoy.",
+    "manual": "Hola, te comparto el manual de Xavilu Network Pro. Te adjunto el PDF. Cualquier duda, aqui estoy.",
+}
+def wa_url(mensaje: str) -> str: return f"https://wa.me/?text={_urlparse.quote(mensaje)}"
+
+# ============================================================
+# BASE DE DATOS Y CONFIG
+# ============================================================
 def init_db():
     with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS historial (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)")
@@ -96,6 +180,9 @@ def inyectar_js_fixer():
     components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#fff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
 
+# ============================================================
+# FUNCIONES CORE
+# ============================================================
 def limpiar_texto_para_voz(texto):
     if not texto: return ""
     texto = re.sub(r'[\*\#\_\`\~\"\']', '', texto)
@@ -261,108 +348,55 @@ def obtener_ruta_fuente():
 
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente(); tmp_img = None
+    
     if logo_bytes:
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp: tmp.write(logo_bytes); tmp_img = tmp.name
-            pdf.image(tmp_img, x=40, y=50, w=130); pdf.ln(150)
+            pdf.image(tmp_img, x=10, y=10, w=35)
+            pdf.set_y(45)
         except Exception as e: st.warning(f"Error portada: {e}")
         finally:
             if tmp_img and os.path.exists(tmp_img):
                 try: os.remove(tmp_img)
                 except: pass
+    else:
+        pdf.set_y(20)
+
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.add_font("XaviFont", "I", font_path, uni=True); pdf.set_font("XaviFont", size=11)
     else: pdf.set_font("Helvetica", size=11)
-    pdf.set_font("XaviFont" if font_path else "Helvetica", "B", 24)
+    
+    pdf.set_font("XaviFont" if font_path else "Helvetica", "B", 20)
     pdf.multi_cell(0, 10, text=titulo, align="C")
-    pdf.set_font("XaviFont" if font_path else "Helvetica", "I", 12)
+    pdf.set_font("XaviFont" if font_path else "Helvetica", "I", 10)
     pdf.cell(0, 10, text="Generado por Xavilu Network", align="C", ln=True)
     pdf.set_draw_color(0, 240, 255); pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5); pdf.ln(15)
-    if not font_path: contenido = contenido.encode("latin-1", "replace").decode("latin-1")
+    
+    contenido_limpio = limpiar_texto_analisis(contenido)
+    if not font_path: contenido_limpio = contenido_limpio.encode("latin-1", "replace").decode("latin-1")
     pdf.set_font("XaviFont" if font_path else "Helvetica", size=11)
-    pdf.multi_cell(0, 8, text=contenido); return bytes(pdf.output())
+    
+    for linea in contenido_limpio.split("\n"):
+        linea = linea.strip()
+        if not linea:
+            pdf.ln(3)
+            continue
+        for fragmento in textwrap.wrap(linea, width=85, break_long_words=True, break_on_hyphens=True) or [""]:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(w=pdf.w - pdf.l_margin - pdf.r_margin, h=6, text=fragmento)
+            
+    resultado = pdf.output(dest="S")
+    return resultado.encode("latin-1") if isinstance(resultado, str) else bytes(resultado)
 
 def generar_manual_pdf() -> bytes:
-    texto_manual = """MANUAL DE USUARIO - XAVILU NETWORK PRO
-
-Bienvenido a tu centro de control definitivo. Esta aplicación integra las mejores IAs (Gemini, Groq, Mistral, etc.) y herramientas de automatización. Asegúrate de tener configuradas tus API Keys en la barra lateral izquierda para el máximo rendimiento.
-
---------------------------------------------------
-1. XAVIWORK (El Estudio)
-Generación de Mapas Mentales, Mapas Conceptuales (Mermaid), Presentaciones (PPT), Informes técnicos, Tarjetas, Test, Tablas a Excel, Guiones de Podcast, Líneas de Tiempo, Glosarios, DAFO y Portadas con IA.
-Ideal para: Organizar ideas, estudiar y preparar clases o reuniones.
-
---------------------------------------------------
-2. CHAT Y ASISTENTES
-- Podcasts: Genera guiones de 3 locutores y conviértelos a audio real.
-- Chat y Voz: Conversación fluida y lectura de textos.
-- Chat con PDFs: Sube documentos y pregúntale a la IA sobre ellos.
-- Agentes: Crea asistentes con personalidad propia (profesor, abogado, etc.).
-- Debate, Cocina, Cuentos, Código y Traductor.
-
---------------------------------------------------
-3. DOCUMENTOS Y TEXTO
-- Análisis: Resúmenes, extracción de fechas y test automáticos.
-- Office: Creación de Word, Excel y PPT desde cero.
-- PDF Pro: Genera documentos con portada personalizada (o sin ella).
-- Facturas: Lee tickets (fotos o PDFs) y conviértelos a Excel.
-- QR & CV, Portapapeles inteligente.
-
---------------------------------------------------
-4. WEB Y ACTUALIDAD
-Buscador con IA, Noticias de deportes, Programación de TV, extracción de tablas web a Excel, resúmenes de vídeos de YouTube y lector de artículos web.
-
---------------------------------------------------
-5. MULTIMEDIA Y CONVERSOR PRO (¡La joya de la corona!)
-- Generador de Imágenes: Crea ilustraciones desde texto.
-- Texto a Voz: Convierte cualquier texto en audio (MP3).
-- CONVERSOR PRO: 
-  * Convierte archivos de audio y vídeo a otros formatos (mp4, mp3, wav, m4a, gif, etc.).
-  * Extrae el audio de cualquier vídeo.
-  * Corta o recorta audios y vídeos indicando los segundos exactos.
-  * Transcribe a texto cualquier audio o vídeo (usando Whisper IA).
-  * Extrae fotogramas (fotos) de un vídeo en el segundo exacto que elijas.
-  * ¡Puedes renombrar el archivo antes de descargarlo!
-
---------------------------------------------------
-6. ESTUDIO Y OFICIOS
-Resolución de deberes paso a paso, Simulador de Entrevistas de trabajo con feedback y PRL PRO (Evaluación de riesgos, tests y resúmenes de normativa de prevención).
-
---------------------------------------------------
-7. VIAJES Y HOGAR
-Planificador de itinerarios de viaje según tus días y estilo, recetas de cocina con lo que tengas en la nevera y Entrenador Personal IA (rutinas y dieta).
-
---------------------------------------------------
-8. MÚSICA Y ARTE
-- Letras y Canciones: Escribe letras y ponles música (incluye modo dúo).
-- SUNO AI: Genera el prompt perfecto (en inglés) y la letra estructurada para crear canciones reales en Suno.com.
-- Portadas y Poesía.
-
---------------------------------------------------
-9. GESTOR DE VECINOS (Comunidad PRO)
-Redacción de Incidencias formales, consultas legales (Ley de Propiedad Horizontal), redacción de Actas de reunión y Citaciones.
-¡NOVEDAD! - ANALIZADOR MÚLTIPLE DE PRESUPUESTOS: Sube 3 o 4 presupuestos a la vez (fotos o PDFs). La IA extraerá el nombre de la empresa, analizará qué incluye cada uno y generará una tabla comparativa final recomendando cuál es la mejor opción calidad/precio para tu comunidad. Puedes descargar el análisis individual o el informe global.
-
---------------------------------------------------
-Xavilu Network Pro - Creado para hacerte la vida más fácil.
-"""
+    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes, audios y CONVERSOR PRO.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía, Canciones y Suno.\n9. Comunidad: Gestor de fincas PRO (Múltiples presupuestos).\n\nCONVERSOR PRO:\nPermite convertir formatos de audio, vídeo e imagen. También permite recortar, extraer audio de vídeos, transcribir a texto, unir archivos y extraer fotogramas. Puedes editar el nombre del archivo antes de descargarlo.\n\n¡Disfruta!"
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
-    if font_path: 
-        pdf.add_font("XaviFont", "", font_path, uni=True)
-        pdf.add_font("XaviFont", "B", font_path, uni=True)
-        pdf.set_font("XaviFont", "B", 18)
-    else: 
-        pdf.set_font("Helvetica", "B", 18)
-        
-    pdf.multi_cell(0, 10, text="Manual de Instrucciones Xavilu", align="C")
-    pdf.ln(10)
-    
-    if not font_path: 
-        texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
-        
-    pdf.set_font("XaviFont" if font_path else "Helvetica", size=11)
-    pdf.multi_cell(0, 6, text=texto_manual)
-    return bytes(pdf.output())
+    if font_path: pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.set_font("XaviFont", "B", 20)
+    else: pdf.set_font("Helvetica", "B", 20)
+    pdf.multi_cell(0, 10, text="Manual de Instrucciones", align="C"); pdf.ln(10)
+    if not font_path: texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
+    pdf.set_font("XaviFont" if font_path else "Helvetica", size=12)
+    pdf.multi_cell(0, 7, text=texto_manual); return bytes(pdf.output())
 
 def generar_word(texto: str) -> bytes:
     doc = Document(); doc.add_heading("Documento Xavilu", 0)
@@ -401,20 +435,38 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
         if logo_file: logo_bytes = logo_file.getvalue()
     if formatos_extra:
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
-        with c2: st.download_button("📄 PDF", generar_pdf_pro(nombre_limpio, texto, logo_bytes), f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
-        with c3: st.download_button("📝 Word", generar_word(texto), f"{nombre_limpio}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"wd_{key_u}", use_container_width=True)
-        with c4: st.download_button("📊 Excel", generar_excel(texto), f"{nombre_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"ex_{key_u}", use_container_width=True)
+        with c1:
+            guardar_descarga(f"{nombre_limpio}.txt", texto.encode("utf-8"))
+            st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
+        with c2:
+            _pdf = generar_pdf_pro(nombre_limpio, texto, logo_bytes)
+            guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
+            st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
+        with c3:
+            _docx = generar_word(texto)
+            guardar_descarga(f"{nombre_limpio}.docx", _docx)
+            st.download_button("📝 Word", _docx, f"{nombre_limpio}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"wd_{key_u}", use_container_width=True)
+        with c4:
+            _xlsx = generar_excel(texto)
+            guardar_descarga(f"{nombre_limpio}.xlsx", _xlsx)
+            st.download_button("📊 Excel", _xlsx, f"{nombre_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"ex_{key_u}", use_container_width=True)
     else:
         c1, c2, c3 = st.columns(3)
-        with c1: st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
-        with c2: st.download_button("📄 PDF", generar_pdf_pro(nombre_limpio, texto, logo_bytes), f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
+        with c1:
+            guardar_descarga(f"{nombre_limpio}.txt", texto.encode("utf-8"))
+            st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
+        with c2:
+            _pdf = generar_pdf_pro(nombre_limpio, texto, logo_bytes)
+            guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
+            st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
         with c3:
             if st.button("📲 Enviar a WhatsApp", key=f"wa_{key_u}", use_container_width=True):
                 num_limpio = re.sub(r'[^0-9]', '', st.session_state.get("whatsapp_number", ""))
                 if num_limpio:
-                    components.html(f"<script>window.open('https://wa.me/{num_limpio}?text={urllib.parse.quote(texto[:1500])}', '_blank');</script>", height=0); st.success("✅ Abriendo WhatsApp...")
-                else: st.error("⚠️ Configura tu número en la barra lateral.")
+                    components.html(f"<script>window.open('https://wa.me/{num_limpio}?text={urllib.parse.quote(texto[:1500])}', '_blank');</script>", height=0)
+                    st.success("✅ Abriendo WhatsApp...")
+                else:
+                    st.error("⚠️ Configura tu número en la barra lateral.")
 
 def run_async_safe(coro):
     with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(lambda: asyncio.run(coro)).result()
@@ -533,7 +585,8 @@ if not st.session_state.sidebar_visible:
     with c2:
         if st.button("⛶ MOSTRAR MENÚ Y KEYS", type="primary", use_container_width=True): st.session_state.sidebar_visible = True; st.rerun()
 
-st.markdown("<h1>XAVILU NETWORK</h1>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+st.markdown("<h1 style='margin-bottom: 0;'>XAVILU NETWORK</h1>", unsafe_allow_html=True)
 
 if st.session_state.sidebar_visible:
     with st.sidebar:
@@ -557,7 +610,17 @@ if st.session_state.sidebar_visible:
         st.markdown("---")
         st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
         st.markdown("---")
-        st.download_button("📖 Descargar Manual (PDF)", generar_manual_pdf(), "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
+
+        _manual_bytes = generar_manual_pdf()
+        guardar_descarga("Manual_Xavilu.pdf", _manual_bytes)
+        st.download_button("📖 Descargar Manual (PDF)", _manual_bytes, "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
+
+        _guia_bytes = generar_guia_pdf(version="1.0")
+        guardar_descarga("Guia_Rapida_Xavilu.pdf", _guia_bytes)
+        st.download_button("⚡ Descargar Guía Rápida (PDF)", _guia_bytes, "Guia_Rapida_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_guia_pdf")
+        st.link_button("💬 Compartir guía por WhatsApp", wa_url(MENSAJES_WA["guia"]), use_container_width=True)
+        st.caption(f"📁 Copia en `{CARPETA_DESCARGAS}/`.")
+
         st.markdown("---")
         archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
         if archivo_global and st.session_state.get("global_file_name") != archivo_global.name:
@@ -964,13 +1027,12 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(res)
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-
-elif macro_idx == 4:
-    st.markdown("#### 🎬 Multimedia y Conversor PRO")
-    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
-    if sub_idx == 0:
-        st.markdown("### Generador de Imágenes")
+    elif macro_idx == 4:
+        st.markdown("#### 🎬 Multimedia y Conversor PRO")
+        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+        if sub_idx == 0:
+            st.markdown("### Generador de Imágenes")
         prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
         if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
             with st.spinner("Generando..."):
@@ -1182,7 +1244,7 @@ elif macro_idx == 7:
         if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
         tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
-        with c1: genero = st.selectbox("Género:", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
+        with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"])
         with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...")
         if st.button("🪄 Generar Letra IA", use_container_width=True) and tema_cancion:
             with st.spinner("Componiendo..."):
@@ -1215,7 +1277,7 @@ elif macro_idx == 7:
         c1, c2 = st.columns(2)
         with c1:
             st_tema = st.text_input("Tema:", placeholder="Ej: Marta y Luz en el campamento...")
-            st_genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica"])
+            st_genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"])
             st_voz = st.selectbox("Voz:", ["Dúo (Hombre y Mujer)", "Masculina", "Femenina", "Coro"])
         with c2:
             st_instr = st.text_input("Instrumentos:", placeholder="Ej: Guitarra, marimba...")
@@ -1326,11 +1388,41 @@ elif macro_idx == 8:
                 for i, arch in enumerate(arch_presupuestos):
                     status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
                     
-                    prompt_individual = """Extrae de este presupuesto: Proveedor, Precio Total, Qué incluye y Qué NO incluye o falta. 
+                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto. 
+                    Tu objetivo es redactar un INFORME PERICIAL Y DE EVALUACIÓN TÉCNICA de este presupuesto para proteger los intereses de la comunidad de vecinos.
+                    
                     IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
-                    1. "empresa": (Solo el nombre corto de la empresa que presenta el presupuesto, ej: "Pinturas Pepe")
-                    2. "analisis": (El texto detallado con los precios, lo que incluye y lo que falta).
-                    No añadas markdown ni texto extra, solo el JSON puro."""
+                    1. "empresa": (Solo el nombre corto de la empresa, ej: "Pinturas Pepe").
+                    2. "analisis": (El informe técnico redactado en texto plano, estructurado y muy profesional).
+                    
+                    En el texto del "analisis", DEBES seguir estrictamente esta estructura formal, usando guiones o números para las listas:
+                    
+                    INFORME TÉCNICO DE EVALUACIÓN
+                    
+                    1. RESUMEN EJECUTIVO: Un párrafo de 2 o 3 líneas con el veredicto general sobre la oferta (viabilidad, riesgos principales).
+                    
+                    2. ANÁLISIS ECONÓMICO: 
+                    - Precio Total y desglose del IVA (si lo lleva o está exento).
+                    - Advertencia sobre posibles partidas ocultas, sobrecostes o falta de desglose.
+                    
+                    3. CUMPLIMIENTO NORMATIVO Y LICENCIAS:
+                    - Evaluación de las licencias de obra/actividad y tasas municipales. ¿Se encarga la empresa o lo deja a la comunidad?
+                    
+                    4. SEGURIDAD Y SALUD (PRL) Y RESIDUOS:
+                    - ¿Incluye Plan de Seguridad y Salud o Estudio Básico? (Obligatorio).
+                    - ¿Se especifica la gestión y retirada de escombros/residuos?
+                    
+                    5. PLAZOS Y GARANTÍAS:
+                    - Plazos de ejecución.
+                    - Garantías ofrecidas por escrito (seguro, años de garantía).
+                    
+                    6. LA LETRA PEQUEÑA (PUNTOS CRÍTICOS):
+                    - Lista de carencias, ambigüedades o cosas que NO incluye el presupuesto y que el presidente de la comunidad debería exigir antes de firmar.
+                    
+                    7. RECOMENDACIONES DEL PERITO:
+                    - 2 o 3 acciones concretas a tomar antes de contratar a esta empresa.
+                    
+                    No añadas markdown extra (como asteriscos) ni símbolos raros. Redacta con un tono serio, formal y jurídico."""
                     
                     try:
                         if arch.name.lower().endswith(".pdf"):
@@ -1347,6 +1439,24 @@ elif macro_idx == 8:
                         except json.JSONDecodeError:
                             nombre_empresa = arch.name
                             texto_analisis = res
+                        
+                        status_text.text(f"Buscando reputación online de {nombre_empresa}...")
+                        res_busqueda = buscar_en_internet(f"{nombre_empresa} opiniones trabajos realizados")
+                        
+                        info_web = ""
+                        if res_busqueda:
+                            info_web = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_busqueda])
+                            prompt_rep = f"Analiza la reputación de '{nombre_empresa}' basándote en estos resultados de búsqueda en internet:\n{info_web}\n\nDevuelve un resumen de máximo 3 líneas. Si no hay información clara o es de otra empresa, di 'No hay información relevante en internet'."
+                            
+                            with st.spinner(f"Consultando web para {nombre_empresa}..."):
+                                rep_ia = llamar_ia(modelo_seleccionado, prompt_rep, st.session_state.api_key_gemini_manual)
+                                
+                            if "[ERROR" not in rep_ia:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {rep_ia}"
+                            else:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {info_web[:300]}..."
+                        else:
+                            texto_analisis += "\n\n[REPUTACIÓN ONLINE]: No se encontraron resultados en internet."
                             
                         resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
                     except Exception as e:
@@ -1361,13 +1471,32 @@ elif macro_idx == 8:
                     for r in resultados_individuales:
                         texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
                     
-                    prompt_comparativa = f"""Actúa como un Administrador de Fincas. Aquí tienes el análisis de {len(resultados_individuales)} presupuestos:
-{texto_para_comparar}
-
-Genera un informe final que contenga:
-1. Una TABLA COMPARATIVA en formato Markdown con las columnas: Proveedor, Precio, Qué incluye, Qué falta, y Valoración.
-2. Un párrafo final de RECOMENDACIÓN explicando cuál es la mejor opción calidad/precio para la comunidad y por qué.
-"""
+                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior. 
+                    Aquí tienes los informes periciales de {len(resultados_individuales)} presupuestos para una comunidad de vecinos:
+                    
+                    {texto_para_comparar}
+                    
+                    Tu tarea es redactar un INFORME COMPARATIVO FINAL EXTREMADAMENTE DETALLADO. No resumas demasiado. Sigue esta estructura exacta:
+                    
+                    1. TABLA COMPARATIVA DETALLADA
+                    Crea una tabla en Markdown con estas columnas: Proveedor, Presupuesto (€), IVA Desglosado (Sí/No), Licencias/PRL (Sí/No), Garantías (Sí/No), Valoración Técnica y Nivel de Riesgo (Bajo/Medio/Alto).
+                    
+                    2. ANÁLISIS PORMENORIZADO POR EMPRESA
+                    Haz un pequeño párrafo para cada empresa (usando su nombre como título). Explica qué ofrece, cuáles son sus puntos fuertes y qué carencias graves tiene respecto al resto.
+                    
+                    3. ANÁLISIS DE RIESGOS (SEMÁFORO)
+                    - RIESGOS CRÍTICOS: ¿Alguna empresa tiene un precio anormalmente bajo que sugiera "bicicleta" o falta de calidad? ¿Falta PRL obligatoria?
+                    - RIESGOS MODERADOS: ¿Faltan detalles de garantías o licencias?
+                    - PUNTOS A FAVOR: ¿Qué empresa da más confianza técnica?
+                    
+                    4. RECOMENDACIÓN FINAL DEL PERITO
+                    Explica con argumentos técnicos y jurídicos cuál es la mejor opción calidad/precio. Justifica si merece la pena pagar más por una empresa que cumpla estrictamente con la normativa.
+                    
+                    5. ACCIONES ANTES DE FIRMAR
+                    Lista de 3 a 5 exigencias que la comunidad debe pedir por escrito a la empresa ganadora antes de dar el visto bueno (ej: "Exigir el Plan de Seguridad y Salud", "Aclarar quién paga la tasa de escombros", etc.).
+                    
+                    IMPORTANTE: Usa un tono formal, serio y profesional. No uses emojis ni símbolos raros. Formatea el texto para que sea fácil de leer en un PDF.
+                    """
                     res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
                     status_text.empty()
                     progreso.empty()
@@ -1392,36 +1521,15 @@ Genera un informe final que contenga:
             st.markdown("### 🏆 Comparativa y Recomendación Final")
             st.markdown(st.session_state["presu_comparativa"])
             botones_descarga(st.session_state["presu_comparativa"], "Comparativa_Presupuestos", formatos_extra=True)
+
+            st.link_button(
+                "💬 Compartir comparativa por WhatsApp",
+                wa_url(MENSAJES_WA["presupuesto"]),
+                use_container_width=True,
+            )
             
             st.markdown("---")
-            st.markdown("### 📂 Descargar Análisis Individuales")
+            st.markdown("### 📂 Informes Periciales Individuales")
             for idx, r in enumerate(st.session_state["presu_resultados"]):
-                with st.expander(f"📄 Análisis: {r['empresa']}"):
-                    st.caption(f"Archivo original: {r['archivo']}")
-                    st.markdown(r['analisis'])
-                    st.download_button(
-                        label=f"📥 Descargar análisis de {r['empresa']}",
-                        data=r['analisis'].encode('utf-8'),
-                        file_name=f"Analisis_{r['empresa'].replace(' ', '_')}.txt",
-                        mime="text/plain",
-                        key=f"dl_ind_{idx}"
-                    )
-
-    elif sub_idx == 3:
-        st.markdown("### 📊 Redactar Acta")
-        puntos_tratados = st.text_area("Puntos tratados:", height=200, placeholder="1. Aprobación de cuentas...\n2. Cambio de ascensor...")
-        if st.button("Generar Acta", type="primary") and puntos_tratados:
-            with st.spinner("Redactando..."):
-                res = llamar_ia(modelo_seleccionado, f"Acta de Junta de Vecinos formal. Puntos: {puntos_tratados}. Añade fórmulas de aprobación y firmas.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.text_area("Acta:", value=res, height=300); botones_descarga(res, "Acta_Reunion")
-
-    elif sub_idx == 4:
-        st.markdown("### 📝 Convocar Junta")
-        motivo = st.text_input("Motivo:", placeholder="Ej: Obras de fachada")
-        fecha = st.text_input("Fecha y hora:", placeholder="Ej: 15 de Noviembre a las 19:00")
-        if st.button("Generar Citación", type="primary") and motivo:
-            with st.spinner("Redactando..."):
-                res = llamar_ia(modelo_seleccionado, f"Citación formal para junta de vecinos. Motivo: {motivo}. Fecha: {fecha}. Incluye orden del día y firma del presidente.", st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Junta")
+                
+                                _texto_raw = str(r['analisis']).replace('[', '').replace(']', '').replace('"', '').replace("'", "").replace(', ', ' ') 
