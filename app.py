@@ -1,5 +1,5 @@
 """
-Xavilu Network Pro - Edición Final Definitiva (Filtro de Etiquetas)
+Xavilu Network Pro - Edición Final Definitiva (Suno + Múltiples Presupuestos)
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -38,6 +38,9 @@ except ImportError: HAS_GEMINI = False
 try: import openai; HAS_OPENAI = True
 except ImportError: HAS_OPENAI = False
 
+# ==========================================
+# 1. CONFIGURACIÓN
+# ==========================================
 st.set_page_config(page_title="Xavilu Network", page_icon="logo.png", layout="wide", initial_sidebar_state="expanded")
 MAX_FILE_MB = 100
 MAX_TEXTO_IA = 60_000
@@ -60,6 +63,9 @@ def obtener_de_db():
     except: return []
 init_db()
 
+# ==========================================
+# 2. ESTADO DE SESIÓN
+# ==========================================
 _defaults = {
     "chat_history": [], "pdf_chat_history": [], "agente_activo": None, "agente_chat_history": [],
     "sidebar_visible": True, "whatsapp_number": "", "api_key_gemini_manual": "", "api_key_groq_manual": "",
@@ -69,11 +75,14 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": [], "letra_edit": ""
+    "alex_chat_history": [], "letra_edit": "", "suno_prompt": "", "suno_letra": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
 
+# ==========================================
+# 3. CSS Y DISEÑO
+# ==========================================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -113,29 +122,19 @@ def inyectar_js_fixer():
     components.html("<script>(function(){var doc=window.parent.document;function f(){doc.querySelectorAll('[data-testid=\"stTextInput\"] *').forEach(function(el){if(el.tagName.toLowerCase()==='input'||el.tagName.toLowerCase()==='div'){el.style.setProperty('background-color','#0a0a0a','important');el.style.setProperty('color','#ffffff','important');}});}f();setInterval(f,300);})();</script>", height=0)
 inyectar_js_fixer()
 
-# --- NUEVA FUNCIÓN DEFINITIVA PARA LIMPIAR EL TEXTO ---
+# ==========================================
+# 4. UTILIDADES Y SEGURIDAD
+# ==========================================
 def limpiar_texto_para_voz(texto):
     if not texto: return ""
-    
-    # 1. Quitar markdown, comillas, asteriscos
     texto = re.sub(r'[\*\#\_\`\~\"\']', '', texto)
-    
-    # 2. Quitar corchetes y paréntesis con su contenido (ej: [Coro], (Guitarra))
     texto = re.sub(r'\[.*?\]', '', texto, flags=re.DOTALL)
     texto = re.sub(r'\(.*?\)', '', texto, flags=re.DOTALL)
-    
-    # 3. Eliminar etiquetas típicas de estructura (Título, Intro, Verso 1, Coro, etc.)
-    # Busca la palabra al principio de una línea (o precedida de espacios) y le quita los dos puntos
     etiquetas = r'(?i)\b(Título|Intro|Verso|Coro|Puente|Outro|Producción|Instrumentos|Ritmo|Estilo|Género|Duración|Tema)\s*\d*\s*:?'
     texto = re.sub(etiquetas, '', texto)
-    
-    # 4. Reemplazar saltos de línea por puntos para que la voz haga pausas naturales
     texto = texto.replace('\n', '. ')
-    
-    # 5. Limpiar espacios múltiples, puntos dobles o triple
     texto = re.sub(r'\.{2,}', '.', texto)
     texto = re.sub(r'\s+', ' ', texto)
-    
     return texto.strip()
 
 def url_segura(url: str) -> bool:
@@ -146,11 +145,13 @@ def url_segura(url: str) -> bool:
         ip = ipaddress.ip_address(host)
         return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
     except: return False
+
 def fetch_seguro(url: str, timeout: int = 15, headers: dict = None):
     if not url_segura(url): raise ValueError(f"URL bloqueada: {url}")
     h = {"User-Agent": "Mozilla/5.0 (compatible; Xavilu)"}
     if headers: h.update(headers)
     return requests.get(url, headers=h, timeout=timeout)
+
 def leer_archivo_universal(upload, modelo_ia: str) -> str:
     if upload.size > MAX_FILE_MB * 1024 * 1024: return ""
     nombre = upload.name.lower()
@@ -161,20 +162,25 @@ def leer_archivo_universal(upload, modelo_ia: str) -> str:
         if nombre.endswith(".xlsx"): return "\n\n".join(f"=== {s} ===\n{d.to_csv(index=False)}" for s, d in pd.read_excel(upload, sheet_name=None).items())
     except Exception as e: st.warning(f"No pude leer '{upload.name}': {e}"); return ""
     return "Formato no reconocido."
+
 @st.cache_resource(show_spinner=False)
 def get_gemini_client(api_key: str): return genai.Client(api_key=api_key)
+
 def buscar_en_internet(query: str):
     if DDGS is None: return []
     try: return [{"titulo": r.get("title", ""), "url": r.get("href", ""), "resumen": r.get("body", "")} for r in DDGS().text(query, region="es-es", max_results=5)]
     except: return []
+
 def buscar_noticias_deportivas(deporte: str, liga: str):
     if DDGS is None: return []
     try: return [{"titulo": r.get("title", ""), "url": r.get("url", ""), "resumen": r.get("body", ""), "fecha": r.get("date", "")} for r in DDGS().news(f"últimas noticias {deporte} {liga} hoy", max_results=5)]
     except: return []
+
 def extraer_youtube_id(url: str):
     if not url: return None
     m = re.search(r"(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})", url)
     return m.group(1) if m else (url.strip() if len(url.strip()) == 11 else None)
+
 def transcribir_audio_youtube(url: str, api_key_groq: str) -> str:
     if not HAS_YTDLP or not HAS_OPENAI or not api_key_groq: return "[ERROR] Faltan herramientas."
     tmp_dir = tempfile.mkdtemp(); audio_path = None
@@ -202,6 +208,7 @@ def transcribir_audio_youtube(url: str, api_key_groq: str) -> str:
             except: pass
         try: os.rmdir(tmp_dir)
         except: pass
+
 def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key_groq: str) -> str:
     if not HAS_OPENAI or not api_key_groq: return "[ERROR] Faltan herramientas."
     ext = os.path.splitext(nombre_archivo)[1]
@@ -215,6 +222,7 @@ def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key
         if os.path.exists(audio_path):
             try: os.remove(audio_path)
             except: pass
+
 def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
     with st.expander("📎 Adjuntar archivo para esta acción (Opcional)"):
         archivo = st.file_uploader("Sube PDF, Word, TXT o Imagen", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"], key=f"adj_{key_suffix}")
@@ -227,6 +235,7 @@ def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
             texto = leer_archivo_universal(archivo, modelo)
             st.success(f"✅ Archivo '{archivo.name}' leído."); return f"\n[CONTENIDO DE '{archivo.name}']:\n{texto[:10000]}\n"
         except Exception as e: st.warning(f"No pude procesar '{archivo.name}': {e}"); return ""
+
 def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str) -> str:
     if not HAS_GEMINI or not api_key_gemini: return "[ERROR] Falta google-genai o API key."
     size_mb = len(archivo_bytes) / (1024 * 1024); tmp_path = None
@@ -249,6 +258,7 @@ def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: st
         if tmp_path and os.path.exists(tmp_path):
             try: os.remove(tmp_path)
             except: pass
+
 def _get_key(nombre: str, arg_directo: str = "") -> str:
     manual = st.session_state.get(f"api_key_{nombre.lower()}_manual", "").strip()
     if manual: return manual
@@ -257,6 +267,7 @@ def _get_key(nombre: str, arg_directo: str = "") -> str:
         if secret: return secret
     except: pass
     return arg_directo or ""
+
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_openai="", api_key_anthropic=""):
     prompt_final = prompt[:MAX_TEXTO_IA]
     if st.session_state.get("global_context"): prompt_final = f"[ARCHIVO ADJUNTO: {st.session_state.global_file_name}]\nCONTENIDO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN]:\n{prompt_final}\n\n(Responde teniendo en cuenta el archivo)."
@@ -324,9 +335,13 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, api_key_op
         return raw.strip()
     except Exception as e: return f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}"
 
+# ==========================================
+# 5. GENERADORES DE DOCUMENTOS
+# ==========================================
 def render_mermaid(mermaid_code):
     html_code = f"<div class='mermaid'>{mermaid_code}</div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';mermaid.initialize({{ startOnLoad: true, theme: 'dark', securityLevel: 'loose' }});</script>"
     components.html(html_code, height=600, scrolling=True)
+
 def obtener_ruta_fuente():
     for ruta in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:/Windows/Fonts/arial.ttf", "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", os.path.join(os.path.dirname(__file__), "DejaVuSans.ttf") if "__file__" in globals() else ""]:
         if ruta and os.path.exists(ruta): return ruta
@@ -334,13 +349,10 @@ def obtener_ruta_fuente():
 
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
-    
     if logo_bytes:
         try:
             with open("temp_custom_cover.jpg", "wb") as f: f.write(logo_bytes)
-            pdf.image("temp_custom_cover.jpg", x=40, y=50, w=130)
-            pdf.ln(150)
-            os.remove("temp_custom_cover.jpg")
+            pdf.image("temp_custom_cover.jpg", x=40, y=50, w=130); pdf.ln(150); os.remove("temp_custom_cover.jpg")
         except Exception as e: st.error(f"Error al procesar la imagen subida: {e}")
     else:
         try:
@@ -349,7 +361,6 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
             with open("temp_cover.jpg", "wb") as f: f.write(img_data)
             pdf.image("temp_cover.jpg", x=40, y=50, w=130); pdf.ln(150); os.remove("temp_cover.jpg")
         except: pass
-
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.add_font("XaviFont", "I", font_path, uni=True); pdf.set_font("XaviFont", size=11)
     else: pdf.set_font("Helvetica", size=11)
@@ -364,7 +375,7 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
     pdf.multi_cell(0, 8, text=contenido); return bytes(pdf.output())
 
 def generar_manual_pdf() -> bytes:
-    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía y Canciones.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
+    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía, Canciones y Suno.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
     if font_path: pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.set_font("XaviFont", "B", 20)
     else: pdf.set_font("Helvetica", "B", 20)
@@ -372,11 +383,13 @@ def generar_manual_pdf() -> bytes:
     if font_path: pdf.set_font("XaviFont", size=12)
     else: pdf.set_font("Helvetica", size=12); texto_manual = texto_manual.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 7, text=texto_manual); return bytes(pdf.output())
+
 def generar_word(texto: str) -> bytes:
     doc = Document(); doc.add_heading("Documento Xavilu", 0)
     for p in texto.split("\n"):
         if p.strip(): doc.add_paragraph(p.strip())
     out = BytesIO(); doc.save(out); return out.getvalue()
+
 def generar_excel(texto_csv: str) -> bytes:
     wb = openpyxl.Workbook(); ws = wb.active; csv_limpio = texto_csv.replace("```csv", "").replace("```", "").strip()
     for r_i, row in enumerate(csv.reader(csv_limpio.split("\n")), 1):
@@ -384,6 +397,7 @@ def generar_excel(texto_csv: str) -> bytes:
             cell = ws.cell(row=r_i, column=c_i, value=val)
             if r_i == 1: cell.font = Font(bold=True)
     out = BytesIO(); wb.save(out); return out.getvalue()
+
 def generar_pptx(titulo: str, texto: str) -> bytes:
     prs = Presentation(); slide = prs.slides.add_slide(prs.slide_layouts[0]); slide.shapes.title.text = titulo
     for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
@@ -400,12 +414,10 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
     st.markdown("---"); key_u = nombre_por_defecto.replace(" ", "_")
     nombre_elegido = st.text_input("📝 Nombre del archivo (sin extensión):", value=nombre_por_defecto, key=f"name_{key_u}")
     nombre_limpio = re.sub(r"[^a-zA-Z0-9_\- ]", "", nombre_elegido).strip().replace(" ", "_") or nombre_por_defecto
-    
     logo_bytes = None
     with st.expander("📸 Cambiar Portada (Sube tu propia foto)"):
         logo_file = st.file_uploader("Sube una imagen (PNG/JPG)", type=["png", "jpg", "jpeg"], key=f"logo_{key_u}", label_visibility="collapsed")
         if logo_file: logo_bytes = logo_file.getvalue()
-
     if formatos_extra:
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
@@ -425,11 +437,14 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
                     components.html(f"<script>window.open('{url_wa}', '_blank');</script>", height=0); st.success("✅ Abriendo WhatsApp...")
                 else: st.error("⚠️ Configura tu número en la barra lateral izquierda.")
 
+# ==========================================
+# 6. AUDIO Y TTS
+# ==========================================
 def run_async_safe(coro):
     def _run(): return asyncio.run(coro)
     with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(_run).result()
+
 def generar_audio_sincrono(texto: str, voz: str) -> bytes:
-    # LIMPIAMOS EL TEXTO ANTES DE LEERLO
     texto_limpio = limpiar_texto_para_voz(texto)
     async def _gen():
         buf = BytesIO()
@@ -438,6 +453,7 @@ def generar_audio_sincrono(texto: str, voz: str) -> bytes:
         return buf.getvalue()
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error TTS: {e}"); return None
+
 def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
     async def _gen():
         buf = BytesIO()
@@ -451,7 +467,6 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
                 num = int(m.group(1)); voz_actual = {1: v1, 2: v2, 3: v3}.get(num, v1)
                 linea = re.sub(r"^Locutor\s*\d\s*:?", "", linea, flags=re.IGNORECASE).strip()
             if not linea or linea.lower() in {"elvira", "jorge", "tomas", "carlos"}: continue
-            # LIMPIAMOS CADA LÍNEA
             linea_limpia = limpiar_texto_para_voz(linea)
             if not linea_limpia: continue
             try:
@@ -461,6 +476,58 @@ def generar_podcast_3_voces(guion: str, v1: str, v2: str, v3: str) -> bytes:
         return buf.getvalue()
     try: return run_async_safe(_gen())
     except Exception as e: st.error(f"Error crítico: {e}"); return None
+
+def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str = None) -> bytes:
+    try:
+        if voz2: 
+            estrofas = [e.strip() for e in letra.split('\n\n') if e.strip()]
+            if len(estrofas) <= 1: estrofas = [e.strip() for e in letra.split('\n') if e.strip()]
+            async def _gen_dueto():
+                buf_total = BytesIO(); voz_actual = voz1
+                for estrofa in estrofas:
+                    estrofa_limpia = limpiar_texto_para_voz(estrofa)
+                    if not estrofa_limpia: continue
+                    try:
+                        async for chunk in edge_tts.Communicate(estrofa_limpia, voz_actual).stream():
+                            if chunk["type"] == "audio": buf_total.write(chunk["data"])
+                    except: pass
+                    voz_actual = voz2 if voz_actual == voz1 else voz1
+                return buf_total.getvalue()
+            voz_bytes = run_async_safe(_gen_dueto())
+        else: 
+            texto_limpio = limpiar_texto_para_voz(letra)
+            voz_bytes = generar_audio_sincrono(texto_limpio, voz1)
+        if not voz_bytes: return None
+        voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
+        urls = {
+            "Reggaeton / Urbano": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+            "Pop / Alegre": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+            "Balada / Acústico": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+            "Rap / Hip-Hop": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+            "Lo-Fi Chill": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+            "Épico / Trap": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+            "Rock": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+            "Electrónica / EDM": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+        }
+        url_base = urls.get(estilo_base, urls["Reggaeton / Urbano"])
+        r = requests.get(url_base, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        if len(r.content) < 100_000:
+            st.error("❌ No se pudo descargar la música (el servidor devolvió un error). Prueba con otro estilo de base.")
+            return None
+        base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3")
+        base_audio = base_audio - 14 
+        if len(voz_audio) > len(base_audio):
+            repeticiones = (len(voz_audio) // len(base_audio)) + 1
+            base_audio = base_audio * repeticiones
+        base_audio = base_audio[:len(voz_audio)]
+        cancion = base_audio.overlay(voz_audio)
+        out = BytesIO(); cancion.export(out, format="mp3"); return out.getvalue()
+    except Exception as e:
+        st.error(f"Error al mezclar el audio: {e}"); return None
+
+# ==========================================
+# 7. HELPERS DE UI
+# ==========================================
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="...", api_key_openai="", api_key_anthropic=""):
     input_key = f"{key_prefix}_input"
     if input_key not in st.session_state: st.session_state[input_key] = ""
@@ -479,6 +546,7 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
             with cols[i]: st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
     return st.text_area(label, key=input_key, placeholder=placeholder, height=100)
+
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, api_key_openai="", api_key_anthropic="", widget_key=None):
     if st.button(f"🚀 {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
         if not texto_base: return
@@ -490,10 +558,12 @@ def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_k
                 st.session_state[state_key] = res
                 if widget_key and widget_key in st.session_state: del st.session_state[widget_key]
                 st.rerun()
+
 def borrador_editable(state_key: str, widget_key: str, height: int = 300) -> str:
     if widget_key not in st.session_state: st.session_state[widget_key] = st.session_state[state_key]
     st.text_area("Editar:", key=widget_key, height=height); st.session_state[state_key] = st.session_state[widget_key]
     return st.session_state[state_key]
+
 def chat_input_pro(key: str, placeholder: str = "Mensaje..."):
     t_k, m_k = f"{key}_txt", f"{key}_msg"
     if t_k not in st.session_state: st.session_state[t_k] = ""
@@ -504,6 +574,7 @@ def chat_input_pro(key: str, placeholder: str = "Mensaje..."):
     with c1: st.text_input("msg", placeholder=placeholder, key=t_k, label_visibility="collapsed")
     with c2: st.button("➤", key=f"{key}_btn", on_click=_send, use_container_width=True, type="primary")
     return st.session_state.pop(m_k, None)
+
 def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
     s_key = f"tab_{key_name}"
     if s_key not in st.session_state: st.session_state[s_key] = default_idx
@@ -516,50 +587,9 @@ def custom_tabs(tab_names, key_name, default_idx=0, cols_per_row=5):
                     st.session_state[s_key] = idx; st.rerun()
     return st.session_state[s_key]
 
-def generar_cancion_con_base(letra: str, voz: str, estilo_base: str) -> bytes:
-    try:
-        texto_limpio = limpiar_texto_para_voz(letra)
-        voz_bytes = generar_audio_sincrono(texto_limpio, voz)
-        if not voz_bytes: return None
-        voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
-        
-        urls = {
-            "Reggaeton / Urbano": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-            "Pop / Alegre": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-            "Balada / Acústico": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-            "Rap / Hip-Hop": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-            "Lo-Fi Chill": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-            "Épico / Trap": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-            "Rock": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
-            "Electrónica / EDM": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-        }
-        
-        url_base = urls.get(estilo_base, urls["Reggaeton / Urbano"])
-        r = requests.get(url_base, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-        
-        if len(r.content) < 100_000:
-            st.error("❌ No se pudo descargar la música (el servidor devolvió un error). Prueba con otro estilo de base.")
-            return None
-            
-        base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3")
-        
-        base_audio = base_audio - 14 
-        
-        if len(voz_audio) > len(base_audio):
-            repeticiones = (len(voz_audio) // len(base_audio)) + 1
-            base_audio = base_audio * repeticiones
-            
-        base_audio = base_audio[:len(voz_audio)]
-        
-        cancion = base_audio.overlay(voz_audio)
-        
-        out = BytesIO()
-        cancion.export(out, format="mp3")
-        return out.getvalue()
-    except Exception as e:
-        st.error(f"Error al mezclar el audio: {e}")
-        return None
-
+# ==========================================
+# 8. INTERFAZ PRINCIPAL
+# ==========================================
 if not st.session_state.sidebar_visible:
     st.markdown("<style>[data-testid=\"collapsedControl\"] {display: none !important;}</style>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
@@ -587,7 +617,6 @@ if st.session_state.sidebar_visible:
             st.session_state.api_key_deepseek_manual = st.text_input("DeepSeek API Key", type="password", value=st.session_state.api_key_deepseek_manual)
             st.session_state.api_key_together_manual = st.text_input("Together API Key", type="password", value=st.session_state.api_key_together_manual)
             st.session_state.api_key_cerebras_manual = st.text_input("Cerebras API Key", type="password", value=st.session_state.api_key_cerebras_manual)
-        
         st.markdown("---")
         st.session_state.whatsapp_number = st.text_input("📲 WhatsApp (ej. 34600000000):", value=st.session_state.whatsapp_number)
         st.markdown("---"); st.download_button("📖 Descargar Manual (PDF)", generar_manual_pdf(), "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
@@ -609,93 +638,10 @@ macro_names = ["🛠️ XAVIWORK", "💬 CHAT Y ASISTENTES", "📁 DOCUMENTOS Y 
 macro_idx = custom_tabs(macro_names, "macro", 0, cols_per_row=4)
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
-if macro_idx == 7:
-    st.markdown("#### 🎵 Música y Arte")
-    sub_names = ["🎤 LETRAS", "🖼️ PORTADAS", "📝 POESÍA"]
-    sub_idx = custom_tabs(sub_names, "music_sub", 0)
-    
-    if sub_idx == 0:
-        st.markdown("### Generador de Letras de Canciones")
-        
-        st.info("💡 **Puedes escribir tu propia letra aquí abajo** o dejar que la IA te ayude rellenando los datos y pulsando el botón.")
-        
-        if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
-        
-        tema_cancion = st.text_input("¿De qué trata la canción? (Solo para la IA)", placeholder="Ej: Un desamor en verano...")
-        c1, c2 = st.columns(2)
-        with c1: genero = st.selectbox("Género (IA):", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
-        with c2: artista_estilo = st.text_input("Estilo de artista (Opcional IA):", placeholder="Ej: Bad Bunny...")
-        
-        if st.button("🪄 Generar Letra Automática con IA", use_container_width=True) and tema_cancion:
-            with st.spinner("Componiendo..."):
-                prompt = f"Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. "
-                if artista_estilo: prompt += f"Imita el estilo de {artista_estilo}. "
-                prompt += "Incluye estructura (Intro, Verso 1, Coro, Verso 2, Coro, Puente, Outro) y añade indicaciones de producción entre corchetes."
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: 
-                    st.session_state.letra_edit = res
-                    st.rerun()
-
-        letra_final = st.text_area("📜 Letra de la canción (Editable):", key="letra_edit", height=300)
-            
-        if letra_final.strip():
-            botones_descarga(letra_final, "Letra_Cancion")
-            
-            st.markdown("---")
-            st.markdown("### 🎵 Ponerle Música")
-            st.caption("Convierte tu letra en una canción con voz y una base musical de fondo.")
-            
-            c1, c2 = st.columns(2)
-            with c1: voz_cancion = st.selectbox("Voz principal:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
-            with c2: 
-                beat_estilo = st.selectbox("Estilo de base musical:", [
-                    "Reggaeton / Urbano", 
-                    "Pop / Alegre", 
-                    "Balada / Acústico", 
-                    "Rap / Hip-Hop", 
-                    "Lo-Fi Chill", 
-                    "Épico / Trap", 
-                    "Rock", 
-                    "Electrónica / EDM"
-                ])
-            
-            if st.button("🎶 Generar Canción (Voz + Base)", type="primary"):
-                with st.spinner("Grabando en el estudio... (esto puede tardar un poco)"):
-                    audio_final = generar_cancion_con_base(letra_final, voz_cancion, beat_estilo)
-                    if audio_final:
-                        st.success("✅ ¡Canción lista! Dale al play.")
-                        st.audio(audio_final, format="audio/mp3")
-                        st.download_button("💾 Descargar Canción (MP3)", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
-
-    elif sub_idx == 1:
-        st.markdown("### Generador de Portadas de Álbum")
-        prompt_portada = st.text_input("Describe la portada:", placeholder="Ej: Un astronauta llorando en Tokio..."); estilo_arte = st.selectbox("Estilo:", ["Fotorrealista", "Pintura al óleo", "Anime", "Surrealista", "Retro 80s", "Abstracto"])
-        if st.button("🖼️ Crear Portada", type="primary") and prompt_portada:
-            with st.spinner("Diseñando portada..."):
-                try:
-                    query = urllib.parse.quote(f"Album cover art, {prompt_portada}, {estilo_arte}, high quality, no text")
-                    url = f"https://image.pollinations.ai/prompt/{query}?width=1024&height=1024&nologo=true"
-                    if url_segura(url):
-                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                        with urllib.request.urlopen(req, timeout=30) as response: img_data = response.read()
-                        st.image(img_data, caption="Portada del Álbum", use_container_width=True); st.download_button("📥 Descargar Portada", img_data, "portada_album.png", "image/png")
-                except Exception as e: st.error(f"Error al generar la portada: {e}")
-    elif sub_idx == 2:
-        st.markdown("### Generador de Poesía y Rimas")
-        tema_poema = st.text_input("Tema del poema:", placeholder="Ej: La soledad, el mar..."); estilo_poema = st.selectbox("Estilo:", ["Soneto clásico", "Verso libre", "Rima infantil", "Haiku", "Siglo de Oro"])
-        if st.button("📝 Crear Poema", type="primary") and tema_poema:
-            with st.spinner("Inspirando a las musas..."):
-                prompt = f"Escribe un poema sobre '{tema_poema}'. Estilo: {estilo_poema}. Cuida la métrica y figuras literarias."
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else:
-                    st.markdown(res); botones_descarga(res, "Poema")
-                    if st.button("🔊 Recitar Poema"):
-                        aud = generar_audio_sincrono(res, "es-ES-ElviraNeural")
-                        if aud: st.audio(aud, format="audio/mp3")
-
-elif macro_idx == 0:
+# ==========================================
+# CATEGORÍA 0: XAVIWORK
+# ==========================================
+if macro_idx == 0:
     st.markdown("#### 🛠️ XaviWork - El Estudio Definitivo")
     contexto_xw = cajita_adjuntar_archivo("xw_adj", modelo_seleccionado, st.session_state.api_key_gemini_manual)
     col1, col2 = st.columns([2, 1])
@@ -790,6 +736,9 @@ elif macro_idx == 0:
             st.image(st.session_state.xw_cover_img, caption="Portada Generada", use_container_width=True)
             st.download_button("📥 Descargar Imagen", st.session_state.xw_cover_img, "portada.png", "image/png", use_container_width=True)
 
+# ==========================================
+# CATEGORÍA 1: CHAT Y ASISTENTES
+# ==========================================
 elif macro_idx == 1:
     sub_names = ["🎙️ PODCAST", "💬 CHAT", "🎙️ VOZ", "💬 CHAT CON PDF", "🕵️‍♂️ AGENTES", "⚖️ DEBATE", "🍳 COCINA", "📖 CUENTOS", "💻 CÓDIGO", "🌍 TRADUCTOR"]
     sub_idx = custom_tabs(sub_names, "chat_sub", 0)
@@ -927,6 +876,9 @@ elif macro_idx == 1:
             if "[ERROR" in res: st.error(res)
             else: st.info(res); botones_descarga(res, "Traduccion")
 
+# ==========================================
+# CATEGORÍA 2: DOCUMENTOS
+# ==========================================
 elif macro_idx == 2:
     sub_names = ["📁 ANÁLISIS", "⚖️ COMPARAR", "📊 OFFICE", "📄 PDF", "🧾 FACTURAS", "📇 QR & CV", "📋 PORTAPAPELES"]
     sub_idx = custom_tabs(sub_names, "doc_sub", 0)
@@ -1028,6 +980,9 @@ elif macro_idx == 2:
             if "[ERROR" in res: st.error(res)
             else: st.info(res)
 
+# ==========================================
+# CATEGORÍA 3: WEB
+# ==========================================
 elif macro_idx == 3:
     sub_names = ["🌐 BUSCADOR", "⚽ DEPORTES", "📺 TV", "📊 WEB A EXCEL", "🎥 YOUTUBE", "📰 LECTOR"]
     sub_idx = custom_tabs(sub_names, "web_sub", 0)
@@ -1095,6 +1050,9 @@ elif macro_idx == 3:
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
 
+# ==========================================
+# CATEGORÍA 4: MULTIMEDIA
+# ==========================================
 elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🎬 VIDEO (Pronto)"]
@@ -1120,6 +1078,9 @@ elif macro_idx == 4:
                 aud = generar_audio_sincrono(txt_tts, voz_tts)
                 if aud: st.audio(aud, format="audio/mp3"); st.download_button("💾 Descargar MP3", aud, "audio.mp3")
 
+# ==========================================
+# CATEGORÍA 5: ESTUDIO Y OFICIOS
+# ==========================================
 elif macro_idx == 5:
     st.markdown("#### 🎓 Estudio y Oficios")
     sub_names = ["📚 DEBERES", "👔 ENTREVISTA", "🛠️ PRL PRO"]
@@ -1185,6 +1146,9 @@ elif macro_idx == 5:
                     if "[ERROR" in res: st.error(res)
                     else: st.markdown(res); botones_descarga(res, "Resumen_Ley_PRL", formatos_extra=True)
 
+# ==========================================
+# CATEGORÍA 6: VIAJES Y HOGAR
+# ==========================================
 elif macro_idx == 6:
     st.markdown("#### 🌍 Viajes y Hogar")
     sub_names = ["✈️ ITINERARIO", "🏠 COCINA", "💪 ENTRENADOR"]
@@ -1226,132 +1190,60 @@ elif macro_idx == 6:
                 if "[ERROR" in res: st.error(res)
                 else: st.markdown(res); botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
 
-elif macro_idx == 8:
-    st.markdown("#### 🏢 Gestor de Comunidad de Vecinos PRO")
-    sub_names = ["📜 ESTATUTOS Y CUOTAS", "🗳️ MAYORÍAS Y VOTOS", "⚖️ ALEX IA LEGAL", "🧾 ANALIZAR PRESUPUESTOS", "📝 DOCUMENTOS", "🚨 INCIDENCIAS"]
-    sub_idx = custom_tabs(sub_names, "comm_sub", 0, cols_per_row=3)
-
+# ==========================================
+# CATEGORÍA 7: MÚSICA Y ARTE (Incluye Suno)
+# ==========================================
+elif macro_idx == 7:
+    st.markdown("#### 🎵 Música y Arte")
+    sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    
     if sub_idx == 0:
-        st.markdown("### 📜 Estatutos y Cuotas de Participación")
-        st.markdown("##### Calculadora Rápida (por metros cuadrados)")
+        st.markdown("### Generador de Letras de Canciones")
+        st.info("💡 **Puedes escribir tu propia letra aquí abajo** o dejar que la IA te ayude rellenando los datos y pulsando el botón.")
+        if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
+        tema_cancion = st.text_input("¿De qué trata la canción? (Solo para la IA)", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
-        with c1: m2_totales = st.number_input("Metros cuadrados TOTALES del edificio:", min_value=1.0, value=1000.0, step=10.0)
-        with c2: m2_piso = st.number_input("Metros cuadrados de TU vivienda/local:", min_value=1.0, value=80.0, step=1.0)
-        if st.button("🧮 Calcular Cuota", type="primary"):
-            if m2_piso > m2_totales: st.error("Los metros de tu piso no pueden ser mayores que los del edificio entero.")
-            else:
-                cuota = (m2_piso / m2_totales) * 100
-                st.success(f"Tu coeficiente de participación es del **{cuota:.4f} %**")
-                st.info("Esto significa que de cada 100€ de gastos generales, a ti te correspondería pagar esa cantidad (ej. si son 100€, pagarías " + f"{cuota:.2f}€).")
-        st.markdown("---")
-        st.markdown("##### Buscar en los Estatutos (IA)")
-        estatutos = st.file_uploader("Sube los Estatutos (PDF, TXT, Word):", type=["pdf", "txt", "docx"])
-        if st.button("🔎 Analizar Estatutos con IA", type="primary") and estatutos:
-            with st.spinner("Leyendo estatutos..."):
-                texto_est = leer_archivo_universal(estatutos, modelo_seleccionado)
-                prompt = f"Actúa como un administrador de fincas experto. Lee los siguientes estatutos de una comunidad de vecinos y explícame: 1. ¿Cómo se calculan las cuotas de participación? 2. ¿Qué dicen sobre derramas o obras? 3. Cualquier artículo importante que deba conocer (Ej: prohibiciones, mayoría de votos).\n\nTEXTO DE LOS ESTATUTOS:\n{texto_est[:15000]}"
+        with c1: genero = st.selectbox("Género (IA):", ["Reggaeton", "Pop", "Rap/Trap", "Rock", "Bachata", "Indie"])
+        with c2: artista_estilo = st.text_input("Estilo de artista (Opcional IA):", placeholder="Ej: Bad Bunny...")
+        if st.button("🪄 Generar Letra Automática con IA", use_container_width=True) and tema_cancion:
+            with st.spinner("Componiendo..."):
+                prompt = f"Escribe la letra de una canción de género {genero} sobre: '{tema_cancion}'. "
+                if artista_estilo: prompt += f"Imita el estilo de {artista_estilo}. "
+                prompt += "Incluye estructura (Intro, Verso 1, Coro, Verso 2, Coro, Puente, Outro) y añade indicaciones de producción entre corchetes."
                 res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
                 if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, "Resumen_Estatutos", formatos_extra=True)
+                else: st.session_state.letra_edit = res; st.rerun()
+        letra_final = st.text_area("📜 Letra de la canción (Editable):", key="letra_edit", height=300)
+        if letra_final.strip():
+            botones_descarga(letra_final, "Letra_Cancion")
+            st.markdown("---"); st.markdown("### 🎵 Ponerle Música"); st.caption("Convierte tu letra en una canción con voz y una base musical de fondo.")
+            hacer_dueto = st.checkbox("🎤 Hacer Dúo (Dos Voces alternando estrofas)")
+            c1, c2 = st.columns(2)
+            with c1: voz_cancion1 = st.selectbox("Voz 1:", ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"])
+            with c2: 
+                if hacer_dueto: voz_cancion2 = st.selectbox("Voz 2:", ["es-MX-JorgeNeural", "es-ES-ElviraNeural", "es-AR-TomasNeural"])
+                else: voz_cancion2 = None; st.selectbox("Estilo de base musical:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_solo")
+            if hacer_dueto:
+                st.info("💡 *El sistema alternará la Voz 1 y la Voz 2 cada vez que haya un salto de párrafo (estrofa).*")
+                beat_estilo = st.selectbox("Estilo de base musical:", ["Reggaeton / Urbano", "Pop / Alegre", "Balada / Acústico", "Rap / Hip-Hop", "Lo-Fi Chill", "Épico / Trap", "Rock", "Electrónica / EDM"], key="beat_select_duo")
+            if st.button("🎶 Generar Canción (Voz + Base)", type="primary"):
+                with st.spinner("Grabando en el estudio... (esto puede tardar un poco)"):
+                    audio_final = generar_cancion_con_base(letra_final, voz_cancion1, beat_estilo, voz_cancion2)
+                    if audio_final:
+                        st.success("✅ ¡Canción lista! Dale al play.")
+                        st.audio(audio_final, format="audio/mp3"); st.download_button("💾 Descargar Canción (MP3)", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
 
     elif sub_idx == 1:
-        st.markdown("### 🗳️ Calculadora de Mayorías y Votaciones")
-        st.caption("¿Tienes una reunión? Calcula si la propuesta del administrador saldrá adelante según la Ley de Propiedad Horizontal.")
+        st.markdown("### 🌞 Generador de Prompts para Suno AI")
+        st.caption("Suno AI es una IA que canta de verdad. Como no tiene API gratuita, aquí te preparamos el texto perfecto para que lo pegues en su web.")
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**1. Asistencia a la reunión**")
-            asistencia = st.number_input("¿Qué % de cuotas de participación hay en la sala?", min_value=0.0, max_value=100.0, value=60.0, step=1.0)
-            st.caption("(Suma los coeficientes de los vecinos presentes y representados).")
+            st_tema = st.text_input("¿De qué trata la canción?", placeholder="Ej: Marta y Luz en el campamento...")
+            st_genero = st.selectbox("Género Musical:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica"])
+            st_voz = st.selectbox("Tipo de Voz:", ["Dúo (Hombre y Mujer)", "Voz Masculina", "Voz Femenina", "Coro"])
         with c2:
-            st.markdown("**2. Votos de la propuesta**")
-            votos_si = st.number_input("Votos A FAVOR (en % del edificio):", min_value=0.0, max_value=100.0, value=35.0, step=1.0)
-            votos_no = st.number_input("Votos EN CONTRA (en % del edificio):", min_value=0.0, max_value=100.0, value=15.0, step=1.0)
-        
-        st.markdown("---")
-        tipo_mayoria = st.selectbox("¿Qué tipo de mayoría requiere el punto del orden del día?", 
-                                    ["Mayoría Simple (más síes que noes)", 
-                                     "Mayoría Cualificada (3/5 del total de la comunidad = 60%)", 
-                                     "Unanimidad (100% de los propietarios)"])
-        
-        if st.button("📊 Calcular Resultado", type="primary"):
-            if votos_si + votos_no > asistencia:
-                st.error("Los votos suman más que la asistencia. Revisa los datos.")
-            else:
-                if tipo_mayoria == "Mayoría Simple (más síes que noes)":
-                    if votos_si > votos_no: st.success("✅ APROBADO. Con mayoría simple, los síes superan a los noes.")
-                    else: st.error("❌ RECHAZADO. Los noes son iguales o superiores a los síes.")
-                elif tipo_mayoria == "Mayoría Cualificada (3/5 del total de la comunidad = 60%)":
-                    if votos_si >= 60.0: st.success("✅ APROBADO. Has alcanzado el 3/5 del total de la comunidad (60%).")
-                    else: st.error(f"❌ RECHAZADO. Necesitas 60% y solo hay {votos_si}% a favor. Faltan {60 - votos_si}%.")
-                elif tipo_mayoria == "Unanimidad (100% de los propietarios)":
-                    if votos_si == 100.0 and votos_no == 0: st.success("✅ APROBADO. Unanimidad total.")
-                    else: st.error("❌ RECHAZADO. Alguien ha votado en contra. La unanimidad es obligatoria para esto.")
-
-    elif sub_idx == 2:
-        st.markdown("### ⚖️ ALEX IA - Tu Asesor Legal de Comunidades")
-        st.info("Pregúntame cualquier duda sobre la Ley de Propiedad Horizontal (LPH), o pégame lo que ha dicho el administrador para que te ayude a rebatirlo con argumentos legales.")
-        
-        for m in st.session_state.alex_chat_history:
-            if m["role"] == "assistant": st.chat_message("assistant", avatar="⚖️").write(m["content"])
-            else: st.chat_message("user").write(m["content"])
-            
-        p_alex = chat_input_pro("alex_input", "Ej: El administrador dice que la derrama del ascensor se aprueba por mayoría simple, ¿es verdad?")
-        if p_alex:
-            st.session_state.alex_chat_history.append({"role": "user", "content": p_alex})
-            with st.spinner("Alex IA revisando la Ley..."):
-                prompt_alex = f"Eres Alex, un abogado experto y Administrador de Fincas en España. Tu objetivo es asesorar a un vecino para defender sus derechos frente a su comunidad o administrador. Responde con base en la Ley de Propiedad Horizontal (Ley 49/1960). Cita artículos si es posible. Sé claro, directo y dale argumentos para rebatir al administrador si es necesario."
-                res = llamar_ia(modelo_seleccionado, f"{prompt_alex}\n\nPregunta del vecino: {p_alex}", st.session_state.api_key_gemini_manual, st.session_state.alex_chat_history)
-                if "[ERROR" in res: st.error(res)
-                else:
-                    st.session_state.alex_chat_history.append({"role": "assistant", "content": res})
-                    st.rerun()
-
-    elif sub_idx == 3:
-        st.markdown("### 🧾 Analizar Presupuesto del Proveedor")
-        st.caption("Sube una foto del presupuesto del pintor, del ascensor, de la limpieza, etc. La IA lo analizará y te dirá si está bien o si hay cosas raras.")
-        arch_presupuesto = st.file_uploader("Sube el presupuesto (JPG, PNG o PDF):", type=["jpg", "jpeg", "png", "pdf"])
-        if st.button("🔍 Analizar Presupuesto", type="primary") and arch_presupuesto:
-            with st.spinner("Analizando presupuesto y comparando precios de mercado..."):
-                prompt_presupuesto = """Actúa como un Administrador de Fincas experto en España. Analiza este presupuesto para una comunidad de vecinos.
-                Devuelve un informe estructurado con:
-                1. Resumen del presupuesto (qué van a hacer y por cuánto).
-                2. ¿Falta algo importante? (Ej: ¿Han incluido el IVA? ¿Gestión de residuos? ¿Andamios? ¿Seguro de responsabilidad civil?).
-                3. ¿El precio es razonable? (Da tu opinión basándote en precios de mercado actuales).
-                4. Recomendaciones antes de firmar o pagar.
-                5. Redacta un correo breve para el proveedor pidiendo las aclaraciones necesarias si falta algo."""
-                if arch_presupuesto.name.lower().endswith(".pdf"):
-                    texto_pdf = leer_archivo_universal(arch_presupuesto, modelo_seleccionado)
-                    res = llamar_ia(modelo_seleccionado, f"{prompt_presupuesto}\n\nTexto del presupuesto:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
-                else: res = analizar_archivo_con_gemini(arch_presupuesto.getvalue(), "image/jpeg", prompt_presupuesto, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, "Analisis_Presupuesto", formatos_extra=True)
-
-    elif sub_idx == 4:
-        st.markdown("### 📝 Redactar Actas o Cartas a la Comunidad")
-        tipo_doc = st.selectbox("Tipo de documento:", ["Acta de Junta General", "Reclamación al Presidente", "Notificación de Derrama", "Solicitud de Reparación", "Burofax de Impago"])
-        puntos = st.text_area("¿Qué ha pasado o qué quieres comunicar? (Escribe los puntos clave):", height=150, placeholder="Ej: Se aprobó cambiar el portero automático por 1.200€. Votaron 8 a favor y 2 en contra.")
-        if st.button("📄 Redactar Documento", type="primary") and puntos:
-            with st.spinner("Redactando documento legal..."):
-                prompt = f"Actúa como un Secretario-Administrador de fincas en España. Redacta un documento oficial del tipo: '{tipo_doc}'. Basándote en estos puntos:\n\n{puntos}\n\nEl tono debe ser formal, claro y legal. Incluye espacios para las firmas al final."
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, tipo_doc.replace(" ", "_"), formatos_extra=True)
-
-    elif sub_idx == 5:
-        st.markdown("### 🚨 Registro de Incidencias y Reclamaciones")
-        st.caption("¿Ruidos, humedades, suciedad? Redacta una queja formal para enviar al administrador o al presidente.")
-        c1, c2 = st.columns(2)
-        with c1:
-            tipo_inc = st.selectbox("Tipo de problema:", ["Ruidos molestos", "Humedades / Filtraciones", "Suciedad en zonas comunes", "Daños en el portal/ascensor", "Mascotas", "Otro"])
-        with c2:
-            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
-        
-        descripcion = st.text_area("Describe el problema con detalle:", placeholder="Ej: Desde el martes por la noche se escuchan ruidos de taladro en el 3ºB después de las 23:00h...")
-        
-        if st.button("📢 Generar Reclamación Formal", type="primary") and descripcion:
-            with st.spinner("Redactando reclamación..."):
-                prompt = f"Actúa como un abogado. Redacta una reclamación formal dirigida al Presidente de la Comunidad y al Administrador de Fincas por el siguiente problema: '{tipo_inc}'. Afecta a: {vecino_afectado}. Detalles del problema: {descripcion}. Exige una solución inmediata y cita el artículo de la LPH o las ordenanzas municipales que obligue a solucionarlo. Incluye un espacio para mi firma y DNI."
-                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
-                if "[ERROR" in res: st.error(res)
-                else: st.markdown(res); botones_descarga(res, "Reclamacion_Comunidad", formatos_extra=True)
+            st_instr = st.text_input("Instrumentos clave:", placeholder="Ej: Guitarra acústica, marimba, trompeta...")
+            st_artista = st.text_input("Estilo de artista (Opcional):", placeholder="Ej: Romeo Santos, Bad Bunny...")
+           
