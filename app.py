@@ -1,5 +1,5 @@
 """
-Xavilu Network Pro - Edición Final Definitiva (Suno + Múltiples Presupuestos)
+Xavilu Network Pro - Edición Definitiva Final
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -75,7 +75,7 @@ _defaults = {
     "xw_tabla": "", "xw_podcast": "", "xw_podcast_audio": None, "xw_timeline": "", "xw_glosario": "",
     "xw_dafo": "", "xw_cover_img": None, "xw_copilot_history": [], "xw_tema_input": "",
     "office_borrador": "", "pdf_borrador": "", "pod_tema_input": "", "podcast_script": "", "entrevista_historial": [],
-    "alex_chat_history": [], "letra_edit": "", "suno_prompt": "", "suno_letra": ""
+    "alex_chat_history": [], "letra_edit": ""
 }
 for _k, _v in _defaults.items():
     if _k not in st.session_state: st.session_state[_k] = _v
@@ -375,7 +375,7 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
     pdf.multi_cell(0, 8, text=contenido); return bytes(pdf.output())
 
 def generar_manual_pdf() -> bytes:
-    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía, Canciones y Suno.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
+    texto_manual = "¡Bienvenido a Xavilu Network Pro!\n\nEsta app conecta con Google, Meta, y modelos abiertos. Necesitas API Keys.\n\n1. XaviWork: Mapas, informes, presentaciones.\n2. Chat: Agentes y podcasts.\n3. Documentos: Resúmenes y facturas.\n4. Web: Búsquedas y YouTube.\n5. Multimedia: Imágenes y audios.\n6. Estudio: Deberes, Entrevistas y PRL.\n7. Viajes: Itinerarios y Rutinas.\n8. Música: Letras, Poesía y Canciones.\n9. Comunidad: Gestor de fincas PRO.\n\n¡Disfruta!"
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente()
     if font_path: pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.set_font("XaviFont", "B", 20)
     else: pdf.set_font("Helvetica", "B", 20)
@@ -1191,13 +1191,12 @@ elif macro_idx == 6:
                 else: st.markdown(res); botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
 
 # ==========================================
-# CATEGORÍA 7: MÚSICA Y ARTE (Incluye Suno)
+# CATEGORÍA 7: MÚSICA Y ARTE
 # ==========================================
 elif macro_idx == 7:
     st.markdown("#### 🎵 Música y Arte")
-    sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
+    sub_names = ["🎤 LETRAS", "🖼️ PORTADAS", "📝 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
-    
     if sub_idx == 0:
         st.markdown("### Generador de Letras de Canciones")
         st.info("💡 **Puedes escribir tu propia letra aquí abajo** o dejar que la IA te ayude rellenando los datos y pulsando el botón.")
@@ -1233,17 +1232,140 @@ elif macro_idx == 7:
                     if audio_final:
                         st.success("✅ ¡Canción lista! Dale al play.")
                         st.audio(audio_final, format="audio/mp3"); st.download_button("💾 Descargar Canción (MP3)", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
-
     elif sub_idx == 1:
-        st.markdown("### 🌞 Generador de Prompts para Suno AI")
-        st.caption("Suno AI es una IA que canta de verdad. Como no tiene API gratuita, aquí te preparamos el texto perfecto para que lo pegues en su web.")
-        
+        st.markdown("### Generador de Portadas de Álbum")
+        prompt_portada = st.text_input("Describe la portada:", placeholder="Ej: Un astronauta llorando en Tokio..."); estilo_arte = st.selectbox("Estilo:", ["Fotorrealista", "Pintura al óleo", "Anime", "Surrealista", "Retro 80s", "Abstracto"])
+        if st.button("🖼️ Crear Portada", type="primary") and prompt_portada:
+            with st.spinner("Diseñando portada..."):
+                try:
+                    query = urllib.parse.quote(f"Album cover art, {prompt_portada}, {estilo_arte}, high quality, no text")
+                    url = f"https://image.pollinations.ai/prompt/{query}?width=1024&height=1024&nologo=true"
+                    if url_segura(url):
+                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=30) as response: img_data = response.read()
+                        st.image(img_data, caption="Portada del Álbum", use_container_width=True); st.download_button("📥 Descargar Portada", img_data, "portada_album.png", "image/png")
+                except Exception as e: st.error(f"Error al generar la portada: {e}")
+    elif sub_idx == 2:
+        st.markdown("### Generador de Poesía y Rimas")
+        tema_poema = st.text_input("Tema del poema:", placeholder="Ej: La soledad, el mar..."); estilo_poema = st.selectbox("Estilo:", ["Soneto clásico", "Verso libre", "Rima infantil", "Haiku", "Siglo de Oro"])
+        if st.button("📝 Crear Poema", type="primary") and tema_poema:
+            with st.spinner("Inspirando a las musas..."):
+                prompt = f"Escribe un poema sobre '{tema_poema}'. Estilo: {estilo_poema}. Cuida la métrica y figuras literarias."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else:
+                    st.markdown(res); botones_descarga(res, "Poema")
+                    if st.button("🔊 Recitar Poema"):
+                        aud = generar_audio_sincrono(res, "es-ES-ElviraNeural")
+                        if aud: st.audio(aud, format="audio/mp3")
+
+# ==========================================
+# CATEGORÍA 8: GESTOR DE VECINOS
+# ==========================================
+elif macro_idx == 8:
+    st.markdown("#### 🏢 Gestor de Comunidad de Vecinos PRO")
+    sub_names = ["📜 ESTATUTOS Y CUOTAS", "🗳️ MAYORÍAS Y VOTOS", "⚖️ ALEX IA LEGAL", "🧾 ANALIZAR PRESUPUESTOS", "📝 DOCUMENTOS", "🚨 INCIDENCIAS"]
+    sub_idx = custom_tabs(sub_names, "comm_sub", 0, cols_per_row=3)
+    if sub_idx == 0:
+        st.markdown("### 📜 Estatutos y Cuotas de Participación")
+        st.markdown("##### Calculadora Rápida (por metros cuadrados)")
+        c1, c2 = st.columns(2)
+        with c1: m2_totales = st.number_input("Metros cuadrados TOTALES del edificio:", min_value=1.0, value=1000.0, step=10.0)
+        with c2: m2_piso = st.number_input("Metros cuadrados de TU vivienda/local:", min_value=1.0, value=80.0, step=1.0)
+        if st.button("🧮 Calcular Cuota", type="primary"):
+            if m2_piso > m2_totales: st.error("Los metros de tu piso no pueden ser mayores que los del edificio entero.")
+            else:
+                cuota = (m2_piso / m2_totales) * 100
+                st.success(f"Tu coeficiente de participación es del **{cuota:.4f} %**")
+                st.info("Esto significa que de cada 100€ de gastos generales, a ti te correspondería pagar esa cantidad (ej. si son 100€, pagarías " + f"{cuota:.2f}€).")
+        st.markdown("---"); st.markdown("##### Buscar en los Estatutos (IA)")
+        estatutos = st.file_uploader("Sube los Estatutos (PDF, TXT, Word):", type=["pdf", "txt", "docx"])
+        if st.button("🔎 Analizar Estatutos con IA", type="primary") and estatutos:
+            with st.spinner("Leyendo estatutos..."):
+                texto_est = leer_archivo_universal(estatutos, modelo_seleccionado)
+                prompt = f"Actúa como un administrador de fincas experto. Lee los siguientes estatutos de una comunidad de vecinos y explícame: 1. ¿Cómo se calculan las cuotas de participación? 2. ¿Qué dicen sobre derramas o obras? 3. Cualquier artículo importante que deba conocer (Ej: prohibiciones, mayoría de votos).\n\nTEXTO DE LOS ESTATUTOS:\n{texto_est[:15000]}"
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Resumen_Estatutos", formatos_extra=True)
+    elif sub_idx == 1:
+        st.markdown("### 🗳️ Calculadora de Mayorías y Votaciones")
+        st.caption("¿Tienes una reunión? Calcula si la propuesta del administrador saldrá adelante según la Ley de Propiedad Horizontal.")
         c1, c2 = st.columns(2)
         with c1:
-            st_tema = st.text_input("¿De qué trata la canción?", placeholder="Ej: Marta y Luz en el campamento...")
-            st_genero = st.selectbox("Género Musical:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica"])
-            st_voz = st.selectbox("Tipo de Voz:", ["Dúo (Hombre y Mujer)", "Voz Masculina", "Voz Femenina", "Coro"])
+            st.markdown("**1. Asistencia a la reunión**")
+            asistencia = st.number_input("¿Qué % de cuotas de participación hay en la sala?", min_value=0.0, max_value=100.0, value=60.0, step=1.0)
+            st.caption("(Suma los coeficientes de los vecinos presentes y representados).")
         with c2:
-            st_instr = st.text_input("Instrumentos clave:", placeholder="Ej: Guitarra acústica, marimba, trompeta...")
-            st_artista = st.text_input("Estilo de artista (Opcional):", placeholder="Ej: Romeo Santos, Bad Bunny...")
-           
+            st.markdown("**2. Votos de la propuesta**")
+            votos_si = st.number_input("Votos A FAVOR (en % del edificio):", min_value=0.0, max_value=100.0, value=35.0, step=1.0)
+            votos_no = st.number_input("Votos EN CONTRA (en % del edificio):", min_value=0.0, max_value=100.0, value=15.0, step=1.0)
+        st.markdown("---")
+        tipo_mayoria = st.selectbox("¿Qué tipo de mayoría requiere el punto del orden del día?", ["Mayoría Simple (más síes que noes)", "Mayoría Cualificada (3/5 del total de la comunidad = 60%)", "Unanimidad (100% de los propietarios)"])
+        if st.button("📊 Calcular Resultado", type="primary"):
+            if votos_si + votos_no > asistencia: st.error("Los votos suman más que la asistencia. Revisa los datos.")
+            else:
+                if tipo_mayoria == "Mayoría Simple (más síes que noes)":
+                    if votos_si > votos_no: st.success("✅ APROBADO. Con mayoría simple, los síes superan a los noes.")
+                    else: st.error("❌ RECHAZADO. Los noes son iguales o superiores a los síes.")
+                elif tipo_mayoria == "Mayoría Cualificada (3/5 del total de la comunidad = 60%)":
+                    if votos_si >= 60.0: st.success("✅ APROBADO. Has alcanzado el 3/5 del total de la comunidad (60%).")
+                    else: st.error(f"❌ RECHAZADO. Necesitas 60% y solo hay {votos_si}% a favor. Faltan {60 - votos_si}%.")
+                elif tipo_mayoria == "Unanimidad (100% de los propietarios)":
+                    if votos_si == 100.0 and votos_no == 0: st.success("✅ APROBADO. Unanimidad total.")
+                    else: st.error("❌ RECHAZADO. Alguien ha votado en contra. La unanimidad es obligatoria para esto.")
+    elif sub_idx == 2:
+        st.markdown("### ⚖️ ALEX IA - Tu Asesor Legal de Comunidades")
+        st.info("Pregúntame cualquier duda sobre la Ley de Propiedad Horizontal (LPH), o pégame lo que ha dicho el administrador para que te ayude a rebatirlo con argumentos legales.")
+        for m in st.session_state.alex_chat_history:
+            if m["role"] == "assistant": st.chat_message("assistant", avatar="⚖️").write(m["content"])
+            else: st.chat_message("user").write(m["content"])
+        p_alex = chat_input_pro("alex_input", "Ej: El administrador dice que la derrama del ascensor se aprueba por mayoría simple, ¿es verdad?")
+        if p_alex:
+            st.session_state.alex_chat_history.append({"role": "user", "content": p_alex})
+            with st.spinner("Alex IA revisando la Ley..."):
+                prompt_alex = f"Eres Alex, un abogado experto y Administrador de Fincas en España. Tu objetivo es asesorar a un vecino para defender sus derechos frente a su comunidad o administrador. Responde con base en la Ley de Propiedad Horizontal (Ley 49/1960). Cita artículos si es posible. Sé claro, directo y dale argumentos para rebatir al administrador si es necesario."
+                res = llamar_ia(modelo_seleccionado, f"{prompt_alex}\n\nPregunta del vecino: {p_alex}", st.session_state.api_key_gemini_manual, st.session_state.alex_chat_history)
+                if "[ERROR" in res: st.error(res)
+                else: st.session_state.alex_chat_history.append({"role": "assistant", "content": res}); st.rerun()
+    elif sub_idx == 3:
+        st.markdown("### 🧾 Analizar Presupuesto del Proveedor")
+        st.caption("Sube una foto del presupuesto del pintor, del ascensor, de la limpieza, etc. La IA lo analizará y te dirá si está bien o si hay cosas raras.")
+        arch_presupuesto = st.file_uploader("Sube el presupuesto (JPG, PNG o PDF):", type=["jpg", "jpeg", "png", "pdf"])
+        if st.button("🔍 Analizar Presupuesto", type="primary") and arch_presupuesto:
+            with st.spinner("Analizando presupuesto y comparando precios de mercado..."):
+                prompt_presupuesto = """Actúa como un Administrador de Fincas experto en España. Analiza este presupuesto para una comunidad de vecinos.
+                Devuelve un informe estructurado con:
+                1. Resumen del presupuesto (qué van a hacer y por cuánto).
+                2. ¿Falta algo importante? (Ej: ¿Han incluido el IVA? ¿Gestión de residuos? ¿Andamios? ¿Seguro de responsabilidad civil?).
+                3. ¿El precio es razonable? (Da tu opinión basándote en precios de mercado actuales).
+                4. Recomendaciones antes de firmar o pagar.
+                5. Redacta un correo breve para el proveedor pidiendo las aclaraciones necesarias si falta algo."""
+                if arch_presupuesto.name.lower().endswith(".pdf"):
+                    texto_pdf = leer_archivo_universal(arch_presupuesto, modelo_seleccionado)
+                    res = llamar_ia(modelo_seleccionado, f"{prompt_presupuesto}\n\nTexto del presupuesto:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                else: res = analizar_archivo_con_gemini(arch_presupuesto.getvalue(), "image/jpeg", prompt_presupuesto, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Analisis_Presupuesto", formatos_extra=True)
+    elif sub_idx == 4:
+        st.markdown("### 📝 Redactar Actas o Cartas a la Comunidad")
+        tipo_doc = st.selectbox("Tipo de documento:", ["Acta de Junta General", "Reclamación al Presidente", "Notificación de Derrama", "Solicitud de Reparación", "Burofax de Impago"])
+        puntos = st.text_area("¿Qué ha pasado o qué quieres comunicar? (Escribe los puntos clave):", height=150, placeholder="Ej: Se aprobó cambiar el portero automático por 1.200€. Votaron 8 a favor y 2 en contra.")
+        if st.button("📄 Redactar Documento", type="primary") and puntos:
+            with st.spinner("Redactando documento legal..."):
+                prompt = f"Actúa como un Secretario-Administrador de fincas en España. Redacta un documento oficial del tipo: '{tipo_doc}'. Basándote en estos puntos:\n\n{puntos}\n\nEl tono debe ser formal, claro y legal. Incluye espacios para las firmas al final."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, tipo_doc.replace(" ", "_"), formatos_extra=True)
+    elif sub_idx == 5:
+        st.markdown("### 🚨 Registro de Incidencias y Reclamaciones")
+        st.caption("¿Ruidos, humedades, suciedad? Redacta una queja formal para enviar al administrador o al presidente.")
+        c1, c2 = st.columns(2)
+        with c1: tipo_inc = st.selectbox("Tipo de problema:", ["Ruidos molestos", "Humedades / Filtraciones", "Suciedad en zonas comunes", "Daños en el portal/ascensor", "Mascotas", "Otro"])
+        with c2: vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
+        descripcion = st.text_area("Describe el problema con detalle:", placeholder="Ej: Desde el martes por la noche se escuchan ruidos de taladro en el 3ºB después de las 23:00h...")
+        if st.button("📢 Generar Reclamación Formal", type="primary") and descripcion:
+            with st.spinner("Redactando reclamación..."):
+                prompt = f"Actúa como un abogado. Redacta una reclamación formal dirigida al Presidente de la Comunidad y al Administrador de Fincas por el siguiente problema: '{tipo_inc}'. Afecta a: {vecino_afectado}. Detalles del problema: {descripcion}. Exige una solución inmediata y cita el artículo de la LPH o las ordenanzas municipales que obligue a solucionarlo. Incluye un espacio para mi firma y DNI."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(res)
+                else: st.markdown(res); botones_descarga(res, "Reclamacion_Comunidad", formatos_extra=True)
