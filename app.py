@@ -168,12 +168,16 @@ def generar_manual_sencillo_pdf() -> bytes:
         ("Musica", "Escribe letras de canciones, poemas y crea la musica para cantarlas."),
         ("Gestor Vecinos", "(Solo Admin). Para papeles del edificio y presupuestos.")
     ]
+    
+    # ESTA ES LA PARTE QUE SE ROMPÍA Y AHORA ESTÁ ARREGLADA
     for nombre, desc in herramientas:
         pdf.set_font(font_name, "B", 11)
-        pdf.cell(35, 6, nombre + ":", ln=False)
+        pdf.cell(0, 6, nombre, ln=True)    # Escribe el título en su propia línea
         pdf.set_font(font_name, "", 11)
-        pdf.multi_cell(0, 6, desc)
-    
+        pdf.set_x(15)                      # Da un margen a la izquierda
+        pdf.multi_cell(0, 6, desc)         # Escribe la descripción abajo
+        pdf.ln(2)                          # Deja un huequito antes de la siguiente
+
     pdf.ln(5)
 
     pdf.set_font(font_name, "B", 14)
@@ -1197,7 +1201,7 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-                elif macro_idx == 4:
+elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
@@ -1356,4 +1360,424 @@ elif macro_idx == 5:
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.markdown(res); botones_descarga(res, f"Evaluacion_PRL", formatos_extra=True)
         with tabs_prl[1]:
-            tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios",)
+            tema_test = st.selectbox("Área:", ["Ley 31/1995", "EPIs", "Primeros Auxilios", "Ergonomía", "Máquinas"])
+            if st.button("📝 Generar Test", type="primary"):
+                with st.spinner("Preparando..."):
+                    res = llamar_ia(modelo_seleccionado, f"Test 10 preguntas (A,B,C,D) sobre '{tema_test}'. Incluye 'Soluciones'. Normativa española.", st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.markdown(res); botones_descarga(res, "Test_PRL", formatos_extra=True)
+        with tabs_prl[2]:
+            if st.button("📖 Resumen Leyes"):
+                with st.spinner("Resumiendo..."):
+                    res = llamar_ia(modelo_seleccionado, "Resumen estructurado Ley 31/1995 PRL: 1. Objeto, 2. Principios, 3. Derechos y obligaciones.", st.session_state.api_key_gemini_manual)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.markdown(res); botones_descarga(res, "Resumen_Ley_PRL", formatos_extra=True)
+
+elif macro_idx == 6:
+    st.markdown("#### 🌍 Viajes y Hogar")
+    sub_names = ["✈️ ITINERARIO", "🏠 COCINA", "💪 ENTRENADOR"]
+    sub_idx = custom_tabs(sub_names, "travel_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Planificador de Viajes")
+        destino = st.text_input("Destino:"); c1, c2 = st.columns(2)
+        with c1: dias = st.number_input("Días:", min_value=1, max_value=30, value=3)
+        with c2: tipo_viaje = st.selectbox("Estilo:", ["Cultural", "Gastronómico", "Aventura", "Relax", "Familiar", "Económico"])
+        if st.button("🗺️ Crear", type="primary") and destino:
+            with st.spinner("Planificando..."):
+                res = llamar_ia(modelo_seleccionado, f"Itinerario {dias} días para {destino}. Estilo: {tipo_viaje}. Incluye qué ver, dónde comer y consejos.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, f"Viaje_{destino}", formatos_extra=True)
+    elif sub_idx == 1:
+        st.markdown("### Recetas")
+        ingredientes = campo_con_ideas("Ingredientes:", "hogar", "recetas", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: Huevos...")
+        if st.button("🍳 Crear", type="primary") and ingredientes:
+            with st.spinner("Cocinando..."):
+                res = llamar_ia(modelo_seleccionado, f"Tengo: {ingredientes}. Dame 2 recetas fáciles. Incluye pasos y tiempo.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, "Recetas_Hogar")
+    elif sub_idx == 2:
+        st.markdown("### 💪 Entrenador IA")
+        c1, c2 = st.columns(2)
+        with c1:
+            edad = st.number_input("Edad:", min_value=14, max_value=99, value=25); peso = st.number_input("Peso:", min_value=40, max_value=200, value=75); altura = st.number_input("Altura:", min_value=130, max_value=220, value=175)
+        with c2:
+            objetivo = st.selectbox("Objetivo:", ["Perder grasa", "Ganar músculo", "Mantenerme en forma", "Resistencia"])
+            equipo = st.selectbox("Material:", ["Gimnasio", "Mancuernas", "Sin material", "Aire libre"]); dias_entreno = st.slider("Días:", 2, 6, 4)
+        if st.button("📋 Generar Plan", type="primary"):
+            with st.spinner("Diseñando..."):
+                res = llamar_ia(modelo_seleccionado, f"Entrenador. Usuario: {edad}a, {peso}kg, {altura}cm. Objetivo: '{objetivo}'. Entrena {dias_entreno} días en '{equipo}'. Genera: 1. Rutina semanal. 2. Consejos nutricionales.", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, "Plan_Entrenamiento", formatos_extra=True)
+
+elif macro_idx == 7:
+    st.markdown("#### 🎵 Música y Arte")
+    sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
+    sub_idx = custom_tabs(sub_names, "music_sub", 0)
+    
+    if sub_idx == 0:
+        st.markdown("### Generador de Letras")
+        if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
+        
+        # --- BLOQUE 1: CONFIGURACIÓN INICIAL ---
+        tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
+        c1, c2 = st.columns(2)
+        with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"], key="gen_letra")
+        with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...", key="art_letra")
+        
+        st.markdown("#### ⚙️ Ajustes de Voz y Música (Elige antes de generar)")
+        hacer_dueto = st.checkbox("🎤 Hacer Dúo")
+        
+        voces_disponibles = ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"]
+        bases_disponibles = ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"]
+        
+        cv1, cv2, cb = st.columns(3)
+        with cv1: voz_config1 = st.selectbox("Voz 1:", voces_disponibles, key="vc_v1")
+        with cv2: 
+            if hacer_dueto: voz_config2 = st.selectbox("Voz 2:", voces_disponibles, index=1, key="vc_v2")
+            else: 
+                voz_config2 = None
+                st.selectbox("Voz 2:", ["(Desactivado)"], disabled=True, key="vc_v2_off")
+        with cb: base_config = st.selectbox("Base musical:", bases_disponibles, key="vc_base")
+
+        if st.button("🪄 Generar Letra IA", use_container_width=True, type="primary") and tema_cancion:
+            with st.spinner("Componiendo..."):
+                prompt = f"Letra de canción {genero} sobre: '{tema_cancion}'. "
+                if artista_estilo: prompt += f"Estilo {artista_estilo}. "
+                prompt += "Estructura (Intro, Verso 1, Coro, etc.) y añade indicaciones de producción entre corchetes."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.session_state.letra_edit = res; st.rerun()
+
+        # --- BLOQUE 2: EDICIÓN Y AUDIO FINAL ---
+        if st.session_state.letra_edit.strip():
+            st.markdown("---")
+            letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
+            botones_descarga(letra_final, "Letra_Cancion")
+            
+            st.markdown("### 🎵 Ponerle Música")
+            st.info("💡 Puedes cambiar las voces o la base musical aquí abajo antes de generar el audio final.")
+            
+            ca1, ca2, ca3 = st.columns(3)
+            with ca1: 
+                idx_v1 = voces_disponibles.index(voz_config1) if voz_config1 in voces_disponibles else 0
+                voz_final1 = st.selectbox("Voz 1 Final:", voces_disponibles, index=idx_v1, key="vf_v1")
+            with ca2: 
+                if hacer_dueto:
+                    idx_v2 = voces_disponibles.index(voz_config2) if voz_config2 in voces_disponibles else 1
+                    voz_final2 = st.selectbox("Voz 2 Final:", voces_disponibles, index=idx_v2, key="vf_v2")
+                else: 
+                    voz_final2 = None
+                    st.selectbox("Voz 2 Final:", ["(Desactivado)"], disabled=True, key="vf_v2_off")
+            with ca3: 
+                idx_b = bases_disponibles.index(base_config) if base_config in bases_disponibles else 0
+                base_final = st.selectbox("Base Final:", bases_disponibles, index=idx_b, key="vf_base")
+
+            if st.button("🎶 Generar Canción Completa", type="primary", use_container_width=True):
+                with st.spinner("Grabando..."):
+                    audio_final = generar_cancion_con_base(letra_final, voz_final1, base_final, voz_final2)
+                    if audio_final:
+                        st.success("✅ ¡Lista!")
+                        st.audio(audio_final, format="audio/mp3")
+                        st.download_button("💾 Descargar MP3", audio_final, "cancion_xavilu.mp3", "audio/mp3", use_container_width=True)
+
+    elif sub_idx == 1:
+        st.markdown("### 🌞 Generador de Prompts para Suno AI")
+        st.caption("Suno AI canta de verdad. Genera el texto perfecto para pegarlo en su web.")
+        c1, c2 = st.columns(2)
+        with c1:
+            st_tema = st.text_input("Tema:", placeholder="Ej: Marta y Luz en el campamento...")
+            st_genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"])
+            st_voz = st.selectbox("Voz:", ["Dúo (Hombre y Mujer)", "Masculina", "Femenina", "Coro"])
+        with c2:
+            st_instr = st.text_input("Instrumentos:", placeholder="Ej: Guitarra, marimba...")
+            st_artista = st.text_input("Artista similar:", placeholder="Ej: Romeo Santos...")
+        if st.button("✨ Generar Prompt para Suno", type="primary") and st_tema:
+            with st.spinner("Preparando el prompt..."):
+                prompt_ia = f"""Actúa como un experto en ingeniería de prompts para Suno AI.
+                Tema: "{st_tema}"
+                Género: {st_genero}
+                Voz: {st_voz}
+                Instrumentos: {st_instr}
+                Artista similar: {st_artista}
+
+                Tu tarea es generar EXCLUSIVAMENTE el texto listo para copiar y pegar en Suno AI.
+                REGLAS ESTRICTAS:
+                1. NO escribas saludos, introducciones ni comentarios (ej: "Aquí tienes...").
+                2. NO uses bloques de código markdown (```) ni formato JSON.
+                3. Sigue el formato exacto usando los separadores que se indican a continuación.
+
+                Formato de salida:
+
+                ---STYLE---
+                [Aquí va el prompt de estilo en inglés, máximo 200 caracteres, describiendo género, instrumentos y voz]
+
+                ---LYRICS---
+                [Aquí va la letra en español con las etiquetas [Verse], [Chorus], [Bridge], etc.]
+                """
+                res = llamar_ia(modelo_seleccionado, prompt_ia, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: 
+                    st.error(mensaje_error_amigable(res))
+                else:
+                    st.success("✅ Prompt generado. Listo para copiar.")
+                    res_limpia = res.replace("```markdown", "").replace("```", "").strip()
+                    if "---STYLE---" in res_limpia and "---LYRICS---" in res_limpia:
+                        partes = res_limpia.split("---LYRICS---")
+                        style_part = partes[0].replace("---STYLE---", "").strip()
+                        lyrics_part = partes[1].strip()
+                        st.markdown("### 🎧 Estilo de Música (Copia y pega en 'Style of Music'):")
+                        st.code(style_part, language="text")
+                        st.markdown("### 📜 Letra (Copia y pega en 'Lyrics' con Custom Mode activado):")
+                        st.code(lyrics_part, language="text")
+                    else:
+                        st.warning("La IA no siguió el formato exacto, pero aquí tienes el texto limpio:")
+                        st.text_area("Copia esto:", value=res_limpia, height=300)
+                    st.markdown("[🚀 Ir a Suno AI a crear la canción](https://suno.com/create)")
+    elif sub_idx == 2:
+        st.markdown("### 🖼️ Portadas")
+        prompt_img = st.text_input("Describe la portada:")
+        if st.button("Generar") and prompt_img:
+            with st.spinner("Pintando..."):
+                url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt_img + ', album cover, high quality')}?width=1024&height=1024&nologo=true"
+                if url_segura(url):
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=30) as response: img_data = response.read()
+                    st.image(img_data, use_container_width=True); st.download_button("📥 Descargar", img_data, "portada.png", "image/png")
+    elif sub_idx == 3:
+        st.markdown("### 📝 Poesía")
+        tema_poema = st.text_input("Tema del poema:")
+        if st.button("Escribir Poema") and tema_poema:
+            with st.spinner("Escribiendo..."):
+                res = llamar_ia(modelo_seleccionado, f"Escribe un poema profundo sobre: {tema_poema}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, "Poema")
+
+elif macro_idx == 8:
+    st.markdown("#### 🏢 Gestor de Comunidad PRO")
+    sub_names = ["🚨 INCIDENCIAS", "📜 NORMATIVA", "🧾 ANALIZAR PRESUPUESTOS", "📊 ACTAS", "📝 CITACIONES"]
+    sub_idx = custom_tabs(sub_names, "vecinos_sub", 0)
+    
+    if sub_idx == 0:
+        st.markdown("### 🚨 Gestión de Incidencias")
+        c1, c2 = st.columns(2)
+        with c1:
+            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "Otro"])
+            urgencia = st.selectbox("Urgencia:", ["Baja", "Media", "Alta", "Urgente"])
+        with c2:
+            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
+            ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB")
+        descripcion_inc = st.text_area("Describe lo ocurrido:", height=150)
+        if st.button("📝 Redactar Reclamación", type="primary") and descripcion_inc:
+            with st.spinner("Redactando..."):
+                prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+    elif sub_idx == 1:
+        st.markdown("### 📜 Normativa y Leyes")
+        consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, st.session_state.api_key_gemini_manual, "Ej: ¿Puedo poner cámara en el rellano?")
+        if st.button("🔎 Consultar") and consulta:
+            with st.spinner("Buscando en la Ley..."):
+                res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.markdown(res); botones_descarga(res, "Consulta_Normativa")
+
+    elif sub_idx == 2:
+        st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
+        st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. Los análisis se guardarán en la memoria hasta que reinicies o limpies.")
+        
+        arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
+        
+        # --- NUEVO CAMPO PARA INSTRUCCIONES ---
+        instrucciones_extra = st.text_area(
+            "📝 ¿En qué quieres que se fije la IA? (Opcional):", 
+            placeholder="Ej: Céntrate en los plazos de entrega, busca si incluyen limpieza o gestión de escombros, revisa las garantías...", 
+            height=80
+        )
+        
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
+            if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
+                resultados_individuales = []
+                progreso = st.progress(0)
+                status_text = st.empty()
+                
+                for i, arch in enumerate(arch_presupuestos):
+                    status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
+                    
+                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto. 
+                    Tu objetivo es redactar un INFORME PERICIAL Y DE EVALUACIÓN TÉCNICA de este presupuesto para proteger los intereses de la comunidad de vecinos.
+                    
+                    IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
+                    1. "empresa": (Solo el nombre corto de la empresa, ej: "Pinturas Pepe").
+                    2. "analisis": (El informe técnico redactado en texto plano, estructurado y muy profesional).
+                    
+                    En el texto del "analisis", DEBES seguir estrictamente esta estructura formal, usando guiones o números para las listas:
+                    
+                    INFORME TÉCNICO DE EVALUACIÓN
+                    
+                    1. RESUMEN EJECUTIVO: Un párrafo de 2 o 3 líneas con el veredicto general sobre la oferta (viabilidad, riesgos principales).
+                    
+                    2. ANÁLISIS ECONÓMICO: 
+                    - Precio Total y desglose del IVA (si lo lleva o está exento).
+                    - Advertencia sobre posibles partidas ocultas, sobrecostes o falta de desglose.
+                    
+                    3. CUMPLIMIENTO NORMATIVO Y LICENCIAS:
+                    - Evaluación de las licencias de obra/actividad y tasas municipales. ¿Se encarga la empresa o lo deja a la comunidad?
+                    
+                    4. SEGURIDAD Y SALUD (PRL) Y RESIDUOS:
+                    - ¿Incluye Plan de Seguridad y Salud o Estudio Básico? (Obligatorio).
+                    - ¿Se especifica la gestión y retirada de escombros/residuos?
+                    
+                    5. PLAZOS Y GARANTÍAS:
+                    - Plazos de ejecución.
+                    - Garantías ofrecidas por escrito (seguro, años de garantía).
+                    
+                    6. LA LETRA PEQUEÑA (PUNTOS CRÍTICOS):
+                    - Lista de carencias, ambigüedades o cosas que NO incluye el presupuesto y que el presidente de la comunidad debería exigir antes de firmar.
+                    
+                    7. RECOMENDACIONES DEL PERITO:
+                    - 2 o 3 acciones concretas a tomar antes de contratar a esta empresa.
+                    
+                    No añadas markdown extra (como asteriscos) ni símbolos raros. Redacta con un tono serio, formal y jurídico."""
+                    
+                    # --- AÑADIMOS TUS INSTRUCCIONES AL PROMPT INDIVIDUAL ---
+                    if instrucciones_extra.strip():
+                        prompt_individual += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA:\n{instrucciones_extra}\n"
+                    
+                    try:
+                        if arch.name.lower().endswith(".pdf"):
+                            texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
+                            res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", st.session_state.api_key_gemini_manual)
+                        else:
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, st.session_state.api_key_gemini_manual)
+                        
+                        res_limpia = res.replace("```json", "").replace("```", "").strip()
+                        try:
+                            data_json = json.loads(res_limpia)
+                            nombre_empresa = data_json.get("empresa", arch.name)
+                            texto_analisis = data_json.get("analisis", res)
+                        except json.JSONDecodeError:
+                            nombre_empresa = arch.name
+                            texto_analisis = res
+                        
+                        status_text.text(f"Buscando reputación online de {nombre_empresa}...")
+                        res_busqueda = buscar_en_internet(f"{nombre_empresa} opiniones trabajos realizados")
+                        
+                        info_web = ""
+                        if res_busqueda:
+                            info_web = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_busqueda])
+                            prompt_rep = f"Analiza la reputación de '{nombre_empresa}' basándote en estos resultados de búsqueda en internet:\n{info_web}\n\nDevuelve un resumen de máximo 3 líneas. Si no hay información clara o es de otra empresa, di 'No hay información relevante en internet'."
+                            
+                            with st.spinner(f"Consultando web para {nombre_empresa}..."):
+                                rep_ia = llamar_ia(modelo_seleccionado, prompt_rep, st.session_state.api_key_gemini_manual)
+                                
+                            if "[ERROR" not in rep_ia:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {rep_ia}"
+                            else:
+                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {info_web[:300]}..."
+                        else:
+                            texto_analisis += "\n\n[REPUTACIÓN ONLINE]: No se encontraron resultados en internet."
+                            
+                        resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
+                    except Exception as e:
+                        resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
+                    
+                    progreso.progress((i + 1) / len(arch_presupuestos))
+                
+                status_text.text("✅ Análisis individual completado. Generando comparativa final...")
+                
+                if len(resultados_individuales) > 0:
+                    texto_para_comparar = ""
+                    for r in resultados_individuales:
+                        texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
+                    
+                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior. 
+                    Aquí tienes los informes periciales de {len(resultados_individuales)} presupuestos para una comunidad de vecinos:
+                    
+                    {texto_para_comparar}
+                    
+                    Tu tarea es redactar un INFORME COMPARATIVO FINAL EXTREMADAMENTE DETALLADO. No resumas demasiado. Sigue esta estructura exacta:
+                    
+                    1. TABLA COMPARATIVA DETALLADA
+                    Crea una tabla en Markdown con estas columnas: Proveedor, Presupuesto (€), IVA Desglosado (Sí/No), Licencias/PRL (Sí/No), Garantías (Sí/No), Valoración Técnica y Nivel de Riesgo (Bajo/Medio/Alto).
+                    
+                    2. ANÁLISIS PORMENORIZADO POR EMPRESA
+                    Haz un pequeño párrafo para cada empresa (usando su nombre como título). Explica qué ofrece, cuáles son sus puntos fuertes y qué carencias graves tiene respecto al resto.
+                    
+                    3. ANÁLISIS DE RIESGOS (SEMÁFORO)
+                    - RIESGOS CRÍTICOS: ¿Alguna empresa tiene un precio anormalmente bajo que sugiera "bicicleta" o falta de calidad? ¿Falta PRL obligatoria?
+                    - RIESGOS MODERADOS: ¿Faltan detalles de garantías o licencias?
+                    - PUNTOS A FAVOR: ¿Qué empresa da más confianza técnica?
+                    
+                    4. RECOMENDACIÓN FINAL DEL PERITO
+                    Explica con argumentos técnicos y jurídicos cuál es la mejor opción calidad/precio. Justifica si merece la pena pagar más por una empresa que cumpla estrictamente con la normativa.
+                    
+                    5. ACCIONES ANTES DE FIRMAR
+                    Lista de 3 a 5 exigencias que la comunidad debe pedir por escrito a la empresa ganadora antes de dar el visto bueno (ej: "Exigir el Plan de Seguridad y Salud", "Aclarar quién paga la tasa de escombros", etc.).
+                    
+                    IMPORTANTE: Usa un tono formal, serio y profesional. No uses emojis ni símbolos raros. Formatea el texto para que sea fácil de leer en un PDF.
+                    """
+                    
+                    # --- AÑADIMOS TUS INSTRUCCIONES TAMBIÉN A LA COMPARATIVA FINAL ---
+                    if instrucciones_extra.strip():
+                        prompt_comparativa += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA EN LA COMPARATIVA:\n{instrucciones_extra}\n"
+                    
+                    res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, st.session_state.api_key_gemini_manual)
+                    status_text.empty()
+                    progreso.empty()
+                    
+                    if "[ERROR" not in res_comparativa:
+                        st.session_state["presu_resultados"] = resultados_individuales
+                        st.session_state["presu_comparativa"] = res_comparativa
+                        st.success("✅ Informe generado y guardado en memoria.")
+                        st.rerun()
+                    else:
+                        st.error("Error al generar la comparativa final.")
+        
+        with c_btn2:
+            if st.session_state["presu_resultados"]:
+                if st.button("🗑️ Limpiar Análisis Guardados", use_container_width=True):
+                    st.session_state["presu_resultados"] = None
+                    st.session_state["presu_comparativa"] = ""
+                    st.rerun()
+
+        if st.session_state["presu_resultados"]:
+            st.markdown("---")
+            st.markdown("### 🏆 Comparativa y Recomendación Final")
+            st.markdown(st.session_state["presu_comparativa"])
+            botones_descarga(st.session_state["presu_comparativa"], "Comparativa_Presupuestos", formatos_extra=True)
+
+            st.link_button(
+                "💬 Compartir comparativa por WhatsApp",
+                wa_url(MENSAJES_WA["presupuesto"]),
+                use_container_width=True,
+            )
+            
+            st.markdown("---")
+            st.markdown("### 📂 Informes Periciales Individuales")
+            for idx, r in enumerate(st.session_state["presu_resultados"]):
+                with st.expander(f"📄 {r['empresa']} (Archivo: {r['archivo']})"):
+                    st.markdown(r['analisis'])
+                    botones_descarga(r['analisis'], f"Analisis_{r['empresa'].replace(' ', '_')}", formatos_extra=True)
+
+    elif sub_idx == 3:
+        st.markdown("### 📊 Actas de Comunidad")
+        puntos_dia = st.text_area("Puntos del día a tratar (uno por línea):", height=150)
+        if st.button("📝 Redactar Acta", type="primary") and puntos_dia:
+            with st.spinner("Redactando..."):
+                prompt = f"Actúa como Secretario-Administrador de Fincas. Redacta un Acta de Reunión formal para una comunidad de vecinos. Los puntos del día a tratar son:\n{puntos_dia}\n\nSigue el formato legal español: Encabezado, Asistentes (deja espacio), Orden del día, Deliberaciones y Acuerdos, Cierre y Firmas."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Acta Redactada:", value=res, height=400); botones_descarga(res, "Acta_Comunidad")
+                
+    elif sub_idx == 4:
+        st.markdown("### 📝 Citaciones y Notificaciones")
+        motivo = st.text_input("Motivo de la citación:", placeholder="Ej: Reunión extraordinaria por derrama...")
+        fecha_hora = st.text_input("Fecha y Hora:", placeholder="Ej: 15 de Noviembre a las 19:00h")
+        lugar = st.text_input("Lugar:", value="Portal del edificio o Sala de juntas")
+        if st.button("📝 Redactar Citación", type="primary") and motivo:
+            with st.spinner("Redactando..."):
+                prompt = f"Actúa como Administrador de Fincas. Redacta una notificación formal para los vecinos. Motivo: {motivo}. Fecha y hora: {fecha_hora}. Lugar: {lugar}. Incluye un lenguaje formal, la obligación de asistencia o delegación de voto, y espacio para la firma."
+                res = llamar_ia(modelo_seleccionado, prompt, st.session_state.api_key_gemini_manual)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Vecinos")
