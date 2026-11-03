@@ -872,19 +872,15 @@ if st.session_state.sidebar_visible:
             st.markdown("---")
 
             _manual_bytes = generar_manual_pdf()
-            guardar_descarga("Manual_Xavilu.pdf", _manual_bytes)
             st.download_button("📖 Descargar Manual (PDF)", _manual_bytes, "Manual_Xavilu.pdf", "application/pdf", use_container_width=True)
 
             _guia_bytes = generar_guia_pdf(version="1.0")
-            guardar_descarga("Guia_Rapida_Xavilu.pdf", _guia_bytes)
             st.download_button("⚡ Descargar Guía Rápida (PDF)", _guia_bytes, "Guia_Rapida_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_guia_pdf")
 
             _manual_sencillo_bytes = generar_manual_sencillo_pdf()
-            guardar_descarga("Manual_Sencillo_Xavilu.pdf", _manual_sencillo_bytes)
             st.download_button("📘 Manual para Principiantes (PDF)", _manual_sencillo_bytes, "Manual_Sencillo_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_manual_sencillo")
 
             st.link_button("💬 Compartir guía por WhatsApp", wa_url(MENSAJES_WA["guia"]), use_container_width=True)
-            st.caption(f"📁 Copia en `{CARPETA_DESCARGAS}/`.")
 
             st.markdown("---")
             archivo_global = st.file_uploader("📁 Cerebro Global", type=["pdf", "txt", "docx", "png", "jpg"], key="up_global")
