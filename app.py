@@ -1928,7 +1928,13 @@ elif macro_idx == 8:
                     else:
                         res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, _get_key("gemini"))
 
-                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else:
-                        st.markdown(res)
-                        botones_descarga(res, "Revision_Citacion", formatos_extra=True)        
+                    if "[ERROR" in res: 
+                        st.error(mensaje_error_amigable(res))
+                        st.session_state["citacion_res"] = "" # Limpiamos si hay error
+                    else: 
+                        st.session_state["citacion_res"] = res # Guardamos en memoria
+
+            # ESTO VA FUERA DEL IF (Desindentado)
+            if st.session_state.get("citacion_res"):
+                st.markdown(st.session_state["citacion_res"])
+                botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)
