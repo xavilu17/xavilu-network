@@ -113,7 +113,6 @@ Version {version}"""
 def generar_manual_sencillo_pdf() -> bytes:
     pdf = FPDF()
     pdf.add_page()
-    
     font_path = obtener_ruta_fuente()
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True)
@@ -129,13 +128,13 @@ def generar_manual_sencillo_pdf() -> bytes:
     pdf.set_text_color(255, 140, 0)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=20, text="XAVILU NETWORK PRO", align="C")
-    
+
     pdf.set_font(font_name, "I", 14)
     pdf.set_text_color(0, 0, 0)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=10, text="Tu centro de trabajo y diversion todo en uno", align="C")
     pdf.ln(10)
-    
+
     pdf.set_font(font_name, "", 12)
     intro = ("Imagina que tienes una oficina entera dentro de tu ordenador. Xavilu Network es una aplicacion "
              "que reune a los mejores asistentes virtuales (Inteligencias Artificiales) para ayudarte con las "
@@ -148,15 +147,15 @@ def generar_manual_sencillo_pdf() -> bytes:
     pdf.set_text_color(200, 0, 150)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=10, text="1. COMO ENTRAR")
-    
+
     pdf.set_font(font_name, "", 12)
     pdf.set_text_color(0, 0, 0)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="Al abrir la aplicacion, lo primero que veras es una pantalla oscura que te pedira una Contrasena.")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- Adultos (Administrador): Acceso a absolutamente todo.")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- Ninos: La app escondera las herramientas delicadas y dejara solo lo divertido.")
     pdf.ln(8)
@@ -165,10 +164,10 @@ def generar_manual_sencillo_pdf() -> bytes:
     pdf.set_text_color(200, 0, 150)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=10, text="2. EL MENU DE ARRIBA (Tus herramientas)")
-    
+
     pdf.set_font(font_name, "", 11)
     pdf.set_text_color(0, 0, 0)
-    
+
     herramientas = [
         ("XaviWork", "Tu bloc de notas inteligente. Crea mapas, resumenes y esquemas."),
         ("Chat", "Habla con la IA como si fuera una persona. Crea guiones de podcast."),
@@ -180,12 +179,11 @@ def generar_manual_sencillo_pdf() -> bytes:
         ("Musica", "Escribe letras de canciones, poemas y crea la musica para cantarlas."),
         ("Gestor Vecinos", "(Solo Admin). Para papeles del edificio y presupuestos.")
     ]
-    
+
     for nombre, desc in herramientas:
         pdf.set_font(font_name, "B", 11)
         pdf.set_x(pdf.l_margin)
         pdf.cell(w=0, h=6, text=nombre, ln=True)
-        
         pdf.set_font(font_name, "", 11)
         pdf.set_x(pdf.l_margin + 5)
         pdf.multi_cell(w=ancho_util - 5, h=6, text=desc)
@@ -197,24 +195,24 @@ def generar_manual_sencillo_pdf() -> bytes:
     pdf.set_text_color(200, 0, 150)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=10, text="3. COMO GUARDAR LO QUE CREO")
-    
+
     pdf.set_font(font_name, "", 12)
     pdf.set_text_color(0, 0, 0)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="Cuando pides a la IA que escriba algo, justo debajo apareceran unos botones de colores para descargarlo:")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- TXT: Solo el texto.")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- PDF: Un documento listo para imprimir.")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- Word / Excel: Para abrirlo en los programas de toda la vida.")
-    
+
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text="- WhatsApp: Para enviartelo al movil.")
-    
+
     pdf.ln(10)
     pdf.set_font(font_name, "I", 12)
     pdf.set_text_color(100, 100, 100)
@@ -299,7 +297,7 @@ def check_login():
     if "rol" not in st.session_state:
         st.markdown("<h2 style='text-align: center; margin-top: 50px;'>🔐 Acceso Restringido</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Introduce tu contraseña para entrar a Xavilu Network.</p>", unsafe_allow_html=True)
-        
+
         c1, c2, c3 = st.columns([1, 1, 1])
         with c2:
             pwd = st.text_input("Contraseña:", type="password", key="login_pwd")
@@ -349,8 +347,8 @@ def mensaje_error_amigable(texto: str) -> str:
     ]
     for clave, msg in mapa:
         if clave in t:
-            return f"{msg}\n\n_Detalle técnico: {texto[:180]}_"
-    return f"⚠️ Algo salió mal con la IA.\n\n_Detalle técnico: {texto[:180]}_"
+            return f"{msg}\n\n_Detalle técnico: {texto[:400]}_"
+    return f"⚠️ Algo salió mal con la IA.\n\n_Detalle técnico: {texto[:400]}_"
 
 def limpiar_texto_para_voz(texto):
     if not texto: return ""
@@ -441,39 +439,68 @@ def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
         texto = leer_archivo_universal(archivo, modelo)
         st.success(f"✅ Archivo '{archivo.name}' leído."); return f"\n[CONTENIDO DE '{archivo.name}']:\n{texto[:10000]}\n"
 
+# ============================================================
+# ⚡ CONEXIÓN DIRECTA A GEMINI (v2 - con diagnóstico real)
+# ============================================================
 def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, mime_type: str = None) -> str:
-    modelos = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
-    versiones = ["v1", "v1beta"]
-    
-    for version in versiones:
-        for modelo in modelos:
-            url = f"https://generativelanguage.googleapis.com/{version}/models/{modelo}:generateContent?key={api_key}"
-            headers = {'Content-Type': 'application/json'}
-            
-            if archivo_bytes and mime_type:
-                b64_data = base64.b64encode(archivo_bytes).decode('utf-8')
-                contents = [{
-                    "parts": [
-                        {"text": prompt},
-                        {"inline_data": {"mime_type": mime_type, "data": b64_data}}
-                    ]
-                }]
-            else:
-                contents = [{"parts": [{"text": prompt}]}]
-                
-            payload = {"contents": contents}
-            
-            try:
-                response = requests.post(url, headers=headers, json=payload, timeout=60)
-                if response.status_code == 200:
-                    res_json = response.json()
+    # 1. Validación previa de la key
+    if not api_key or len(api_key.strip()) < 15:
+        return "[ERROR GEMINI] No hay API Key configurada o es demasiado corta. Añádela en el panel lateral o en st.secrets como GEMINI_API_KEY."
+
+    api_key = api_key.strip()
+
+    # 2. Orden de intentos: v1beta primero (modelos accesibles), v1 como fallback
+    combinaciones = [
+        ("v1beta", "gemini-3.8-flash"),
+        ("v1beta", "gemini-3.6-flash"),
+    ]
+
+    errores_detalle = []
+
+    for version, modelo in combinaciones:
+        url = f"https://generativelanguage.googleapis.com/{version}/models/{modelo}:generateContent?key={api_key}"
+        headers = {'Content-Type': 'application/json'}
+
+        if archivo_bytes and mime_type:
+            b64_data = base64.b64encode(archivo_bytes).decode('utf-8')
+            contents = [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": mime_type, "data": b64_data}}
+                ]
+            }]
+        else:
+            contents = [{"parts": [{"text": prompt}]}]
+
+        payload = {"contents": contents}
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            if response.status_code == 200:
+                res_json = response.json()
+                try:
                     return res_json['candidates'][0]['content']['parts'][0]['text']
-                elif response.status_code == 400:
+                except (KeyError, IndexError):
+                    errores_detalle.append(f"{version}/{modelo}: HTTP 200 sin texto -> {str(res_json)[:150]}")
                     continue
-            except Exception:
-                continue
-                
-    return "[ERROR GEMINI] No se pudo conectar con Google. Revisa tu API Key o tu conexión."
+            else:
+                txt_err = response.text[:250]
+                errores_detalle.append(f"{version}/{modelo}: HTTP {response.status_code} -> {txt_err}")
+                # Si la key es inválida o sin permisos, no perder tiempo probando más modelos
+                if response.status_code in (401, 403) or "API_KEY_INVALID" in txt_err or "API key not valid" in txt_err:
+                    return f"[ERROR GEMINI] API Key inválida o sin permisos. HTTP {response.status_code}. Detalle: {txt_err}"
+                # Si es 429 (cuota), tampoco tiene sentido seguir
+                if response.status_code == 429:
+                    return f"[ERROR GEMINI] Cuota agotada (HTTP 429). Espera un poco o usa otro proveedor. Detalle: {txt_err}"
+        except requests.exceptions.Timeout:
+            errores_detalle.append(f"{version}/{modelo}: Timeout (60s)")
+        except requests.exceptions.ConnectionError as e:
+            errores_detalle.append(f"{version}/{modelo}: Error de conexión -> {str(e)[:120]}")
+        except Exception as e:
+            errores_detalle.append(f"{version}/{modelo}: {type(e).__name__} -> {str(e)[:120]}")
+
+    detalle = " | ".join(errores_detalle[-3:]) if errores_detalle else "Sin detalles"
+    return f"[ERROR GEMINI] Todos los intentos fallaron. Detalles: {detalle}"
 
 def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str) -> str:
     if not api_key_gemini: return "[ERROR] Falta la API Key de Gemini."
@@ -490,21 +517,21 @@ def _get_key(nombre: str, arg_directo: str = "") -> str:
 
 def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
     prompt_final = prompt[:MAX_TEXTO_IA]
-    if st.session_state.get("global_context"): 
+    if st.session_state.get("global_context"):
         prompt_final = f"[ARCHIVO ADJUNTO: {st.session_state.global_file_name}]\nCONTENIDO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN]:\n{prompt_final}"
-    if historial_chat: 
+    if historial_chat:
         prompt_final = f"Historial:\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in historial_chat[-10:]) + f"\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
-    
+
     keys = {k: _get_key(k, api_key_gemini if k=="gemini" else "") for k in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]}
-    
+
     if keys["gemini"]:
         res = llamar_gemini_rest(prompt_final, keys["gemini"])
         if "[ERROR" not in res:
             return res
-            
+
     urls = {"groq": "https://api.groq.com/openai/v1", "silicon": "https://api.siliconflow.cn/v1", "mistral": "https://api.mistral.ai/v1", "openrouter": "https://openrouter.ai/api/v1", "deepseek": "https://api.deepseek.com/v1", "together": "https://api.together.xyz/v1", "cerebras": "https://api.cerebras.ai/v1"}
     models = {"groq": "llama-3.3-70b-versatile", "silicon": "Qwen/Qwen2.5-7B-Instruct", "mistral": "mistral-small-latest", "openrouter": "deepseek/deepseek-r1:free", "deepseek": "deepseek-chat", "together": "meta-llama/Llama-3-70b-chat-hf", "cerebras": "llama3.1-70b"}
-    
+
     for prov in ["groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]:
         if keys[prov] and HAS_OPENAI:
             try:
@@ -512,12 +539,12 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
                 res = client.chat.completions.create(model=models[prov], messages=[{"role": "user", "content": prompt_final}]).choices[0].message.content
                 if res: return res
             except: pass
-            
+
     try:
         client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         raw = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options={"temperature": 0.2})["message"]["content"]
         return re.sub(r"\n```\s*$", "", re.sub(r"^```\w*\n", "", raw)).strip()
-    except Exception as e: 
+    except Exception as e:
         return mensaje_error_amigable(f"[ERROR CRÍTICO] Todas las IAs fallaron. Detalle Ollama: {e}")
 
 def render_mermaid(mermaid_code):
@@ -530,7 +557,7 @@ def obtener_ruta_fuente():
 
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
     pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente(); tmp_img = None
-    
+
     if logo_bytes:
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp: tmp.write(logo_bytes); tmp_img = tmp.name
@@ -547,17 +574,17 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
     if font_path:
         pdf.add_font("XaviFont", "", font_path, uni=True); pdf.add_font("XaviFont", "B", font_path, uni=True); pdf.add_font("XaviFont", "I", font_path, uni=True); pdf.set_font("XaviFont", size=11)
     else: pdf.set_font("Helvetica", size=11)
-    
+
     pdf.set_font("XaviFont" if font_path else "Helvetica", "B", 20)
     pdf.multi_cell(w=0, h=10, text=titulo, align="C")
     pdf.set_font("XaviFont" if font_path else "Helvetica", "I", 10)
     pdf.cell(w=0, h=10, text="Generado por Xavilu Network", align="C", ln=True)
     pdf.set_draw_color(0, 240, 255); pdf.line(10, pdf.get_y() + 5, 200, pdf.get_y() + 5); pdf.ln(15)
-    
+
     contenido_limpio = limpiar_texto_analisis(contenido)
     if not font_path: contenido_limpio = contenido_limpio.encode("latin-1", "replace").decode("latin-1")
     pdf.set_font("XaviFont" if font_path else "Helvetica", size=11)
-    
+
     for linea in contenido_limpio.split("\n"):
         linea = linea.strip()
         if not linea:
@@ -566,7 +593,7 @@ def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> by
         for fragmento in textwrap.wrap(linea, width=85, break_long_words=True, break_on_hyphens=True) or [""]:
             pdf.set_x(pdf.l_margin)
             pdf.multi_cell(w=0, h=6, text=fragmento)
-            
+
     resultado = pdf.output(dest="S")
     return resultado.encode("latin-1") if isinstance(resultado, str) else bytes(resultado)
 
@@ -701,20 +728,20 @@ def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str 
         else: voz_bytes = generar_audio_sincrono(limpiar_texto_para_voz(letra), voz1)
         if not voz_bytes: return None
         voz_audio = AudioSegment.from_file(BytesIO(voz_bytes), format="mp3")
-        
+
         mapeo_bases = {
-            "Bachata": "SoundHelix-Song-3", "Reggaeton": "SoundHelix-Song-1", "Pop": "SoundHelix-Song-2", 
-            "Rock": "SoundHelix-Song-7", "Rap": "SoundHelix-Song-4", "Cumbia": "SoundHelix-Song-2", 
-            "Balada": "SoundHelix-Song-3", "Electrónica": "SoundHelix-Song-8", "Rumba": "SoundHelix-Song-2", 
-            "Flamenco": "SoundHelix-Song-3", "Salsa": "SoundHelix-Song-2", "Merengue": "SoundHelix-Song-2", 
-            "Tango": "SoundHelix-Song-3", "Reggae": "SoundHelix-Song-5", "Metal": "SoundHelix-Song-7", 
-            "Jazz": "SoundHelix-Song-5", "Blues": "SoundHelix-Song-5", "Country": "SoundHelix-Song-7", 
-            "Clásica": "SoundHelix-Song-3", "Trap": "SoundHelix-Song-6", "Techno": "SoundHelix-Song-8", 
-            "Indie": "SoundHelix-Song-8", "Punk": "SoundHelix-Song-7", "Funk": "SoundHelix-Song-8", 
+            "Bachata": "SoundHelix-Song-3", "Reggaeton": "SoundHelix-Song-1", "Pop": "SoundHelix-Song-2",
+            "Rock": "SoundHelix-Song-7", "Rap": "SoundHelix-Song-4", "Cumbia": "SoundHelix-Song-2",
+            "Balada": "SoundHelix-Song-3", "Electrónica": "SoundHelix-Song-8", "Rumba": "SoundHelix-Song-2",
+            "Flamenco": "SoundHelix-Song-3", "Salsa": "SoundHelix-Song-2", "Merengue": "SoundHelix-Song-2",
+            "Tango": "SoundHelix-Song-3", "Reggae": "SoundHelix-Song-5", "Metal": "SoundHelix-Song-7",
+            "Jazz": "SoundHelix-Song-5", "Blues": "SoundHelix-Song-5", "Country": "SoundHelix-Song-7",
+            "Clásica": "SoundHelix-Song-3", "Trap": "SoundHelix-Song-6", "Techno": "SoundHelix-Song-8",
+            "Indie": "SoundHelix-Song-8", "Punk": "SoundHelix-Song-7", "Funk": "SoundHelix-Song-8",
             "Bossa Nova": "SoundHelix-Song-5"
         }
         track_elegido = mapeo_bases.get(estilo_base, "SoundHelix-Song-1")
-        
+
         r = requests.get(f"https://www.soundhelix.com/examples/mp3/{track_elegido}.mp3", headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
         if len(r.content) < 100_000: st.error("❌ No se pudo descargar la música."); return None
         base_audio = AudioSegment.from_file(BytesIO(r.content), format="mp3") - 14
@@ -724,25 +751,25 @@ def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str 
 
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="..."):
     if f"{key_prefix}_input" not in st.session_state: st.session_state[f"{key_prefix}_input"] = ""
-    
+
     def agregar_idea(idea):
         txt = st.session_state[f"{key_prefix}_input"].strip()
         st.session_state[f"{key_prefix}_input"] = f"{txt}\n\n{idea}" if txt else idea
         if f"{key_prefix}_sugs" in st.session_state: del st.session_state[f"{key_prefix}_sugs"]
 
     texto = st.text_area(label, key=f"{key_prefix}_input", placeholder=placeholder, height=100)
-    
+
     if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
         with st.spinner("Pensando..."):
             res = llamar_ia(modelo, f"Dame 3 ideas creativas para {contexto_ia}. Solo lista por líneas.", api_key)
             if "[ERROR" in res: st.error(mensaje_error_amigable(res))
             else: st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
-            
+
     if st.session_state.get(f"{key_prefix}_sugs"):
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
             with cols[i]: st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
-            
+
     return texto
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, widget_key=None):
@@ -799,7 +826,7 @@ if st.session_state.sidebar_visible:
             del st.session_state["rol"]
             st.rerun()
         st.markdown("---")
-        
+
         if st.session_state.get("rol") == "admin":
             try: st.image("logo.png", use_container_width=True)
             except: st.markdown("### 🪐 PANEL DE CONTROL")
@@ -818,6 +845,28 @@ if st.session_state.sidebar_visible:
                 st.session_state.api_key_deepseek_manual = st.text_input("DeepSeek", type="password", value=st.session_state.api_key_deepseek_manual)
                 st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
                 st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
+
+            # 🧪 NUEVO: Botón para probar la conexión con Gemini
+            if st.button("🧪 Probar conexión Gemini", use_container_width=True, key="btn_test_gemini"):
+                key_test = _get_key("gemini")
+                if not key_test:
+                    st.error("⚠️ No hay API Key de Gemini configurada.")
+                else:
+                    with st.spinner("Probando conexión..."):
+                        try:
+                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={key_test}"
+                            r = requests.post(url_test, json={"contents":[{"parts":[{"text":"Di solo: OK"}]}]}, timeout=30)
+                            if r.status_code == 200:
+                                try:
+                                    txt = r.json()['candidates'][0]['content']['parts'][0]['text']
+                                    st.success(f"✅ Conexión OK (HTTP 200). Respuesta: {txt[:80]}")
+                                except Exception:
+                                    st.success(f"✅ Conexión OK (HTTP 200) pero sin texto. JSON: {str(r.json())[:200]}")
+                            else:
+                                st.error(f"❌ HTTP {r.status_code}: {r.text[:400]}")
+                        except Exception as e:
+                            st.error(f"❌ {type(e).__name__}: {e}")
+
             st.markdown("---")
             st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
             st.markdown("---")
@@ -829,11 +878,11 @@ if st.session_state.sidebar_visible:
             _guia_bytes = generar_guia_pdf(version="1.0")
             guardar_descarga("Guia_Rapida_Xavilu.pdf", _guia_bytes)
             st.download_button("⚡ Descargar Guía Rápida (PDF)", _guia_bytes, "Guia_Rapida_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_guia_pdf")
-            
+
             _manual_sencillo_bytes = generar_manual_sencillo_pdf()
             guardar_descarga("Manual_Sencillo_Xavilu.pdf", _manual_sencillo_bytes)
             st.download_button("📘 Manual para Principiantes (PDF)", _manual_sencillo_bytes, "Manual_Sencillo_Xavilu.pdf", "application/pdf", use_container_width=True, key="dl_manual_sencillo")
-            
+
             st.link_button("💬 Compartir guía por WhatsApp", wa_url(MENSAJES_WA["guia"]), use_container_width=True)
             st.caption(f"📁 Copia en `{CARPETA_DESCARGAS}/`.")
 
@@ -1249,10 +1298,10 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-elif macro_idx == 4:
-    st.markdown("#### 🎬 Multimedia y Conversor PRO")
-    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    elif macro_idx == 4:
+        st.markdown("#### 🎬 Multimedia y Conversor PRO")
+        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
     if sub_idx == 0:
         st.markdown("### Generador de Imágenes")
         prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
@@ -1276,22 +1325,22 @@ elif macro_idx == 4:
     elif sub_idx == 2:
         st.markdown("### 🔄 Conversor Multiformato PRO")
         st.caption("Convierte audio, vídeo, extrae fotogramas, transcribe y más.")
-        
+
         tipo_conv = st.radio("¿Qué quieres hacer?", ["Convertir Audio", "Convertir Vídeo", "Extraer Audio de Vídeo", "Cortar/Recortar", "Transcribir a Texto", "Extraer Fotograma"], horizontal=True)
-        
+
         def procesar_ffmpeg(comando, nombre_defecto, extension, es_audio=False, es_video=False, es_imagen=False):
             with st.spinner("Procesando archivo..."):
                 try:
                     subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     with open(comando[-1], "rb") as f: res_bytes = f.read()
-                    
+
                     nuevo_nombre = st.text_input("📝 Renombrar archivo antes de descargar:", value=nombre_defecto)
                     nombre_limpio = re.sub(r'[^a-zA-Z0-9_\- ]', '', nuevo_nombre).strip().replace(" ", "_")
-                    
+
                     if es_audio: st.audio(res_bytes)
                     elif es_video: st.video(res_bytes)
                     elif es_imagen: st.image(res_bytes)
-                    
+
                     st.download_button(f"💾 Descargar {extension.upper()}", res_bytes, f"{nombre_limpio}.{extension}", use_container_width=True)
                 except Exception as e:
                     st.error(f"Error al procesar: {e}")
@@ -1309,7 +1358,7 @@ elif macro_idx == 4:
                 with open(tmp_in, "wb") as f: f.write(arch_audio.getvalue())
                 tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=f".{fmt_audio}").name
                 procesar_ffmpeg([FFMPEG_EXE, "-y", "-i", tmp_in, tmp_out], arch_audio.name.split('.')[0], fmt_audio, es_audio=True)
-                
+
         elif tipo_conv == "Convertir Vídeo":
             arch_video = st.file_uploader("Sube tu vídeo:", type=["mp4", "mov", "avi", "mkv", "webm"])
             fmt_video = st.selectbox("Formato de salida:", ["mp4", "avi", "mkv", "webm", "gif"])
@@ -1461,27 +1510,27 @@ elif macro_idx == 7:
     st.markdown("#### 🎵 Música y Arte")
     sub_names = ["🎤 LETRAS", "🌞 SUNO AI", "🖼️ PORTADAS", "📝 POESÍA"]
     sub_idx = custom_tabs(sub_names, "music_sub", 0)
-    
+
     if sub_idx == 0:
         st.markdown("### Generador de Letras")
         if "letra_edit" not in st.session_state: st.session_state.letra_edit = ""
-        
+
         tema_cancion = st.text_input("Tema (para la IA):", placeholder="Ej: Un desamor en verano...")
         c1, c2 = st.columns(2)
         with c1: genero = st.selectbox("Género:", ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"], key="gen_letra")
         with c2: artista_estilo = st.text_input("Estilo artista:", placeholder="Ej: Bad Bunny...", key="art_letra")
-        
+
         st.markdown("#### ⚙️ Ajustes de Voz y Música (Elige antes de generar)")
         hacer_dueto = st.checkbox("🎤 Hacer Dúo")
-        
+
         voces_disponibles = ["es-ES-ElviraNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"]
         bases_disponibles = ["Bachata", "Reggaeton", "Pop", "Rock", "Rap", "Cumbia", "Balada", "Electrónica", "Rumba", "Flamenco", "Salsa", "Merengue", "Tango", "Reggae", "Metal", "Jazz", "Blues", "Country", "Clásica", "Trap", "Techno", "Indie", "Punk", "Funk", "Bossa Nova"]
-        
+
         cv1, cv2, cb = st.columns(3)
         with cv1: voz_config1 = st.selectbox("Voz 1:", voces_disponibles, key="vc_v1")
-        with cv2: 
+        with cv2:
             if hacer_dueto: voz_config2 = st.selectbox("Voz 2:", voces_disponibles, index=1, key="vc_v2")
-            else: 
+            else:
                 voz_config2 = None
                 st.selectbox("Voz 2:", ["(Desactivado)"], disabled=True, key="vc_v2_off")
         with cb: base_config = st.selectbox("Base musical:", bases_disponibles, key="vc_base")
@@ -1499,22 +1548,22 @@ elif macro_idx == 7:
             st.markdown("---")
             letra_final = st.text_area("📜 Letra (Editable):", key="letra_edit", height=300)
             botones_descarga(letra_final, "Letra_Cancion")
-            
+
             st.markdown("### 🎵 Ponerle Música")
             st.info("💡 Puedes cambiar las voces o la base musical aquí abajo antes de generar el audio final.")
-            
+
             ca1, ca2, ca3 = st.columns(3)
-            with ca1: 
+            with ca1:
                 idx_v1 = voces_disponibles.index(voz_config1) if voz_config1 in voces_disponibles else 0
                 voz_final1 = st.selectbox("Voz 1 Final:", voces_disponibles, index=idx_v1, key="vf_v1")
-            with ca2: 
+            with ca2:
                 if hacer_dueto:
                     idx_v2 = voces_disponibles.index(voz_config2) if voz_config2 in voces_disponibles else 1
                     voz_final2 = st.selectbox("Voz 2 Final:", voces_disponibles, index=idx_v2, key="vf_v2")
-                else: 
+                else:
                     voz_final2 = None
                     st.selectbox("Voz 2 Final:", ["(Desactivado)"], disabled=True, key="vf_v2_off")
-            with ca3: 
+            with ca3:
                 idx_b = bases_disponibles.index(base_config) if base_config in bases_disponibles else 0
                 base_final = st.selectbox("Base Final:", bases_disponibles, index=idx_b, key="vf_base")
 
@@ -1561,7 +1610,7 @@ elif macro_idx == 7:
                 [Aquí va la letra en español con las etiquetas [Verse], [Chorus], [Bridge], etc.]
                 """
                 res = llamar_ia(modelo_seleccionado, prompt_ia, _get_key("gemini"))
-                if "[ERROR" in res: 
+                if "[ERROR" in res:
                     st.error(mensaje_error_amigable(res))
                 else:
                     st.success("✅ Prompt generado. Listo para copiar.")
@@ -1601,7 +1650,7 @@ elif macro_idx == 8:
     st.markdown("#### 🏢 Gestor de Comunidad PRO")
     sub_names = ["🚨 INCIDENCIAS", "📜 NORMATIVA", "🧾 ANALIZAR PRESUPUESTOS", "📊 ACTAS", "📝 CITACIONES"]
     sub_idx = custom_tabs(sub_names, "vecinos_sub", 0)
-    
+
     if sub_idx == 0:
         st.markdown("### 🚨 Gestión de Incidencias")
         c1, c2 = st.columns(2)
@@ -1618,7 +1667,7 @@ elif macro_idx == 8:
                 res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
-                
+
     elif sub_idx == 1:
         st.markdown("### 📜 Normativa y Leyes")
         consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, _get_key("gemini"), "Ej: ¿Puedo poner cámara en el rellano?")
@@ -1631,71 +1680,71 @@ elif macro_idx == 8:
     elif sub_idx == 2:
         st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
         st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. Los análisis se guardarán en la memoria hasta que reinicies o limpies.")
-        
+
         arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
-        
+
         instrucciones_extra = st.text_area(
-            "📝 ¿En qué quieres que se fije la IA? (Opcional):", 
-            placeholder="Ej: Céntrate en los plazos de entrega, busca si incluyen limpieza o gestión de escombros, revisa las garantías...", 
+            "📝 ¿En qué quieres que se fije la IA? (Opcional):",
+            placeholder="Ej: Céntrate en los plazos de entrega, busca si incluyen limpieza o gestión de escombros, revisa las garantías...",
             height=80
         )
-        
+
         c_btn1, c_btn2 = st.columns(2)
         with c_btn1:
             if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
                 resultados_individuales = []
                 progreso = st.progress(0)
                 status_text = st.empty()
-                
+
                 for i, arch in enumerate(arch_presupuestos):
                     status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
-                    
-                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto. 
+
+                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto.
                     Tu objetivo es redactar un INFORME PERICIAL Y DE EVALUACIÓN TÉCNICA de este presupuesto para proteger los intereses de la comunidad de vecinos.
-                    
+
                     IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
                     1. "empresa": (Solo el nombre corto de la empresa, ej: "Pinturas Pepe").
                     2. "analisis": (El informe técnico redactado en texto plano, estructurado y muy profesional).
-                    
+
                     En el texto del "analisis", DEBES seguir estrictamente esta estructura formal, usando guiones o números para las listas:
-                    
+
                     INFORME TÉCNICO DE EVALUACIÓN
-                    
+
                     1. RESUMEN EJECUTIVO: Un párrafo de 2 o 3 líneas con el veredicto general sobre la oferta (viabilidad, riesgos principales).
-                    
-                    2. ANÁLISIS ECONÓMICO: 
+
+                    2. ANÁLISIS ECONÓMICO:
                     - Precio Total y desglose del IVA (si lo lleva o está exento).
                     - Advertencia sobre posibles partidas ocultas, sobrecostes o falta de desglose.
-                    
+
                     3. CUMPLIMIENTO NORMATIVO Y LICENCIAS:
                     - Evaluación de las licencias de obra/actividad y tasas municipales. ¿Se encarga la empresa o lo deja a la comunidad?
-                    
+
                     4. SEGURIDAD Y SALUD (PRL) Y RESIDUOS:
                     - ¿Incluye Plan de Seguridad y Salud o Estudio Básico? (Obligatorio).
                     - ¿Se especifica la gestión y retirada de escombros/residuos?
-                    
+
                     5. PLAZOS Y GARANTÍAS:
                     - Plazos de ejecución.
                     - Garantías ofrecidas por escrito (seguro, años de garantía).
-                    
+
                     6. LA LETRA PEQUEÑA (PUNTOS CRÍTICOS):
                     - Lista de carencias, ambigüedades o cosas que NO incluye el presupuesto y que el presidente de la comunidad debería exigir antes de firmar.
-                    
+
                     7. RECOMENDACIONES DEL PERITO:
                     - 2 o 3 acciones concretas a tomar antes de contratar a esta empresa.
-                    
+
                     No añadas markdown extra (como asteriscos) ni símbolos raros. Redacta con un tono serio, formal y jurídico."""
-                    
+
                     if instrucciones_extra.strip():
                         prompt_individual += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA:\n{instrucciones_extra}\n"
-                    
+
                     try:
                         if arch.name.lower().endswith(".pdf"):
                             texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
                             res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", _get_key("gemini"))
                         else:
                             res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, _get_key("gemini"))
-                        
+
                         res_limpia = res.replace("```json", "").replace("```", "").strip()
                         try:
                             data_json = json.loads(res_limpia)
@@ -1704,72 +1753,72 @@ elif macro_idx == 8:
                         except json.JSONDecodeError:
                             nombre_empresa = arch.name
                             texto_analisis = res
-                        
+
                         status_text.text(f"Buscando reputación online de {nombre_empresa}...")
                         res_busqueda = buscar_en_internet(f"{nombre_empresa} opiniones trabajos realizados")
-                        
+
                         info_web = ""
                         if res_busqueda:
                             info_web = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_busqueda])
                             prompt_rep = f"Analiza la reputación de '{nombre_empresa}' basándote en estos resultados de búsqueda en internet:\n{info_web}\n\nDevuelve un resumen de máximo 3 líneas. Si no hay información clara o es de otra empresa, di 'No hay información relevante en internet'."
-                            
+
                             with st.spinner(f"Consultando web para {nombre_empresa}..."):
                                 rep_ia = llamar_ia(modelo_seleccionado, prompt_rep, _get_key("gemini"))
-                                
+
                             if "[ERROR" not in rep_ia:
                                 texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {rep_ia}"
                             else:
                                 texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {info_web[:300]}..."
                         else:
                             texto_analisis += "\n\n[REPUTACIÓN ONLINE]: No se encontraron resultados en internet."
-                            
+
                         resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
                     except Exception as e:
                         resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
-                    
+
                     progreso.progress((i + 1) / len(arch_presupuestos))
-                
+
                 status_text.text("✅ Análisis individual completado. Generando comparativa final...")
-                
+
                 if len(resultados_individuales) > 0:
                     texto_para_comparar = ""
                     for r in resultados_individuales:
                         texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
-                    
-                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior. 
+
+                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior.
                     Aquí tienes los informes periciales de {len(resultados_individuales)} presupuestos para una comunidad de vecinos:
-                    
+
                     {texto_para_comparar}
-                    
+
                     Tu tarea es redactar un INFORME COMPARATIVO FINAL EXTREMADAMENTE DETALLADO. No resumas demasiado. Sigue esta estructura exacta:
-                    
+
                     1. TABLA COMPARATIVA DETALLADA
                     Crea una tabla en Markdown con estas columnas: Proveedor, Presupuesto (€), IVA Desglosado (Sí/No), Licencias/PRL (Sí/No), Garantías (Sí/No), Valoración Técnica y Nivel de Riesgo (Bajo/Medio/Alto).
-                    
+
                     2. ANÁLISIS PORMENORIZADO POR EMPRESA
                     Haz un pequeño párrafo para cada empresa (usando su nombre como título). Explica qué ofrece, cuáles son sus puntos fuertes y qué carencias graves tiene respecto al resto.
-                    
+
                     3. ANÁLISIS DE RIESGOS (SEMÁFORO)
                     - RIESGOS CRÍTICOS: ¿Alguna empresa tiene un precio anormalmente bajo que sugiera "bicicleta" o falta de calidad? ¿Falta PRL obligatoria?
                     - RIESGOS MODERADOS: ¿Faltan detalles de garantías o licencias?
                     - PUNTOS A FAVOR: ¿Qué empresa da más confianza técnica?
-                    
+
                     4. RECOMENDACIÓN FINAL DEL PERITO
                     Explica con argumentos técnicos y jurídicos cuál es la mejor opción calidad/precio. Justifica si merece la pena pagar más por una empresa que cumpla estrictamente con la normativa.
-                    
+
                     5. ACCIONES ANTES DE FIRMAR
                     Lista de 3 a 5 exigencias que la comunidad debe pedir por escrito a la empresa ganadora antes de dar el visto bueno (ej: "Exigir el Plan de Seguridad y Salud", "Aclarar quién paga la tasa de escombros", etc.).
-                    
+
                     IMPORTANTE: Usa un tono formal, serio y profesional. No uses emojis ni símbolos raros. Formatea el texto para que sea fácil de leer en un PDF.
                     """
-                    
+
                     if instrucciones_extra.strip():
                         prompt_comparativa += f"\n\nINSTRUCCIONES ESPECÍFICAS DEL USUARIO A TENER EN CUENTA EN LA COMPARATIVA:\n{instrucciones_extra}\n"
-                    
+
                     res_comparativa = llamar_ia(modelo_seleccionado, prompt_comparativa, _get_key("gemini"))
                     status_text.empty()
                     progreso.empty()
-                    
+
                     if "[ERROR" not in res_comparativa:
                         st.session_state["presu_resultados"] = resultados_individuales
                         st.session_state["presu_comparativa"] = res_comparativa
@@ -1777,7 +1826,7 @@ elif macro_idx == 8:
                         st.rerun()
                     else:
                         st.error("Error al generar la comparativa final.")
-        
+
         with c_btn2:
             if st.session_state["presu_resultados"]:
                 if st.button("🗑️ Limpiar Análisis Guardados", use_container_width=True):
@@ -1796,7 +1845,7 @@ elif macro_idx == 8:
                 wa_url(MENSAJES_WA["presupuesto"]),
                 use_container_width=True,
             )
-            
+
             st.markdown("---")
             st.markdown("### 📂 Informes Periciales Individuales")
             for idx, r in enumerate(st.session_state["presu_resultados"]):
@@ -1807,7 +1856,7 @@ elif macro_idx == 8:
     elif sub_idx == 3:
         st.markdown("### 📊 Actas de Comunidad")
         tab_act = st.tabs(["📝 Crear Nueva", "🔍 Analizar / Preguntar"])
-        
+
         with tab_act[0]:
             puntos_dia = st.text_area("Puntos del día a tratar (uno por línea):", height=150)
             if st.button("📝 Redactar Acta", type="primary") and puntos_dia:
@@ -1816,34 +1865,34 @@ elif macro_idx == 8:
                     res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.text_area("Acta Redactada:", value=res, height=400); botones_descarga(res, "Acta_Comunidad")
-                    
+
         with tab_act[1]:
             st.markdown("Sube un acta (foto o PDF) y pregúntale a la IA lo que necesites.")
             arch_acta = st.file_uploader("Sube el documento:", type=["pdf", "jpg", "jpeg", "png"], key="up_acta")
             pregunta_acta = st.text_area("¿Qué quieres saber sobre esta acta?", placeholder="Ej: Resume los acuerdos, ¿qué se aprobó sobre la derrama?, mejora la redacción...", height=100)
-            
+
             if arch_acta and st.button("🔍 Analizar Documento", type="primary", key="btn_analizar_acta"):
                 with st.spinner("Analizando el documento..."):
                     prompt_analisis = f"""Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).
                     IMPORTANTE: Responde de forma clara y concisa a la instrucción del usuario. No inventes información que no esté en el documento.
-                    
+
                     INSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}
                     """
-                    
+
                     if arch_acta.name.lower().endswith(".pdf"):
                         res = analizar_archivo_con_gemini(arch_acta.getvalue(), "application/pdf", prompt_analisis, _get_key("gemini"))
                     else:
                         res = analizar_archivo_con_gemini(arch_acta.getvalue(), "image/jpeg", prompt_analisis, _get_key("gemini"))
-                        
+
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else: 
+                    else:
                         st.markdown(res)
                         botones_descarga(res, "Analisis_Acta", formatos_extra=True)
 
     elif sub_idx == 4:
         st.markdown("### 📝 Citaciones y Notificaciones")
         tab_cit = st.tabs(["📝 Crear Nueva", "🔍 Analizar / Preguntar"])
-        
+
         with tab_cit[0]:
             motivo = st.text_input("Motivo de la citación:", placeholder="Ej: Reunión extraordinaria por derrama...")
             fecha_hora = st.text_input("Fecha y Hora:", placeholder="Ej: 15 de Noviembre a las 19:00h")
@@ -1854,36 +1903,36 @@ elif macro_idx == 8:
                     res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Vecinos")
-                    
+
         with tab_cit[1]:
             st.markdown("Sube una citación o notificación (foto o PDF) para que la IA la revise en busca de defectos de forma o errores legales.")
             arch_citacion = st.file_uploader("Sube el documento:", type=["pdf", "jpg", "jpeg", "png"], key="up_citacion")
             pregunta_cit = st.text_area("¿Qué quieres saber sobre esta citación?", placeholder="Ej: ¿Falta el orden del día?, ¿Es válida legalmente?, redáctala de nuevo corrigiendo errores...", height=100)
-            
+
             if arch_citacion and st.button("🔍 Revisar Documento", type="primary", key="btn_analizar_cit"):
                 with st.spinner("Analizando el documento..."):
                     prompt_revision = f"""Actúa como un Administrador de Fincas y Abogado experto en propiedad horizontal en España.
-                    Tu objetivo es revisar la siguiente citación. 
-                    
+                    Tu objetivo es revisar la siguiente citación.
+
                     INSTRUCCIÓN DEL USUARIO: {pregunta_cit if pregunta_cit.strip() else 'Analiza los defectos de forma y propón una versión corregida.'}
-                    
+
                     REGLAS ESTRICTAS:
                     1. NO TE INVENTES FALLOS. Si el documento tiene fecha, hora, lugar y orden del día, indica que es correcto.
                     2. Si el usuario te ha pedido algo concreto, responde a eso.
                     3. Si propones una versión corregida, usa exactamente los datos que aparecen en el documento.
-                    
+
                     Estructura tu respuesta así:
                     VEREDICTO: (Es válido o tiene fallos reales)
                     ANÁLISIS DE FORMA: (Puntos clave que sí tiene o que faltan de verdad)
                     PROPUESTA DE MEJORA: (Si es necesario, redacta la versión final con los datos del documento)
                     """
-                    
+
                     if arch_citacion.name.lower().endswith(".pdf"):
                         res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "application/pdf", prompt_revision, _get_key("gemini"))
                     else:
                         res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, _get_key("gemini"))
-                        
+
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else: 
+                    else:
                         st.markdown(res)
-                        botones_descarga(res, "Revision_Citacion", formatos_extra=True)
+                        botones_descarga(res, "Revision_Citacion", formatos_extra=True)        
