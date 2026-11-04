@@ -8,7 +8,7 @@ from openpyxl.styles import Font
 from pptx import Presentation
 from pptx.util import Inches
 from io import BytesIO
-import textwrap
+import textwrapa
 from PIL import Image
 from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
