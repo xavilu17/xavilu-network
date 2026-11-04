@@ -26,6 +26,18 @@ except ImportError: FFMPEG_EXE = "ffmpeg"
 
 try: import cv2; HAS_CV2 = True
 except ImportError: HAS_CV2 = False
+try:
+    import pymupdf as fitz  # PyMuPDF: extrae texto y rasteriza páginas para OCR
+    HAS_PYMUPDF = True
+except ImportError:
+    fitz = None
+    HAS_PYMUPDF = False
+try:
+    from rapidocr import RapidOCR
+    HAS_RAPIDOCR = True
+except ImportError:
+    RapidOCR = None
+    HAS_RAPIDOCR = False
 try: import yt_dlp; HAS_YTDLP = True
 except ImportError: HAS_YTDLP = False
 try: from ddgs import DDGS
@@ -400,12 +412,66 @@ def url_segura(url: str) -> bool:
         return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
     except: return False
 
+@st.cache_resource(show_spinner=False)
+def obtener_motor_ocr():
+    """Carga RapidOCR una sola vez; funciona localmente sin enviar el PDF a terceros."""
+    if not HAS_RAPIDOCR:
+        return None
+    return RapidOCR()
+
+def extraer_texto_pdf(pdf_bytes: bytes, max_paginas_ocr: int = 60) -> str:
+    """Extrae texto con pypdf/PyMuPDF y aplica OCR local a páginas escaneadas."""
+    if not pdf_bytes:
+        return ""
+    reader = pypdf.PdfReader(BytesIO(pdf_bytes))
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf") if HAS_PYMUPDF else None
+    except Exception:
+        doc = None
+
+    salida = []
+    motor_ocr = None
+    paginas_ocr = 0
+    for indice, pagina in enumerate(reader.pages):
+        texto_pypdf = (pagina.extract_text() or "").strip()
+        texto_fitz = ""
+        if doc is not None and indice < len(doc):
+            try:
+                texto_fitz = doc[indice].get_text("text").strip()
+            except Exception:
+                pass
+        # Conserva el extractor que haya recuperado más contenido útil.
+        texto = max((texto_pypdf, texto_fitz), key=lambda t: len(re.sub(r"\s+", "", t)))
+        compacto = len(re.sub(r"\s+", "", texto))
+
+        if compacto < 80 and doc is not None and HAS_RAPIDOCR and paginas_ocr < max_paginas_ocr:
+            try:
+                if motor_ocr is None:
+                    motor_ocr = obtener_motor_ocr()
+                pix = doc[indice].get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False)
+                imagen = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                resultado = motor_ocr(imagen)
+                textos_ocr = getattr(resultado, "txts", None) or []
+                texto_ocr = "\n".join(str(t).strip() for t in textos_ocr if str(t).strip()).strip()
+                paginas_ocr += 1
+                if len(re.sub(r"\s+", "", texto_ocr)) > compacto:
+                    texto = texto_ocr
+            except Exception:
+                # Una página problemática no impide recuperar el resto del documento.
+                paginas_ocr += 1
+
+        if texto:
+            salida.append(f"--- Página {indice + 1} ---\n{texto}")
+    if doc is not None:
+        doc.close()
+    return "\n\n".join(salida).strip()
+
 def leer_archivo_universal(upload, modelo_ia: str) -> str:
     if upload.size > MAX_FILE_MB * 1024 * 1024: return ""
     nombre = upload.name.lower()
     try:
         if nombre.endswith(".txt"): return upload.read().decode("utf-8", errors="ignore")
-        if nombre.endswith(".pdf"): return "\n".join(p.extract_text() for p in pypdf.PdfReader(BytesIO(upload.getvalue())).pages if p.extract_text())
+        if nombre.endswith(".pdf"): return extraer_texto_pdf(upload.getvalue())
         if nombre.endswith(".docx"): return "\n".join(p.text for p in Document(upload).paragraphs if p.text)
         if nombre.endswith(".xlsx"): return "\n\n".join(f"=== {s} ===\n{d.to_csv(index=False)}" for s, d in pd.read_excel(upload, sheet_name=None).items())
     except Exception as e: st.warning(f"No pude leer '{upload.name}': {e}")
@@ -612,6 +678,25 @@ def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, m
     detalle = " | ".join(errores_detalle[-3:]) if errores_detalle else "Sin detalles"
     return f"[ERROR GEMINI] Todos los intentos fallaron. Detalles: {detalle}"
 
+def motivo_fallo_documento(res: str) -> str:
+    """Diagnóstico breve para la interfaz; no se incorpora al informe descargable."""
+    t = str(res or "").casefold()
+    if "no contiene texto seleccionable" in t:
+        if not HAS_PYMUPDF or not HAS_RAPIDOCR:
+            return "No se pudo extraer texto del PDF. El lector OCR local no está instalado o no pudo iniciarse; reinstala las dependencias del proyecto y vuelve a intentarlo."
+        return "Ni la extracción de texto ni el OCR local recuperaron contenido. Puede ser un PDF protegido, dañado, contener páginas en blanco o tener una calidad de imagen muy baja."
+    if "no se pudo extraer texto del pdf" in t:
+        return "El PDF abrió, pero falló la extracción. Puede estar protegido, dañado o usar una estructura poco compatible; vuelve a guardarlo como PDF y reintenta."
+    if "429" in t or "cuota" in t or "resource_exhausted" in t:
+        return "Gemini alcanzó su cuota y los proveedores de respaldo no completaron el análisis. Revisa la conexión y que DEEPSEEK_API_KEY esté disponible en st.secrets; inténtalo más tarde."
+    if "ollama" in t or "localhost:11434" in t:
+        return "No respondió Ollama. Comprueba que esté abierto y que el modelo seleccionado esté descargado."
+    if "api key" in t or "api_key" in t or "401" in t or "403" in t:
+        return "Falló la autenticación de un proveedor de IA. Revisa las claves de st.secrets."
+    if "timeout" in t or "tiempo" in t:
+        return "La lectura o el proveedor tardó demasiado. Reintenta; si vuelve a ocurrir, prueba con menos páginas."
+    return "Falló el análisis automático. El archivo se omitió del informe. Comprueba si puedes seleccionar texto y vuelve a intentarlo."
+
 def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str, modelo_local: str = "llama3.2:latest") -> str:
     """Analiza adjuntos con Gemini y usa proveedores de texto/Ollama como respaldo para PDF legible."""
     error_gemini = "[ERROR] No se pudo usar Gemini."
@@ -623,8 +708,7 @@ def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: st
 
     if mime_type == "application/pdf":
         try:
-            paginas = pypdf.PdfReader(BytesIO(archivo_bytes)).pages
-            texto = "\n\n".join((pagina.extract_text() or "") for pagina in paginas).strip()
+            texto = extraer_texto_pdf(archivo_bytes)
         except Exception as e:
             return f"{error_gemini}\nNo se pudo extraer texto del PDF: {e}"
 
@@ -2168,7 +2252,7 @@ FUENTES OFICIALES RECUPERADAS EN DIRECTO:
                             res = analizar_archivo_con_gemini(arch.getvalue(), mime, prompt_analisis, _get_key("gemini"), modelo_local=modelo_seleccionado)
                         
                         if "[ERROR" in res:
-                            errores_documentos.append(arch.name)
+                            errores_documentos.append((arch.name, motivo_fallo_documento(res)))
                         else:
                             resultados_combinados.append(f"### Análisis de: {arch.name}\n\n{res.strip()}")
                             
@@ -2178,8 +2262,8 @@ FUENTES OFICIALES RECUPERADAS EN DIRECTO:
                     st.session_state["acta_analisis_errores"] = errores_documentos
                     progreso.empty()
 
-            for nombre_error in st.session_state.get("acta_analisis_errores", []):
-                st.warning(f"No se pudo analizar {nombre_error}. Se omitió del informe; comprueba si el PDF tiene texto seleccionable o inténtalo más tarde.")
+            for nombre_error, motivo_error in st.session_state.get("acta_analisis_errores", []):
+                st.warning(f"No se pudo analizar {nombre_error}. Se omitió del informe. Motivo: {motivo_error}")
 
             if st.session_state.get("acta_analisis_res"):
                 st.markdown(st.session_state["acta_analisis_res"])
