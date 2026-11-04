@@ -1304,13 +1304,13 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-     elif macro_idx == 4:
-    st.markdown("#### 🎬 Multimedia y Conversor PRO")
-    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
-    if sub_idx == 0:
-        st.markdown("### Generador de Imágenes")
-        prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
+    elif macro_idx == 4:
+        st.markdown("#### 🎬 Multimedia y Conversor PRO")
+        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+        if sub_idx == 0:
+                st.markdown("### Generador de Imágenes")
+                prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
         if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
             with st.spinner("Generando..."):
                 try:
