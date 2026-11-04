@@ -8,7 +8,7 @@ from openpyxl.styles import Font
 from pptx import Presentation
 from pptx.util import Inches
 from io import BytesIO
-import textwrapa
+import textwrap
 from PIL import Image
 from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
@@ -1304,7 +1304,7 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-                elif macro_idx == 4:
+     elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
@@ -1961,4 +1961,4 @@ elif macro_idx == 8:
 
             if st.session_state.get("citacion_res"):
                 st.markdown(st.session_state["citacion_res"])
-                botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)
+                botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)           
