@@ -430,17 +430,25 @@ def transcribir_archivo_local(archivo_bytes: bytes, nombre_archivo: str, api_key
             except: pass
 
 def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
-    with st.expander("📎 Adjuntar archivo (Opcional)"):
-        archivo = st.file_uploader("Sube PDF, Word, TXT o Imagen", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"], key=f"adj_{key_suffix}")
-        if not archivo: return ""
-        if archivo.name.lower().endswith((".png", ".jpg", ".jpeg")):
-            with st.spinner("Analizando imagen..."): ctx = analizar_archivo_con_gemini(archivo.getvalue(), "image/jpeg", "Describe esta imagen o extrae el texto (OCR).", api_key)
-            st.success("✅ Imagen leída."); return f"\n[TEXTO DE IMAGEN]:\n{ctx}\n"
-        texto = leer_archivo_universal(archivo, modelo)
-        st.success(f"✅ Archivo '{archivo.name}' leído."); return f"\n[CONTENIDO DE '{archivo.name}']:\n{texto[:10000]}\n"
+    with st.expander("📎 Adjuntar archivo(s) (Opcional)"):
+        archivos = st.file_uploader("Sube PDF, Word, TXT o Imagen (puedes seleccionar varios)", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"], accept_multiple_files=True, key=f"adj_{key_suffix}")
+        if not archivos: return ""
+        
+        contexto_total = ""
+        for i, archivo in enumerate(archivos):
+            if archivo.name.lower().endswith((".png", ".jpg", ".jpeg")):
+                with st.spinner(f"Analizando imagen {i+1}/{len(archivos)}..."):
+                    ctx = analizar_archivo_con_gemini(archivo.getvalue(), "image/jpeg", "Describe esta imagen o extrae el texto (OCR).", api_key)
+                    contexto_total += f"\n[TEXTO DE IMAGEN {i+1} - {archivo.name}]:\n{ctx}\n"
+            else:
+                texto = leer_archivo_universal(archivo, modelo)
+                contexto_total += f"\n[CONTENIDO DE '{archivo.name}']:\n{texto[:10000]}\n"
+        
+        st.success(f"✅ {len(archivos)} archivo(s) leído(s) correctamente.")
+        return contexto_total
 
 # ============================================================
-# ⚡ CONEXIÓN DIRECTA A GEMINI (v2 - con diagnóstico real)
+# ⚡ CONEXIÓN DIRECTA A GEMINI (Modelos ACTUALIZADOS)
 # ============================================================
 def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, mime_type: str = None) -> str:
     if not api_key or len(api_key.strip()) < 15:
@@ -448,12 +456,13 @@ def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, m
 
     api_key = api_key.strip()
 
+    # Modelos actualizados para evitar el error 404
     combinaciones = [
-        ("v1beta", "gemini-1.5-flash"),
-        ("v1beta", "gemini-2.0-flash-exp"),
-        ("v1beta", "gemini-1.5-pro"),
-        ("v1",     "gemini-1.5-flash-001"),
-        ("v1",     "gemini-1.5-pro-001"),
+        ("v1beta", "gemini-1.5-flash-latest"),
+        ("v1beta", "gemini-2.0-flash"),
+        ("v1beta", "gemini-1.5-pro-latest"),
+        ("v1beta", "gemini-1.5-flash-8b"),
+        ("v1beta", "gemini-1.5-flash")
     ]
 
     errores_detalle = []
@@ -752,11 +761,9 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
     if f"{key_prefix}_input" not in st.session_state: st.session_state[f"{key_prefix}_input"] = ""
     if f"{key_prefix}_sugs" not in st.session_state: st.session_state[f"{key_prefix}_sugs"] = []
 
-    # 1. El usuario escribe su idea
     texto = st.text_area(label, key=f"{key_prefix}_input", placeholder=placeholder, height=100)
 
-    # 2. Botones de acción
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("💡 3 Ideas IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
             with st.spinner("Pensando..."):
@@ -778,8 +785,11 @@ def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder
                         st.session_state[f"{key_prefix}_input"] = res
                         st.session_state[f"{key_prefix}_sugs"] = []
                         st.rerun()
+    with c3:
+        if st.button("✍️ Usar mi idea", key=f"{key_prefix}_btn_use", use_container_width=True):
+            st.session_state[f"{key_prefix}_sugs"] = []
+            st.rerun()
 
-    # 3. Mostrar ideas IA
     if st.session_state[f"{key_prefix}_sugs"]:
         st.caption("👉 Haz clic en una idea para reemplazar tu texto, o pulsa 'Mezclar' para fusionarla:")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
@@ -866,7 +876,7 @@ if st.session_state.sidebar_visible:
                 st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
                 st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
 
-            # 🧪 Botón para probar la conexión con Gemini
+            # 🧪 Botón para probar la conexión con Gemini (con modelo actualizado)
             if st.button("🧪 Probar conexión Gemini", use_container_width=True, key="btn_test_gemini"):
                 key_test = _get_key("gemini")
                 if not key_test:
@@ -874,7 +884,7 @@ if st.session_state.sidebar_visible:
                 else:
                     with st.spinner("Probando conexión..."):
                         try:
-                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key_test}"
+                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={key_test}"
                             r = requests.post(url_test, json={"contents":[{"parts":[{"text":"Di solo: OK"}]}]}, timeout=30)
                             if r.status_code == 200:
                                 try:
@@ -1067,7 +1077,10 @@ elif macro_idx == 1:
         st.markdown("#### Chat con PDFs")
         archs = st.file_uploader("Docs:", type=["pdf","txt","docx"], accept_multiple_files=True)
         if archs:
-            texto = "".join([leer_archivo_universal(a, modelo_seleccionado) for a in archs])[:MAX_TEXTO_IA]
+            texto = ""
+            for a in archs:
+                texto += f"\n--- {a.name} ---\n" + leer_archivo_universal(a, modelo_seleccionado)
+            texto = texto[:MAX_TEXTO_IA]
             st.success("Cargados.")
             for m in st.session_state.pdf_chat_history: st.chat_message(m["role"]).write(m["content"])
             p = chat_input_pro("pdf")
@@ -1149,11 +1162,14 @@ elif macro_idx == 2:
     sub_idx = custom_tabs(sub_names, "doc_sub", 0)
     if sub_idx == 0:
         st.markdown("#### Análisis")
-        arch = st.file_uploader("PDF, Word, Excel o TXT", type=["pdf","txt","docx","xlsx"])
+        archs = st.file_uploader("PDF, Word, Excel o TXT (Puedes subir varios)", type=["pdf","txt","docx","xlsx"], accept_multiple_files=True)
         opc = st.selectbox("Análisis:", ["Resumen Ejecutivo","Extraer Fechas y Cifras","Buscar Errores","Crear Test","Traducir al Inglés"])
-        if arch and st.button("🔎 Ejecutar", type="primary"):
+        if archs and st.button("🔎 Ejecutar", type="primary"):
             with st.spinner("Analizando..."):
-                texto = leer_archivo_universal(arch, modelo_seleccionado)
+                texto = ""
+                for a in archs:
+                    texto += f"\n--- DOCUMENTO: {a.name} ---\n" + leer_archivo_universal(a, modelo_seleccionado)
+                
                 prompt = {"Resumen Ejecutivo": f"Resumen:\n{texto}", "Extraer Fechas y Cifras": f"Fechas:\n{texto}", "Buscar Errores": f"Errores:\n{texto}", "Crear Test": f"Test 5 preguntas:\n{texto}", "Traducir al Inglés": f"Traduce al inglés:\n{texto}"}[opc]
                 res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
@@ -1210,18 +1226,23 @@ elif macro_idx == 2:
             st.markdown("---"); botones_descarga(st.session_state.pdf_borrador, titulo or "PDF_Pro")
     elif sub_idx == 4:
         st.markdown("#### 🧾 Facturas")
-        arch_factura = st.file_uploader("Factura (JPG/PNG/PDF):", type=["jpg","jpeg","png","pdf"])
-        if st.button("🪄 Extraer", type="primary") and arch_factura:
+        archs_factura = st.file_uploader("Factura(s) (JPG/PNG/PDF):", type=["jpg","jpeg","png","pdf"], accept_multiple_files=True)
+        if st.button("🪄 Extraer", type="primary") and archs_factura:
             with st.spinner("Escaneando..."):
                 prompt_factura = "Extrae datos. Devuelve CSV: Proveedor, Fecha, Concepto, Base_Imponible, IVA, Total. Sin markdown."
-                if arch_factura.name.lower().endswith(".pdf"):
-                    texto_pdf = leer_archivo_universal(arch_factura, modelo_seleccionado)
-                    res = llamar_ia(modelo_seleccionado, f"{prompt_factura}\n\n{texto_pdf}", _get_key("gemini"))
-                else: res = analizar_archivo_con_gemini(arch_factura.getvalue(), "image/jpeg", prompt_factura, _get_key("gemini"))
-                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                resultados_totales = ""
+                for a in archs_factura:
+                    if a.name.lower().endswith(".pdf"):
+                        texto_pdf = leer_archivo_universal(a, modelo_seleccionado)
+                        res = llamar_ia(modelo_seleccionado, f"{prompt_factura}\n\n{texto_pdf}", _get_key("gemini"))
+                    else:
+                        res = analizar_archivo_con_gemini(a.getvalue(), "image/jpeg", prompt_factura, _get_key("gemini"))
+                    resultados_totales += f"\n[Factura: {a.name}]\n{res}\n"
+                
+                if "[ERROR" in resultados_totales: st.error(mensaje_error_amigable(resultados_totales))
                 else:
-                    st.success("✅ Listo."); st.text_area("Datos:", value=res, height=150, key="factura_data")
-                    st.download_button("📊 Excel", generar_excel(st.session_state.factura_data), "factura.xlsx", use_container_width=True)
+                    st.success("✅ Listo."); st.text_area("Datos:", value=resultados_totales, height=150, key="factura_data")
+                    st.download_button("📊 Excel", generar_excel(st.session_state.factura_data), "facturas.xlsx", use_container_width=True)
     elif sub_idx == 5:
         c1, c2 = st.columns(2)
         with c1:
@@ -1305,12 +1326,12 @@ elif macro_idx == 3:
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
     elif macro_idx == 4:
-        st.markdown("#### 🎬 Multimedia y Conversor PRO")
-        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
-        if sub_idx == 0:
-                st.markdown("### Generador de Imágenes")
-                prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
+    st.markdown("#### 🎬 Multimedia y Conversor PRO")
+    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+    if sub_idx == 0:
+        st.markdown("### Generador de Imágenes")
+        prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
         if st.button("🖼️ Generar Imagen", type="primary") and prompt_img:
             with st.spinner("Generando..."):
                 try:
@@ -1885,29 +1906,40 @@ elif macro_idx == 8:
                 botones_descarga(st.session_state["acta_crear_res"], "Acta_Comunidad")
 
         with tab_act[1]:
-            st.markdown("Sube un acta (foto o PDF) y pregúntale a la IA lo que necesites.")
-            arch_acta = st.file_uploader("Sube el documento:", type=["pdf", "jpg", "jpeg", "png"], key="up_acta")
-            pregunta_acta = st.text_area("¿Qué quieres saber sobre esta acta?", placeholder="Ej: Resume los acuerdos, ¿qué se aprobó sobre la derrama?, mejora la redacción...", height=100)
+            st.markdown("Sube una o varias actas (fotos o PDFs) y pregúntale a la IA lo que necesites.")
+            archs_acta = st.file_uploader("Sube los documentos (puedes seleccionar varios):", type=["pdf", "jpg", "jpeg", "png"], accept_multiple_files=True, key="up_acta")
+            pregunta_acta = st.text_area("¿Qué quieres saber sobre estas actas?", placeholder="Ej: Resume los acuerdos, ¿qué se aprobó sobre la derrama?, mejora la redacción...", height=100)
 
-            if arch_acta and st.button("🔍 Analizar Documento", type="primary", key="btn_analizar_acta"):
-                with st.spinner("Analizando el documento..."):
+            if archs_acta and st.button("🔍 Analizar Documentos", type="primary", key="btn_analizar_acta"):
+                with st.spinner("Analizando los documentos..."):
                     prompt_analisis = f"""Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).
                     IMPORTANTE: Responde de forma clara y concisa a la instrucción del usuario. No inventes información que no esté en el documento.
 
                     INSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}
                     """
-
-                    if arch_acta.name.lower().endswith(".pdf"):
-                        res = analizar_archivo_con_gemini(arch_acta.getvalue(), "application/pdf", prompt_analisis, _get_key("gemini"))
-                    else:
-                        res = analizar_archivo_con_gemini(arch_acta.getvalue(), "image/jpeg", prompt_analisis, _get_key("gemini"))
-
-                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else: st.session_state["acta_analisis_res"] = res
+                    
+                    resultados_combinados = ""
+                    progreso = st.progress(0)
+                    
+                    for i, arch in enumerate(archs_acta):
+                        if arch.name.lower().endswith(".pdf"):
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "application/pdf", prompt_analisis, _get_key("gemini"))
+                        else:
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_analisis, _get_key("gemini"))
+                        
+                        if "[ERROR" in res:
+                            resultados_combinados += f"\n\n--- ERROR EN: {arch.name} ---\n{res}\n"
+                        else:
+                            resultados_combinados += f"\n\n--- ANÁLISIS DE: {arch.name} ---\n{res}\n"
+                            
+                        progreso.progress((i + 1) / len(archs_acta))
+                        
+                    st.session_state["acta_analisis_res"] = resultados_combinados
+                    progreso.empty()
 
             if st.session_state.get("acta_analisis_res"):
                 st.markdown(st.session_state["acta_analisis_res"])
-                botones_descarga(st.session_state["acta_analisis_res"], "Analisis_Acta", formatos_extra=True)
+                botones_descarga(st.session_state["acta_analisis_res"], "Analisis_Actas", formatos_extra=True)
 
     elif sub_idx == 4:
         st.markdown("### 📝 Citaciones y Notificaciones")
@@ -1961,4 +1993,4 @@ elif macro_idx == 8:
 
             if st.session_state.get("citacion_res"):
                 st.markdown(st.session_state["citacion_res"])
-                botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)           
+                botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)        
