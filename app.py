@@ -137,7 +137,7 @@ def generar_manual_sencillo_pdf() -> bytes:
 
     pdf.set_font(font_name, "", 12)
     intro = ("Imagina que tienes una oficina entera dentro de tu ordenador. Xavilu Network es una aplicacion "
-             "que reune a los mejores asistentes virtuales (Inteligencias Artificiales) para ayudarte con las "
+             "que reune a los mejores asistentes virtuales (Inteligencia Artificial) para ayudarte con las "
              "tareas del dia a dia, los deberes, el trabajo o para crear musica. Todo desde una sola pantalla.")
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(w=ancho_util, h=7, text=intro)
@@ -443,16 +443,17 @@ def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
 # ⚡ CONEXIÓN DIRECTA A GEMINI (v2 - con diagnóstico real)
 # ============================================================
 def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, mime_type: str = None) -> str:
-    # 1. Validación previa de la key
     if not api_key or len(api_key.strip()) < 15:
         return "[ERROR GEMINI] No hay API Key configurada o es demasiado corta. Añádela en el panel lateral o en st.secrets como GEMINI_API_KEY."
 
     api_key = api_key.strip()
 
-    # 2. Orden de intentos: v1beta primero (modelos accesibles), v1 como fallback
     combinaciones = [
-        ("v1beta", "gemini-3.8-flash"),
-        ("v1beta", "gemini-3.6-flash"),
+        ("v1beta", "gemini-1.5-flash"),
+        ("v1beta", "gemini-2.0-flash-exp"),
+        ("v1beta", "gemini-1.5-pro"),
+        ("v1",     "gemini-1.5-flash-001"),
+        ("v1",     "gemini-1.5-pro-001"),
     ]
 
     errores_detalle = []
@@ -486,10 +487,8 @@ def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, m
             else:
                 txt_err = response.text[:250]
                 errores_detalle.append(f"{version}/{modelo}: HTTP {response.status_code} -> {txt_err}")
-                # Si la key es inválida o sin permisos, no perder tiempo probando más modelos
                 if response.status_code in (401, 403) or "API_KEY_INVALID" in txt_err or "API key not valid" in txt_err:
                     return f"[ERROR GEMINI] API Key inválida o sin permisos. HTTP {response.status_code}. Detalle: {txt_err}"
-                # Si es 429 (cuota), tampoco tiene sentido seguir
                 if response.status_code == 429:
                     return f"[ERROR GEMINI] Cuota agotada (HTTP 429). Espera un poco o usa otro proveedor. Detalle: {txt_err}"
         except requests.exceptions.Timeout:
@@ -751,26 +750,47 @@ def generar_cancion_con_base(letra: str, voz1: str, estilo_base: str, voz2: str 
 
 def campo_con_ideas(label, key_prefix, contexto_ia, modelo, api_key, placeholder="..."):
     if f"{key_prefix}_input" not in st.session_state: st.session_state[f"{key_prefix}_input"] = ""
+    if f"{key_prefix}_sugs" not in st.session_state: st.session_state[f"{key_prefix}_sugs"] = []
 
-    def agregar_idea(idea):
-        txt = st.session_state[f"{key_prefix}_input"].strip()
-        st.session_state[f"{key_prefix}_input"] = f"{txt}\n\n{idea}" if txt else idea
-        if f"{key_prefix}_sugs" in st.session_state: del st.session_state[f"{key_prefix}_sugs"]
-
+    # 1. El usuario escribe su idea
     texto = st.text_area(label, key=f"{key_prefix}_input", placeholder=placeholder, height=100)
 
-    if st.button("💡 Generar Ideas con IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
-        with st.spinner("Pensando..."):
-            res = llamar_ia(modelo, f"Dame 3 ideas creativas para {contexto_ia}. Solo lista por líneas.", api_key)
-            if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-            else: st.session_state[f"{key_prefix}_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
+    # 2. Botones de acción
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("💡 3 Ideas IA", key=f"{key_prefix}_btn_ideas", use_container_width=True):
+            with st.spinner("Pensando..."):
+                res = llamar_ia(modelo, f"Dame 3 ideas creativas y concisas para {contexto_ia}. Solo lista por líneas.", api_key)
+                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                else:
+                    st.session_state[f"{key_prefix}_sugs"] = [re.sub(r'^[\-\*\d\.]+\s*', '', l).strip() for l in res.split("\n") if len(l.strip()) > 5][:3]
+    with c2:
+        if st.button("🧬 Mezclar con IA", key=f"{key_prefix}_btn_mix", use_container_width=True):
+            if not texto.strip() and not st.session_state[f"{key_prefix}_sugs"]:
+                st.warning("Escribe algo o genera ideas IA primero.")
+            else:
+                with st.spinner("Fusionando ideas..."):
+                    ideas_ia = ", ".join(st.session_state[f"{key_prefix}_sugs"]) if st.session_state[f"{key_prefix}_sugs"] else "Ninguna (usa tu creatividad)"
+                    prompt_mix = f"Mi idea base es: '{texto}'.\nIdeas de la IA: {ideas_ia}.\n\nFusiona todo en un único prompt o idea final mucho más detallada, profesional y creativa. Devuelve SOLO el texto final, sin introducciones ni saludos."
+                    res = llamar_ia(modelo, prompt_mix, api_key)
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else:
+                        st.session_state[f"{key_prefix}_input"] = res
+                        st.session_state[f"{key_prefix}_sugs"] = []
+                        st.rerun()
 
-    if st.session_state.get(f"{key_prefix}_sugs"):
+    # 3. Mostrar ideas IA
+    if st.session_state[f"{key_prefix}_sugs"]:
+        st.caption("👉 Haz clic en una idea para reemplazar tu texto, o pulsa 'Mezclar' para fusionarla:")
         cols = st.columns(len(st.session_state[f"{key_prefix}_sugs"]))
         for i, idea in enumerate(st.session_state[f"{key_prefix}_sugs"]):
-            with cols[i]: st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True, on_click=agregar_idea, args=(idea,))
+            with cols[i]:
+                if st.button(idea, key=f"{key_prefix}_idea_{i}", use_container_width=True):
+                    st.session_state[f"{key_prefix}_input"] = idea
+                    st.session_state[f"{key_prefix}_sugs"] = []
+                    st.rerun()
 
-    return texto
+    return st.session_state[f"{key_prefix}_input"]
 
 def boton_superpoder_borrador(texto_base, instruccion, key_suffix, modelo, api_key, state_key, widget_key=None):
     if st.button(f"🚀 {instruccion}", key=f"super_{key_suffix}", type="secondary", use_container_width=True):
@@ -846,7 +866,7 @@ if st.session_state.sidebar_visible:
                 st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
                 st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
 
-            # 🧪 NUEVO: Botón para probar la conexión con Gemini
+            # 🧪 Botón para probar la conexión con Gemini
             if st.button("🧪 Probar conexión Gemini", use_container_width=True, key="btn_test_gemini"):
                 key_test = _get_key("gemini")
                 if not key_test:
@@ -854,7 +874,7 @@ if st.session_state.sidebar_visible:
                 else:
                     with st.spinner("Probando conexión..."):
                         try:
-                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={key_test}"
+                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key_test}"
                             r = requests.post(url_test, json={"contents":[{"parts":[{"text":"Di solo: OK"}]}]}, timeout=30)
                             if r.status_code == 200:
                                 try:
@@ -909,19 +929,9 @@ st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 if macro_idx == 0:
     st.markdown("#### 🛠️ XaviWork")
     contexto_xw = cajita_adjuntar_archivo("xw_adj", modelo_seleccionado, _get_key("gemini"))
-    col1, col2 = st.columns([2, 1])
-    with col1: st.text_area("💡 ¿Sobre qué quieres trabajar?", height=100, key="xw_tema_input", placeholder="Ej: Estrategia de marketing...")
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💡 3 Ideas Base", use_container_width=True):
-            with st.spinner("Pensando..."):
-                res = llamar_ia(modelo_seleccionado, f"3 ideas sobre: '{st.session_state.xw_tema_input}'. Por líneas.", _get_key("gemini"))
-                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                else: st.session_state["xw_sugs"] = [l.strip("-*1234567890. ") for l in res.split("\n") if len(l.strip()) > 5][:3]
-        def _xw_add(idea):
-            actual = st.session_state["xw_tema_input"].strip(); st.session_state["xw_tema_input"] = f"{actual}\n{idea}" if actual else idea; st.session_state["xw_sugs"] = []
-        if st.session_state.get("xw_sugs"):
-            for i, idea in enumerate(st.session_state["xw_sugs"]): st.button(f"➕ {idea}", key=f"xw_idea_{i}", use_container_width=True, on_click=_xw_add, args=(idea,))
+    
+    campo_con_ideas("💡 ¿Sobre qué quieres trabajar? (Define el tema central)", "xw_tema", "temas de trabajo o estudio", modelo_seleccionado, _get_key("gemini"), "Ej: Estrategia de marketing...")
+    
     st.markdown("---")
     tabs_xw = st.tabs(["🕸️ Mapa Mental", "🧠 Mapa Conceptual", "📊 PPT", "📄 Informe", "🃏 Tarjetas", "❓ Test", "📋 Tabla", "🎙️ Podcast", "💬 Copiloto", "📅 Timeline", "📖 Glosario", "📊 DAFO", "🖼️ Portada"])
     def _panel_borrador(nombre, prompt_gen, state_key, edit_key, superpowers, download_label=None):
@@ -1294,10 +1304,10 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-    elif macro_idx == 4:
-        st.markdown("#### 🎬 Multimedia y Conversor PRO")
-        sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
-        sub_idx = custom_tabs(sub_names, "multi_sub", 0)
+                elif macro_idx == 4:
+    st.markdown("#### 🎬 Multimedia y Conversor PRO")
+    sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
+    sub_idx = custom_tabs(sub_names, "multi_sub", 0)
     if sub_idx == 0:
         st.markdown("### Generador de Imágenes")
         prompt_img = st.text_input("Describe la imagen:", key="img_gen_prompt"); estilo_img = st.selectbox("Estilo:", ["Cyberpunk", "Realista", "Anime", "3D Render", "Fotografía"], key="img_style")
@@ -1662,7 +1672,11 @@ elif macro_idx == 8:
                 prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
                 res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                else: st.text_area("Documento:", value=res, height=300); botones_descarga(res, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+                else: st.session_state["incidencia_res"] = res
+
+        if st.session_state.get("incidencia_res"):
+            st.text_area("Documento:", value=st.session_state["incidencia_res"], height=300)
+            botones_descarga(st.session_state["incidencia_res"], f"Reclamacion_{tipo_inc.replace(' ', '_')}")
 
     elif sub_idx == 1:
         st.markdown("### 📜 Normativa y Leyes")
@@ -1671,7 +1685,11 @@ elif macro_idx == 8:
             with st.spinner("Buscando en la Ley..."):
                 res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", _get_key("gemini"))
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                else: st.markdown(res); botones_descarga(res, "Consulta_Normativa")
+                else: st.session_state["normativa_res"] = res
+
+        if st.session_state.get("normativa_res"):
+            st.markdown(st.session_state["normativa_res"])
+            botones_descarga(st.session_state["normativa_res"], "Consulta_Normativa")
 
     elif sub_idx == 2:
         st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
@@ -1860,7 +1878,11 @@ elif macro_idx == 8:
                     prompt = f"Actúa como Secretario-Administrador de Fincas. Redacta un Acta de Reunión formal para una comunidad de vecinos. Los puntos del día a tratar son:\n{puntos_dia}\n\nSigue el formato legal español: Encabezado, Asistentes (deja espacio), Orden del día, Deliberaciones y Acuerdos, Cierre y Firmas."
                     res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else: st.text_area("Acta Redactada:", value=res, height=400); botones_descarga(res, "Acta_Comunidad")
+                    else: st.session_state["acta_crear_res"] = res
+            
+            if st.session_state.get("acta_crear_res"):
+                st.text_area("Acta Redactada:", value=st.session_state["acta_crear_res"], height=400)
+                botones_descarga(st.session_state["acta_crear_res"], "Acta_Comunidad")
 
         with tab_act[1]:
             st.markdown("Sube un acta (foto o PDF) y pregúntale a la IA lo que necesites.")
@@ -1881,9 +1903,11 @@ elif macro_idx == 8:
                         res = analizar_archivo_con_gemini(arch_acta.getvalue(), "image/jpeg", prompt_analisis, _get_key("gemini"))
 
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else:
-                        st.markdown(res)
-                        botones_descarga(res, "Analisis_Acta", formatos_extra=True)
+                    else: st.session_state["acta_analisis_res"] = res
+
+            if st.session_state.get("acta_analisis_res"):
+                st.markdown(st.session_state["acta_analisis_res"])
+                botones_descarga(st.session_state["acta_analisis_res"], "Analisis_Acta", formatos_extra=True)
 
     elif sub_idx == 4:
         st.markdown("### 📝 Citaciones y Notificaciones")
@@ -1898,7 +1922,11 @@ elif macro_idx == 8:
                     prompt = f"Actúa como Administrador de Fincas. Redacta una notificación formal para los vecinos. Motivo: {motivo}. Fecha y hora: {fecha_hora}. Lugar: {lugar}. Incluye un lenguaje formal, la obligación de asistencia o delegación de voto, y espacio para la firma."
                     res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                    else: st.text_area("Citación:", value=res, height=300); botones_descarga(res, "Citacion_Vecinos")
+                    else: st.session_state["citacion_crear_res"] = res
+            
+            if st.session_state.get("citacion_crear_res"):
+                st.text_area("Citación:", value=st.session_state["citacion_crear_res"], height=300)
+                botones_descarga(st.session_state["citacion_crear_res"], "Citacion_Vecinos")
 
         with tab_cit[1]:
             st.markdown("Sube una citación o notificación (foto o PDF) para que la IA la revise en busca de defectos de forma o errores legales.")
@@ -1928,13 +1956,9 @@ elif macro_idx == 8:
                     else:
                         res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, _get_key("gemini"))
 
-                    if "[ERROR" in res: 
-                        st.error(mensaje_error_amigable(res))
-                        st.session_state["citacion_res"] = "" # Limpiamos si hay error
-                    else: 
-                        st.session_state["citacion_res"] = res # Guardamos en memoria
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.session_state["citacion_res"] = res
 
-            # ESTO VA FUERA DEL IF (Desindentado)
             if st.session_state.get("citacion_res"):
                 st.markdown(st.session_state["citacion_res"])
                 botones_descarga(st.session_state["citacion_res"], "Revision_Citacion", formatos_extra=True)
