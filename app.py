@@ -9,6 +9,7 @@ from pptx import Presentation
 from pptx.util import Inches
 from io import BytesIO
 import textwrap
+import xml.etree.ElementTree as ET
 from PIL import Image
 from fpdf import FPDF
 import urllib.parse, urllib.request, ipaddress, socket
@@ -237,6 +238,39 @@ def wa_url(mensaje: str) -> str: return f"https://wa.me/?text={_urlparse.quote(m
 def init_db():
     with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS historial (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, contenido TEXT)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS incidencias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            creada TEXT NOT NULL,
+            tipo TEXT NOT NULL,
+            urgencia TEXT NOT NULL,
+            afectado TEXT,
+            ubicacion TEXT,
+            descripcion TEXT NOT NULL,
+            responsable TEXT,
+            fecha_limite TEXT,
+            estado TEXT NOT NULL DEFAULT 'Abierta',
+            actualizada TEXT NOT NULL
+        )""")
+
+def guardar_incidencia(tipo, urgencia, afectado, ubicacion, descripcion, responsable="", fecha_limite=""):
+    ahora = datetime.datetime.now().isoformat(timespec="minutes")
+    with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
+        cur = conn.execute(
+            "INSERT INTO incidencias (creada,tipo,urgencia,afectado,ubicacion,descripcion,responsable,fecha_limite,estado,actualizada) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (ahora, tipo, urgencia, afectado, ubicacion, descripcion, responsable, fecha_limite, "Abierta", ahora)
+        )
+        return cur.lastrowid
+
+def listar_incidencias():
+    with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
+        return conn.execute("SELECT id,creada,tipo,urgencia,afectado,ubicacion,descripcion,responsable,fecha_limite,estado,actualizada FROM incidencias ORDER BY CASE urgencia WHEN 'Urgente' THEN 0 WHEN 'Alta' THEN 1 WHEN 'Media' THEN 2 ELSE 3 END, id DESC").fetchall()
+
+def actualizar_incidencia(incidencia_id, estado, responsable):
+    if estado not in {"Abierta", "En curso", "Resuelta", "Cerrada"}: return False
+    ahora = datetime.datetime.now().isoformat(timespec="minutes")
+    with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
+        cur = conn.execute("UPDATE incidencias SET estado=?, responsable=?, actualizada=? WHERE id=?", (estado, responsable, ahora, incidencia_id))
+        return cur.rowcount == 1
 def guardar_en_db(tipo, contenido):
     try:
         with sqlite3.connect("xavilu_memoria.db", timeout=10) as conn:
@@ -377,6 +411,76 @@ def leer_archivo_universal(upload, modelo_ia: str) -> str:
     except Exception as e: st.warning(f"No pude leer '{upload.name}': {e}")
     return ""
 
+def buscar_legislacion_boe(consulta: str, max_normas: int = 3):
+    """Recupera normativa consolidada vigente desde la API oficial del BOE."""
+    api = "https://www.boe.es/datosabiertos/api/legislacion-consolidada"
+    stop = {"para", "como", "sobre", "puede", "puedo", "debe", "deben", "cuando", "donde", "cual", "cuáles", "comunidad", "propietarios", "ley", "legal", "normativa", "una", "unos", "unas", "los", "las", "del", "por", "que", "qué", "con", "sin", "esta", "este", "hay", "ser", "son", "tiene", "tienen", "hacer", "poner", "tener"}
+    tokens = [t for t in re.findall(r"[a-záéíóúüñ]{4,}", consulta.lower()) if t not in stop][:5]
+    hoy = datetime.date.today().strftime("%Y%m%d")
+    normas = []
+    vistos = set()
+
+    # La LPH es la norma marco de esta sección; se obtiene siempre en su última versión consolidada.
+    ids = ["BOE-A-1960-10906"]
+    if tokens:
+        query_string = " and ".join(f'texto:"{t}"' for t in tokens[:3])
+        query_json = json.dumps({"query": {"query_string": {"query": query_string}}, "sort": [{"fecha_actualizacion": "desc"}]}, ensure_ascii=False)
+        try:
+            respuesta = requests.get(api, params={"query": query_json, "limit": max_normas + 2}, headers={"Accept": "application/json"}, timeout=(5, 20))
+            respuesta.raise_for_status()
+            datos = respuesta.json().get("data", [])
+            if isinstance(datos, dict): datos = datos.get("item", []) if isinstance(datos.get("item", []), list) else [datos.get("item", {})]
+            for item in datos if isinstance(datos, list) else []:
+                ident = item.get("identificador")
+                if ident and item.get("vigencia_agotada", "N") != "S" and item.get("estatus_derogacion", "N") != "S" and item.get("estatus_anulacion", "N") != "S" and ident not in ids:
+                    ids.append(ident)
+                if len(ids) >= max_normas: break
+        except Exception:
+            # Si falla la búsqueda temática, aún se intenta la LPH consolidada.
+            pass
+
+    for ident in ids[:max_normas]:
+        try:
+            respuesta = requests.get(f"{api}/id/{ident}", headers={"Accept": "application/xml"}, timeout=(5, 20))
+            respuesta.raise_for_status()
+            root = ET.fromstring(respuesta.content)
+            data = root.find("data")
+            if data is None: continue
+            meta = data.find("metadatos")
+            if meta is None: continue
+            def meta_text(tag):
+                node = meta.find(tag)
+                return (node.text or "").strip() if node is not None else ""
+            titulo = meta_text("titulo") or ident
+            actualizado = meta_text("fecha_actualizacion")[:8]
+            url = meta_text("url_html_consolidada") or f"{api}/id/{ident}/texto"
+            texto_node = data.find("texto")
+            bloques = []
+            if texto_node is not None:
+                for bloque in texto_node.findall("bloque"):
+                    versiones = bloque.findall("version")
+                    aplicables = [v for v in versiones if (v.get("fecha_vigencia") or v.get("fecha_publicacion") or "00000000") <= hoy]
+                    if not aplicables: continue
+                    version = max(aplicables, key=lambda v: (v.get("fecha_vigencia") or v.get("fecha_publicacion") or "00000000"))
+                    fragmento = " ".join(x.strip() for x in version.itertext() if x and x.strip())
+                    encabezado = bloque.get("titulo", "")
+                    if fragmento: bloques.append((encabezado, fragmento))
+            if not bloques: continue
+            scored = []
+            for titulo_bloque, fragmento in bloques:
+                haystack = f"{titulo_bloque} {fragmento}".lower()
+                score = sum(1 for t in tokens if t in haystack)
+                if score: scored.append((score, titulo_bloque, fragmento))
+            seleccion = sorted(scored, key=lambda x: x[0], reverse=True)[:12]
+            if not seleccion: seleccion = [(0, h, t) for h, t in bloques[:8]]
+            texto_norma = "\n".join(f"{h}: {t}" if h else t for _, h, t in seleccion)
+            if texto_norma.strip():
+                normas.append({"id": ident, "titulo": titulo, "actualizado": actualizado, "url": url, "texto": texto_norma[:16000]})
+                vistos.add(ident)
+        except Exception:
+            continue
+    return normas
+
 def buscar_en_internet(query: str):
     if DDGS is None: return []
     try: return [{"titulo": r.get("title", ""), "url": r.get("href", ""), "resumen": r.get("body", "")} for r in DDGS().text(query, region="es-es", max_results=5)]
@@ -438,7 +542,8 @@ def cajita_adjuntar_archivo(key_suffix: str, modelo: str, api_key: str) -> str:
         for i, archivo in enumerate(archivos):
             if archivo.name.lower().endswith((".png", ".jpg", ".jpeg")):
                 with st.spinner(f"Analizando imagen {i+1}/{len(archivos)}..."):
-                    ctx = analizar_archivo_con_gemini(archivo.getvalue(), "image/jpeg", "Describe esta imagen o extrae el texto (OCR).", api_key)
+                    mime = "image/png" if archivo.name.lower().endswith(".png") else "image/jpeg"
+                    ctx = analizar_archivo_con_gemini(archivo.getvalue(), mime, "Describe esta imagen o extrae el texto (OCR).", api_key, modelo_local=modelo)
                     contexto_total += f"\n[TEXTO DE IMAGEN {i+1} - {archivo.name}]:\n{ctx}\n"
             else:
                 texto = leer_archivo_universal(archivo, modelo)
@@ -456,20 +561,17 @@ def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, m
 
     api_key = api_key.strip()
 
-    # Modelos actualizados para evitar el error 404
     combinaciones = [
-        ("v1beta", "gemini-1.5-flash-latest"),
-        ("v1beta", "gemini-2.0-flash"),
-        ("v1beta", "gemini-1.5-pro-latest"),
-        ("v1beta", "gemini-1.5-flash-8b"),
-        ("v1beta", "gemini-1.5-flash")
+        ("v1beta", "gemini-3.8-flash"),
+        ("v1beta", "gemini-3.6-flash"),
+        ("v1beta", "gemini-3.5-flash"),
     ]
 
     errores_detalle = []
 
     for version, modelo in combinaciones:
-        url = f"https://generativelanguage.googleapis.com/{version}/models/{modelo}:generateContent?key={api_key}"
-        headers = {'Content-Type': 'application/json'}
+        url = f"https://generativelanguage.googleapis.com/{version}/models/{modelo}:generateContent"
+        headers = {'Content-Type': 'application/json', 'x-goog-api-key': api_key}
 
         if archivo_bytes and mime_type:
             b64_data = base64.b64encode(archivo_bytes).decode('utf-8')
@@ -510,9 +612,34 @@ def llamar_gemini_rest(prompt: str, api_key: str, archivo_bytes: bytes = None, m
     detalle = " | ".join(errores_detalle[-3:]) if errores_detalle else "Sin detalles"
     return f"[ERROR GEMINI] Todos los intentos fallaron. Detalles: {detalle}"
 
-def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str) -> str:
-    if not api_key_gemini: return "[ERROR] Falta la API Key de Gemini."
-    return llamar_gemini_rest(prompt, api_key_gemini, archivo_bytes, mime_type)
+def analizar_archivo_con_gemini(archivo_bytes: bytes, mime_type: str, prompt: str, api_key_gemini: str, modelo_local: str = "llama3.2:latest") -> str:
+    """Analiza adjuntos con Gemini y usa proveedores de texto/Ollama como respaldo para PDF legible."""
+    error_gemini = "[ERROR] No se pudo usar Gemini."
+    if api_key_gemini:
+        res = llamar_gemini_rest(prompt, api_key_gemini, archivo_bytes, mime_type)
+        if "[ERROR" not in res:
+            return res
+        error_gemini = res
+
+    if mime_type == "application/pdf":
+        try:
+            paginas = pypdf.PdfReader(BytesIO(archivo_bytes)).pages
+            texto = "\n\n".join((pagina.extract_text() or "") for pagina in paginas).strip()
+        except Exception as e:
+            return f"{error_gemini}\nNo se pudo extraer texto del PDF: {e}"
+
+        if texto:
+            prompt_respaldo = (
+                f"{prompt}\n\nEl proveedor principal no pudo procesar el archivo. "
+                "Analiza únicamente el texto extraído a continuación; si falta información, indícalo.\n\n"
+                f"TEXTO DEL PDF:\n{texto[:MAX_TEXTO_IA]}"
+            )
+            return llamar_ia(modelo_local, prompt_respaldo, api_key_gemini, intentar_gemini=False, incluir_contexto_global=False)
+        return f"{error_gemini}\nEl PDF no contiene texto seleccionable. Si es un escaneo, hace falta OCR o un modelo con visión."
+
+    if mime_type.startswith("image/"):
+        return f"{error_gemini}\nEl respaldo automático de imágenes requiere un modelo con visión; los modelos locales configurados actualmente son de texto."
+    return error_gemini
 
 def _get_key(nombre: str, arg_directo: str = "") -> str:
     manual = st.session_state.get(f"api_key_{nombre.lower()}_manual", "").strip()
@@ -523,16 +650,16 @@ def _get_key(nombre: str, arg_directo: str = "") -> str:
     except: pass
     return arg_directo or ""
 
-def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None):
+def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, intentar_gemini=True, incluir_contexto_global=True):
     prompt_final = prompt[:MAX_TEXTO_IA]
-    if st.session_state.get("global_context"):
+    if incluir_contexto_global and st.session_state.get("global_context"):
         prompt_final = f"[ARCHIVO ADJUNTO: {st.session_state.global_file_name}]\nCONTENIDO:\n{st.session_state.global_context}\n\n[INSTRUCCIÓN]:\n{prompt_final}"
     if historial_chat:
         prompt_final = f"Historial:\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in historial_chat[-10:]) + f"\n\nNuevo mensaje:\n{prompt_final}\n\nResponde."
 
     keys = {k: _get_key(k, api_key_gemini if k=="gemini" else "") for k in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]}
 
-    if keys["gemini"]:
+    if intentar_gemini and keys["gemini"]:
         res = llamar_gemini_rest(prompt_final, keys["gemini"])
         if "[ERROR" not in res:
             return res
@@ -564,12 +691,15 @@ def obtener_ruta_fuente():
     return None
 
 def generar_pdf_pro(titulo: str, contenido: str, logo_bytes: bytes = None) -> bytes:
-    pdf = FPDF(); pdf.add_page(); font_path = obtener_ruta_fuente(); tmp_img = None
+    pdf = FPDF(); pdf.set_auto_page_break(auto=True, margin=18); pdf.add_page(); font_path = obtener_ruta_fuente(); tmp_img = None
 
     if logo_bytes:
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp: tmp.write(logo_bytes); tmp_img = tmp.name
-            pdf.image(tmp_img, x=10, y=10, w=35)
+            imagen_logo = Image.open(BytesIO(logo_bytes))
+            formato_logo = (imagen_logo.format or "PNG").lower()
+            extension_logo = ".jpg" if formato_logo in ("jpeg", "jpg") else ".png"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=extension_logo) as tmp: tmp.write(logo_bytes); tmp_img = tmp.name
+            pdf.image(tmp_img, x=10, y=10, w=32)
             pdf.set_y(45)
         except Exception as e: st.warning(f"Error portada: {e}")
         finally:
@@ -615,8 +745,16 @@ def generar_manual_pdf() -> bytes:
     pdf.set_font("XaviFont" if font_path else "Helvetica", size=12)
     pdf.multi_cell(w=0, h=7, text=texto_manual); return bytes(pdf.output())
 
-def generar_word(texto: str) -> bytes:
-    doc = Document(); doc.add_heading("Documento Xavilu", 0)
+def generar_word(texto: str, logo_bytes: bytes = None) -> bytes:
+    doc = Document()
+    if logo_bytes:
+        try:
+            parrafo_logo = doc.add_paragraph()
+            parrafo_logo.alignment = 1
+            parrafo_logo.add_run().add_picture(BytesIO(logo_bytes), width=Inches(1.8))
+        except Exception:
+            pass
+    doc.add_heading("Documento Xavilu", 0)
     for p in texto.split("\n"):
         if p.strip(): doc.add_paragraph(p.strip())
     out = BytesIO(); doc.save(out); return out.getvalue()
@@ -645,37 +783,49 @@ def botones_descarga(texto: str, nombre_por_defecto: str = "documento", formatos
     st.markdown("---"); key_u = nombre_por_defecto.replace(" ", "_")
     nombre_elegido = st.text_input("📝 Nombre del archivo:", value=nombre_por_defecto, key=f"name_{key_u}")
     nombre_limpio = re.sub(r"[^a-zA-Z0-9_\- ]", "", nombre_elegido).strip().replace(" ", "_") or nombre_por_defecto
-    logo_bytes = None
-    with st.expander("📸 Cambiar Portada (Sube tu propia foto)"):
-        st.caption("Si no subes foto, el PDF saldrá sin portada (solo título y texto).")
-        logo_file = st.file_uploader("Sube imagen (PNG/JPG)", type=["png", "jpg", "jpeg"], key=f"logo_{key_u}", label_visibility="collapsed")
+    logo_general = st.session_state.get("logo_empresa_upload")
+    logo_bytes = logo_general.getvalue() if logo_general else None
+    with st.expander("🏷️ Logo del informe (opcional)"):
+        st.caption("Se aplicará el logo general configurado en el menú lateral. Puedes sustituirlo solo para este PDF.")
+        logo_file = st.file_uploader("Elegir otro logo para este PDF", type=["png", "jpg", "jpeg"], key=f"logo_{key_u}", label_visibility="collapsed")
         if logo_file: logo_bytes = logo_file.getvalue()
+        
     if formatos_extra:
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
-            guardar_descarga(f"{nombre_limpio}.txt", texto.encode("utf-8"))
-            st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
+            _txt = texto.encode("utf-8")
+            if st.download_button("📥 TXT", _txt, f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.txt", _txt)
         with c2:
             _pdf = generar_pdf_pro(nombre_limpio, texto, logo_bytes)
-            guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
-            st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
+            if st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
         with c3:
-            _docx = generar_word(texto)
-            guardar_descarga(f"{nombre_limpio}.docx", _docx)
-            st.download_button("📝 Word", _docx, f"{nombre_limpio}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"wd_{key_u}", use_container_width=True)
+            _docx = generar_word(texto, logo_bytes)
+            if st.download_button("📝 Word", _docx, f"{nombre_limpio}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"wd_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.docx", _docx)
         with c4:
             _xlsx = generar_excel(texto)
-            guardar_descarga(f"{nombre_limpio}.xlsx", _xlsx)
-            st.download_button("📊 Excel", _xlsx, f"{nombre_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"ex_{key_u}", use_container_width=True)
+            if st.download_button("📊 Excel", _xlsx, f"{nombre_limpio}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"ex_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.xlsx", _xlsx)
+        with c5:
+            if st.button("📲 WhatsApp", key=f"wa_{key_u}", use_container_width=True):
+                num_limpio = re.sub(r'[^0-9]', '', st.session_state.get("whatsapp_number", ""))
+                if num_limpio:
+                    components.html(f"<script>window.open('https://wa.me/{num_limpio}?text={urllib.parse.quote(texto[:1500])}', '_blank');</script>", height=0)
+                    st.success("✅ Abriendo WhatsApp...")
+                else:
+                    st.error("⚠️ Configura tu número en la barra lateral.")
     else:
         c1, c2, c3 = st.columns(3)
         with c1:
-            guardar_descarga(f"{nombre_limpio}.txt", texto.encode("utf-8"))
-            st.download_button("📥 TXT", texto.encode("utf-8"), f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True)
+            _txt = texto.encode("utf-8")
+            if st.download_button("📥 TXT", _txt, f"{nombre_limpio}.txt", "text/plain", key=f"tx_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.txt", _txt)
         with c2:
             _pdf = generar_pdf_pro(nombre_limpio, texto, logo_bytes)
-            guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
-            st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True)
+            if st.download_button("📄 PDF", _pdf, f"{nombre_limpio}.pdf", "application/pdf", key=f"pd_{key_u}", use_container_width=True):
+                guardar_descarga(f"{nombre_limpio}.pdf", _pdf)
         with c3:
             if st.button("📲 Enviar a WhatsApp", key=f"wa_{key_u}", use_container_width=True):
                 num_limpio = re.sub(r'[^0-9]', '', st.session_state.get("whatsapp_number", ""))
@@ -876,29 +1026,21 @@ if st.session_state.sidebar_visible:
                 st.session_state.api_key_together_manual = st.text_input("Together", type="password", value=st.session_state.api_key_together_manual)
                 st.session_state.api_key_cerebras_manual = st.text_input("Cerebras", type="password", value=st.session_state.api_key_cerebras_manual)
 
-            # 🧪 Botón para probar la conexión con Gemini (con modelo actualizado)
+            # Botón para probar la misma conexión Gemini que usa el resto de la app.
             if st.button("🧪 Probar conexión Gemini", use_container_width=True, key="btn_test_gemini"):
                 key_test = _get_key("gemini")
                 if not key_test:
                     st.error("⚠️ No hay API Key de Gemini configurada.")
                 else:
                     with st.spinner("Probando conexión..."):
-                        try:
-                            url_test = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={key_test}"
-                            r = requests.post(url_test, json={"contents":[{"parts":[{"text":"Di solo: OK"}]}]}, timeout=30)
-                            if r.status_code == 200:
-                                try:
-                                    txt = r.json()['candidates'][0]['content']['parts'][0]['text']
-                                    st.success(f"✅ Conexión OK (HTTP 200). Respuesta: {txt[:80]}")
-                                except Exception:
-                                    st.success(f"✅ Conexión OK (HTTP 200) pero sin texto. JSON: {str(r.json())[:200]}")
-                            else:
-                                st.error(f"❌ HTTP {r.status_code}: {r.text[:400]}")
-                        except Exception as e:
-                            st.error(f"❌ {type(e).__name__}: {e}")
-
+                        resultado_test = llamar_gemini_rest("Di solo: OK", key_test)
+                        if resultado_test.startswith("[ERROR"):
+                            st.error(resultado_test)
+                        else:
+                            st.success(f"✅ Conexión Gemini OK. Respuesta: {resultado_test[:80]}")
             st.markdown("---")
             st.session_state.whatsapp_number = st.text_input("📲 WhatsApp:", value=st.session_state.whatsapp_number)
+            st.file_uploader("🏷️ Logo para informes PDF (opcional)", type=["png", "jpg", "jpeg"], key="logo_empresa_upload", help="Se usará automáticamente en los PDF que descargues. Puedes cambiarlo o quitarlo cuando quieras.")
             st.markdown("---")
 
             _manual_bytes = generar_manual_pdf()
@@ -1205,7 +1347,7 @@ elif macro_idx == 2:
             with c2: boton_superpoder_borrador(st.session_state.office_txt, "Resúmelo", "of_sup2", modelo_seleccionado, _get_key("gemini"), "office_borrador", widget_key="office_txt")
             with c3: boton_superpoder_borrador(st.session_state.office_txt, "+detalles", "of_sup3", modelo_seleccionado, _get_key("gemini"), "office_borrador", widget_key="office_txt")
             st.markdown("---")
-            if formato == "Word": st.download_button("📥 Word", generar_word(st.session_state.office_txt), "doc.docx")
+            if formato == "Word": st.download_button("📥 Word", generar_word(st.session_state.office_txt, (st.session_state.get("logo_empresa_upload").getvalue() if st.session_state.get("logo_empresa_upload") else None)), "doc.docx")
             elif formato == "Excel": st.download_button("📥 Excel", generar_excel(st.session_state.office_txt), "doc.xlsx")
             else: st.download_button("📥 PPTX", generar_pptx("Presentación", st.session_state.office_txt), "doc.pptx")
     elif sub_idx == 3:
@@ -1325,7 +1467,7 @@ elif macro_idx == 3:
                 if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                 else: st.text_area("Resumen:", res, height=200)
             except Exception as e: st.error(f"Error: {e}")
-    elif macro_idx == 4:
+elif macro_idx == 4:
     st.markdown("#### 🎬 Multimedia y Conversor PRO")
     sub_names = ["🖼️ IMAGEN", "🎙️ TEXTO A VOZ", "🔄 CONVERSOR PRO"]
     sub_idx = custom_tabs(sub_names, "multi_sub", 0)
@@ -1680,43 +1822,124 @@ elif macro_idx == 8:
 
     if sub_idx == 0:
         st.markdown("### 🚨 Gestión de Incidencias")
+        st.caption("Registra cada aviso y sigue su responsable, plazo y estado. Los registros se guardan en la base de datos local.")
         c1, c2 = st.columns(2)
         with c1:
-            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "Otro"])
-            urgencia = st.selectbox("Urgencia:", ["Baja", "Media", "Alta", "Urgente"])
+            tipo_inc = st.selectbox("Tipo:", ["Avería general", "Ruidos", "Filtración", "Daños", "Otro"], key="inc_tipo")
+            urgencia = st.selectbox("Urgencia:", ["Baja", "Media", "Alta", "Urgente"], key="inc_urgencia")
+            vecino_afectado = st.text_input("¿A quién afecta?", value="A mi vivienda", key="inc_afectado")
         with c2:
-            vecino_afectado = st.text_input("¿A quién afecta? (Ej: A mi vivienda, a todo el bloque...):", value="A mi vivienda")
-            ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB")
-        descripcion_inc = st.text_area("Describe lo ocurrido:", height=150)
-        if st.button("📝 Redactar Reclamación", type="primary") and descripcion_inc:
-            with st.spinner("Redactando..."):
-                prompt = f"Administrador de fincas. Reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. Incluye encabezado, cuerpo y pie solicitando solución."
-                res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
-                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                else: st.session_state["incidencia_res"] = res
+            ubicacion = st.text_input("Ubicación:", placeholder="Ej: Portal 2, 3ºB", key="inc_ubicacion")
+            responsable = st.text_input("Responsable de seguimiento", key="inc_responsable")
+            fecha_limite = st.text_input("Fecha objetivo (AAAA-MM-DD)", placeholder="2026-11-20", key="inc_fecha_limite")
+        descripcion_inc = st.text_area("Describe lo ocurrido:", height=130, key="inc_descripcion")
+        col_guardar, col_redactar = st.columns(2)
+        with col_guardar:
+            if st.button("💾 Registrar incidencia", type="primary", use_container_width=True, key="inc_guardar"):
+                if not descripcion_inc.strip():
+                    st.warning("Describe la incidencia antes de registrarla.")
+                else:
+                    fecha_ok = True
+                    if fecha_limite.strip():
+                        try: datetime.date.fromisoformat(fecha_limite.strip())
+                        except ValueError:
+                            fecha_ok = False
+                            st.warning("Usa el formato de fecha AAAA-MM-DD, por ejemplo 2026-11-20.")
+                    if fecha_ok:
+                        try:
+                            incidencia_id = guardar_incidencia(tipo_inc, urgencia, vecino_afectado, ubicacion, descripcion_inc.strip(), responsable.strip(), fecha_limite.strip())
+                            st.success(f"Incidencia #{incidencia_id} registrada.")
+                        except Exception as e:
+                            st.error(f"No se pudo guardar la incidencia: {e}")
+        with col_redactar:
+            if st.button("📝 Redactar reclamación", use_container_width=True, key="inc_redactar") and descripcion_inc.strip():
+                st.session_state.pop("incidencia_res", None)
+                st.session_state.pop("inc_documento", None)
+                with st.spinner("Redactando..."):
+                    prompt = f"Administrador de fincas. Redacta una reclamación formal. Tipo: {tipo_inc}. Urgencia: {urgencia}. Afecta a: {vecino_afectado}. Ubicación: {ubicacion}. Descripción: {descripcion_inc}. No inventes fechas, normas ni datos de contacto. Incluye encabezado, solicitud de solución y espacios identificados para los datos que falten."
+                    res = llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"))
+                    if "[ERROR" in res: st.error(mensaje_error_amigable(res))
+                    else: st.session_state["incidencia_res"] = res
 
         if st.session_state.get("incidencia_res"):
-            st.text_area("Documento:", value=st.session_state["incidencia_res"], height=300)
-            botones_descarga(st.session_state["incidencia_res"], f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+            documento_inc_editado = st.text_area("Documento (puedes editarlo):", value=st.session_state["incidencia_res"], height=300, key="inc_documento")
+            botones_descarga(documento_inc_editado, f"Reclamacion_{tipo_inc.replace(' ', '_')}")
+
+        st.markdown("#### Seguimiento de incidencias")
+        try:
+            incidencias = listar_incidencias()
+            if not incidencias:
+                st.info("Aún no hay incidencias registradas.")
+            for incidencia in incidencias:
+                iid, creada, tipo, urg, afectado, lugar, desc, resp, limite, estado, actualizada = incidencia
+                with st.expander(f"#{iid} · {urg} · {tipo} · {lugar or 'Ubicación pendiente'} · {estado}"):
+                    st.caption(f"Creada: {creada} · Última actualización: {actualizada}")
+                    st.write(f"**Afectado:** {afectado or 'No indicado'}")
+                    st.write(f"**Descripción:** {desc}")
+                    st.write(f"**Fecha objetivo:** {limite or 'No indicada'}")
+                    c_estado, c_responsable, c_actualizar = st.columns([1, 2, 1])
+                    with c_estado:
+                        estado_nuevo = st.selectbox("Estado", ["Abierta", "En curso", "Resuelta", "Cerrada"], index=["Abierta", "En curso", "Resuelta", "Cerrada"].index(estado), key=f"inc_estado_{iid}")
+                    with c_responsable:
+                        responsable_nuevo = st.text_input("Responsable", value=resp or "", key=f"inc_resp_{iid}")
+                    with c_actualizar:
+                        if st.button("Guardar", key=f"inc_update_{iid}", use_container_width=True):
+                            if actualizar_incidencia(iid, estado_nuevo, responsable_nuevo.strip()):
+                                st.success("Seguimiento actualizado.")
+                                st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo cargar el seguimiento: {e}")
 
     elif sub_idx == 1:
         st.markdown("### 📜 Normativa y Leyes")
         consulta = campo_con_ideas("Duda legal:", "norm", "dudas legales de comunidad", modelo_seleccionado, _get_key("gemini"), "Ej: ¿Puedo poner cámara en el rellano?")
-        if st.button("🔎 Consultar") and consulta:
-            with st.spinner("Buscando en la Ley..."):
-                res = llamar_ia(modelo_seleccionado, f"Abogado experto en propiedad horizontal (España). Resuelve: {consulta}", _get_key("gemini"))
-                if "[ERROR" in res: st.error(mensaje_error_amigable(res))
-                else: st.session_state["normativa_res"] = res
+        if st.button("🔎 Consultar en fuentes oficiales") and consulta:
+            st.session_state["normativa_res"] = ""
+            st.session_state["normativa_fuentes"] = []
+            with st.spinner("Consultando legislación consolidada del BOE..."):
+                fuentes = buscar_legislacion_boe(consulta)
+                if not fuentes:
+                    st.error("No se pudo verificar legislación en el BOE. Comprueba la conexión y vuelve a intentarlo; no se generó una respuesta presentada como vigente.")
+                else:
+                    contexto_legal = "\n\n".join(
+                        f"FUENTE OFICIAL: {f['titulo']}\nÚltima actualización que informa el BOE: {f['actualizado'] or 'no indicada'}\nTexto relevante actual:\n{f['texto']}"
+                        for f in fuentes
+                    )
+                    prompt_legal = f"""Responde en español a la consulta sobre normativa de comunidades de propietarios en España usando EXCLUSIVAMENTE las fuentes oficiales del BOE incluidas abajo.
+No inventes artículos, obligaciones, mayorías ni fechas. Cita cada norma y artículo que sustente la respuesta. Si las fuentes no resuelven la cuestión, dilo expresamente y señala qué normativa autonómica, municipal o jurisprudencia habría que verificar. Separa texto legal, interpretación orientativa y datos que faltan. No presentes la respuesta como asesoramiento jurídico vinculante.
+
+CONSULTA: {consulta}
+
+FUENTES OFICIALES RECUPERADAS EN DIRECTO:
+{contexto_legal}"""
+                    res = llamar_ia(modelo_seleccionado, prompt_legal, _get_key("gemini"), incluir_contexto_global=False)
+                    if "[ERROR" in res:
+                        st.error(mensaje_error_amigable(res))
+                    else:
+                        st.session_state["normativa_res"] = res
+                        st.session_state["normativa_fuentes"] = fuentes
 
         if st.session_state.get("normativa_res"):
+            st.markdown("**Respuesta orientativa basada en legislación consolidada recuperada del BOE.**")
             st.markdown(st.session_state["normativa_res"])
-            botones_descarga(st.session_state["normativa_res"], "Consulta_Normativa")
+            st.markdown("#### Fuentes oficiales consultadas")
+            for fuente in st.session_state.get("normativa_fuentes", []):
+                fecha_fuente = fuente["actualizado"]
+                fecha_legible = f"{fecha_fuente[6:8]}/{fecha_fuente[4:6]}/{fecha_fuente[:4]}" if len(fecha_fuente) == 8 else "fecha no indicada"
+                st.markdown(f"- [{fuente['titulo']}]({fuente['url']}) — actualización BOE: {fecha_legible}")
+            st.caption("El texto consolidado del BOE es informativo. Para decisiones o procedimientos, confirma el texto oficial y la normativa autonómica aplicable.")
+            fuentes_export = "\n\nFUENTES OFICIALES CONSULTADAS\n" + "\n".join(
+                f"- {f['titulo']} | Actualización BOE: {f['actualizado'] or 'no indicada'} | {f['url']}"
+                for f in st.session_state.get("normativa_fuentes", [])
+            )
+            botones_descarga(st.session_state["normativa_res"] + fuentes_export, "Consulta_Normativa")
 
     elif sub_idx == 2:
         st.markdown("### 🧾 Analizador Múltiple de Presupuestos")
         st.caption("Sube varios presupuestos (fotos o PDFs) a la vez. Los análisis se guardarán en la memoria hasta que reinicies o limpies.")
 
         arch_presupuestos = st.file_uploader("Sube los presupuestos (puedes seleccionar varios):", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
+        incluir_reputacion = st.checkbox("Añadir búsqueda pública de reputación (opcional; resultados orientativos y con enlaces)", value=False, key="presu_incluir_reputacion")
 
         instrucciones_extra = st.text_area(
             "📝 ¿En qué quieres que se fije la IA? (Opcional):",
@@ -1727,15 +1950,17 @@ elif macro_idx == 8:
         c_btn1, c_btn2 = st.columns(2)
         with c_btn1:
             if st.button("🔍 Analizar Presupuestos", type="primary") and arch_presupuestos:
+                st.session_state["presu_resultados"] = None
+                st.session_state["presu_comparativa"] = ""
                 resultados_individuales = []
+                errores_presupuestos = []
                 progreso = st.progress(0)
                 status_text = st.empty()
 
                 for i, arch in enumerate(arch_presupuestos):
                     status_text.text(f"Analizando presupuesto {i+1} de {len(arch_presupuestos)}: {arch.name}...")
 
-                    prompt_individual = """Actúa como un Administrador de Fincas y Arquitecto Técnico experto.
-                    Tu objetivo es redactar un INFORME PERICIAL Y DE EVALUACIÓN TÉCNICA de este presupuesto para proteger los intereses de la comunidad de vecinos.
+                    prompt_individual = """Analiza este presupuesto desde una perspectiva técnica y administrativa orientativa. No te presentes como perito ni como profesional que ha inspeccionado la obra. Separa los datos que aparecen literalmente de las observaciones; si un dato no está, escribe «No consta». No inventes importes, partidas, permisos ni garantías.
 
                     IMPORTANTE: Devuelve EXCLUSIVAMENTE un objeto JSON válido con dos claves:
                     1. "empresa": (Solo el nombre corto de la empresa, ej: "Pinturas Pepe").
@@ -1755,8 +1980,8 @@ elif macro_idx == 8:
                     - Evaluación de las licencias de obra/actividad y tasas municipales. ¿Se encarga la empresa o lo deja a la comunidad?
 
                     4. SEGURIDAD Y SALUD (PRL) Y RESIDUOS:
-                    - ¿Incluye Plan de Seguridad y Salud o Estudio Básico? (Obligatorio).
-                    - ¿Se especifica la gestión y retirada de escombros/residuos?
+                    - Indica qué documentación preventiva se menciona. No supongas que un plan específico es exigible en todos los casos; marca como «requiere revisión técnica según el tipo de obra» cuando no se pueda determinar.
+                    - ¿Se especifica la gestión y retirada de escombros/residuos? Si no consta, indícalo expresamente.
 
                     5. PLAZOS Y GARANTÍAS:
                     - Plazos de ejecución.
@@ -1765,7 +1990,7 @@ elif macro_idx == 8:
                     6. LA LETRA PEQUEÑA (PUNTOS CRÍTICOS):
                     - Lista de carencias, ambigüedades o cosas que NO incluye el presupuesto y que el presidente de la comunidad debería exigir antes de firmar.
 
-                    7. RECOMENDACIONES DEL PERITO:
+                    7. RECOMENDACIONES PARA REVISIÓN:
                     - 2 o 3 acciones concretas a tomar antes de contratar a esta empresa.
 
                     No añadas markdown extra (como asteriscos) ni símbolos raros. Redacta con un tono serio, formal y jurídico."""
@@ -1776,9 +2001,19 @@ elif macro_idx == 8:
                     try:
                         if arch.name.lower().endswith(".pdf"):
                             texto_pdf = leer_archivo_universal(arch, modelo_seleccionado)
-                            res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf}", _get_key("gemini"))
+                            if texto_pdf.strip():
+                                res = llamar_ia(modelo_seleccionado, f"{prompt_individual}\n\nTexto del PDF:\n{texto_pdf[:MAX_TEXTO_IA]}", _get_key("gemini"))
+                            else:
+                                # PDF escaneado o vacío: intentar el analizador de adjuntos; si no hay OCR, no inventar datos.
+                                res = analizar_archivo_con_gemini(arch.getvalue(), "application/pdf", prompt_individual, _get_key("gemini"), modelo_local=modelo_seleccionado)
                         else:
-                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_individual, _get_key("gemini"))
+                            mime = "image/png" if arch.name.lower().endswith(".png") else "image/jpeg"
+                            res = analizar_archivo_con_gemini(arch.getvalue(), mime, prompt_individual, _get_key("gemini"), modelo_local=modelo_seleccionado)
+
+                        if "[ERROR" in res:
+                            errores_presupuestos.append(arch.name)
+                            progreso.progress((i + 1) / len(arch_presupuestos))
+                            continue
 
                         res_limpia = res.replace("```json", "").replace("```", "").strip()
                         try:
@@ -1789,38 +2024,35 @@ elif macro_idx == 8:
                             nombre_empresa = arch.name
                             texto_analisis = res
 
-                        status_text.text(f"Buscando reputación online de {nombre_empresa}...")
-                        res_busqueda = buscar_en_internet(f"{nombre_empresa} opiniones trabajos realizados")
-
-                        info_web = ""
-                        if res_busqueda:
-                            info_web = "\n".join([f"- {r['titulo']}: {r['resumen']}" for r in res_busqueda])
-                            prompt_rep = f"Analiza la reputación de '{nombre_empresa}' basándote en estos resultados de búsqueda en internet:\n{info_web}\n\nDevuelve un resumen de máximo 3 líneas. Si no hay información clara o es de otra empresa, di 'No hay información relevante en internet'."
-
-                            with st.spinner(f"Consultando web para {nombre_empresa}..."):
+                        if incluir_reputacion:
+                            status_text.text(f"Buscando referencias públicas para {nombre_empresa}...")
+                            res_busqueda = buscar_en_internet(f'"{nombre_empresa}" opiniones trabajos realizados')
+                            if res_busqueda:
+                                fuentes_web = "\n".join(f"- {r['titulo']} | {r['url']} | {r['resumen']}" for r in res_busqueda)
+                                prompt_rep = f"Evalúa con cautela estos resultados sobre la empresa '{nombre_empresa}'. No afirmes que corresponden a la misma empresa salvo que el propio resultado lo confirme claramente. Resume en un máximo de 3 líneas y conserva enlaces para revisión humana. Datos encontrados:\n{fuentes_web}"
                                 rep_ia = llamar_ia(modelo_seleccionado, prompt_rep, _get_key("gemini"))
-
-                            if "[ERROR" not in rep_ia:
-                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {rep_ia}"
+                                texto_analisis += "\n\nREFERENCIAS PÚBLICAS (pendientes de verificación de identidad):\n" + (rep_ia if "[ERROR" not in rep_ia else "No se pudo resumir la búsqueda; revisa las fuentes enlazadas.") + "\n\nFuentes consultadas:\n" + fuentes_web
                             else:
-                                texto_analisis += f"\n\n[REPUTACIÓN ONLINE]: {info_web[:300]}..."
+                                texto_analisis += "\n\nReferencias públicas: búsqueda sin resultados concluyentes."
                         else:
-                            texto_analisis += "\n\n[REPUTACIÓN ONLINE]: No se encontraron resultados en internet."
+                            texto_analisis += "\n\nReferencias públicas: no consultadas."
 
                         resultados_individuales.append({"empresa": nombre_empresa, "archivo": arch.name, "analisis": texto_analisis})
-                    except Exception as e:
-                        resultados_individuales.append({"empresa": arch.name, "archivo": arch.name, "analisis": f"Error al procesar: {e}"})
+                    except Exception:
+                        errores_presupuestos.append(arch.name)
 
                     progreso.progress((i + 1) / len(arch_presupuestos))
 
                 status_text.text("✅ Análisis individual completado. Generando comparativa final...")
+                for archivo_error in errores_presupuestos:
+                    st.warning(f"No se pudo analizar {archivo_error}; se excluyó del informe para evitar resultados incompletos o inventados.")
 
                 if len(resultados_individuales) > 0:
                     texto_para_comparar = ""
                     for r in resultados_individuales:
                         texto_para_comparar += f"\n--- PROVEEDOR: {r['empresa']} (Archivo: {r['archivo']}) ---\n{r['analisis']}\n"
 
-                    prompt_comparativa = f"""Actúa como un Administrador de Fincas y Arquitecto Técnico Superior.
+                    prompt_comparativa = f"""Redacta una comparativa técnica orientativa de ofertas para una comunidad de propietarios. No te presentes como perito ni completes datos ausentes por inferencia. Usa «No consta» cuando el documento no indique un importe, IVA, licencia, garantía o plazo. Distingue hechos del documento de recomendaciones.
                     Aquí tienes los informes periciales de {len(resultados_individuales)} presupuestos para una comunidad de vecinos:
 
                     {texto_para_comparar}
@@ -1838,7 +2070,7 @@ elif macro_idx == 8:
                     - RIESGOS MODERADOS: ¿Faltan detalles de garantías o licencias?
                     - PUNTOS A FAVOR: ¿Qué empresa da más confianza técnica?
 
-                    4. RECOMENDACIÓN FINAL DEL PERITO
+                    4. RECOMENDACIÓN ORIENTATIVA
                     Explica con argumentos técnicos y jurídicos cuál es la mejor opción calidad/precio. Justifica si merece la pena pagar más por una empresa que cumpla estrictamente con la normativa.
 
                     5. ACCIONES ANTES DE FIRMAR
@@ -1860,7 +2092,11 @@ elif macro_idx == 8:
                         st.success("✅ Informe generado y guardado en memoria.")
                         st.rerun()
                     else:
-                        st.error("Error al generar la comparativa final.")
+                        st.error("No se pudo generar la comparativa. Revisa las conexiones de IA y vuelve a intentarlo.")
+                elif errores_presupuestos:
+                    status_text.empty()
+                    progreso.empty()
+                    st.info("No se generó informe porque ningún presupuesto pudo analizarse correctamente.")
 
         with c_btn2:
             if st.session_state["presu_resultados"]:
@@ -1911,6 +2147,8 @@ elif macro_idx == 8:
             pregunta_acta = st.text_area("¿Qué quieres saber sobre estas actas?", placeholder="Ej: Resume los acuerdos, ¿qué se aprobó sobre la derrama?, mejora la redacción...", height=100)
 
             if archs_acta and st.button("🔍 Analizar Documentos", type="primary", key="btn_analizar_acta"):
+                st.session_state.pop("acta_analisis_res", None)
+                st.session_state["acta_analisis_errores"] = []
                 with st.spinner("Analizando los documentos..."):
                     prompt_analisis = f"""Actúa como un Administrador de Fincas experto. Analiza el siguiente documento (Acta de Comunidad).
                     IMPORTANTE: Responde de forma clara y concisa a la instrucción del usuario. No inventes información que no esté en el documento.
@@ -1918,24 +2156,30 @@ elif macro_idx == 8:
                     INSTRUCCIÓN DEL USUARIO: {pregunta_acta if pregunta_acta.strip() else 'Haz un resumen ejecutivo y extrae los acuerdos principales.'}
                     """
                     
-                    resultados_combinados = ""
+                    resultados_combinados = []
+                    errores_documentos = []
                     progreso = st.progress(0)
                     
                     for i, arch in enumerate(archs_acta):
                         if arch.name.lower().endswith(".pdf"):
-                            res = analizar_archivo_con_gemini(arch.getvalue(), "application/pdf", prompt_analisis, _get_key("gemini"))
+                            res = analizar_archivo_con_gemini(arch.getvalue(), "application/pdf", prompt_analisis, _get_key("gemini"), modelo_local=modelo_seleccionado)
                         else:
-                            res = analizar_archivo_con_gemini(arch.getvalue(), "image/jpeg", prompt_analisis, _get_key("gemini"))
+                            mime = "image/png" if arch.name.lower().endswith(".png") else "image/jpeg"
+                            res = analizar_archivo_con_gemini(arch.getvalue(), mime, prompt_analisis, _get_key("gemini"), modelo_local=modelo_seleccionado)
                         
                         if "[ERROR" in res:
-                            resultados_combinados += f"\n\n--- ERROR EN: {arch.name} ---\n{res}\n"
+                            errores_documentos.append(arch.name)
                         else:
-                            resultados_combinados += f"\n\n--- ANÁLISIS DE: {arch.name} ---\n{res}\n"
+                            resultados_combinados.append(f"### Análisis de: {arch.name}\n\n{res.strip()}")
                             
                         progreso.progress((i + 1) / len(archs_acta))
                         
-                    st.session_state["acta_analisis_res"] = resultados_combinados
+                    st.session_state["acta_analisis_res"] = "\n\n---\n\n".join(resultados_combinados)
+                    st.session_state["acta_analisis_errores"] = errores_documentos
                     progreso.empty()
+
+            for nombre_error in st.session_state.get("acta_analisis_errores", []):
+                st.warning(f"No se pudo analizar {nombre_error}. Se omitió del informe; comprueba si el PDF tiene texto seleccionable o inténtalo más tarde.")
 
             if st.session_state.get("acta_analisis_res"):
                 st.markdown(st.session_state["acta_analisis_res"])
@@ -1984,9 +2228,10 @@ elif macro_idx == 8:
                     """
 
                     if arch_citacion.name.lower().endswith(".pdf"):
-                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "application/pdf", prompt_revision, _get_key("gemini"))
+                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "application/pdf", prompt_revision, _get_key("gemini"), modelo_local=modelo_seleccionado)
                     else:
-                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), "image/jpeg", prompt_revision, _get_key("gemini"))
+                        mime = "image/png" if arch_citacion.name.lower().endswith(".png") else "image/jpeg"
+                        res = analizar_archivo_con_gemini(arch_citacion.getvalue(), mime, prompt_revision, _get_key("gemini"), modelo_local=modelo_seleccionado)
 
                     if "[ERROR" in res: st.error(mensaje_error_amigable(res))
                     else: st.session_state["citacion_res"] = res
