@@ -1,4 +1,4 @@
-estado_archivo = "Leído y doblemente revisado" if doble_revision_actas else "Leído; una pasada más síntesis conjunta"
+                        if doble_revision_actas else "Leído; una pasada más síntesis conjunta"
                         else:
                             estado_archivo = "Leído; revisión parcial o páginas pendientes"
                         detalle_archivo = "\n\n---\n\n".join(hallazgos_bloques) if hallazgos_bloques else "No se pudo recuperar contenido legible."
