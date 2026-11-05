@@ -1419,6 +1419,69 @@ def _render_editor_office():
                         pass
             except Exception as exc:
                 st.warning(f"No se pudo previsualizar el PDF: {exc}")
+
+            # Puente explícito entre el editor PDF y el expediente del Gestor de Comunidad.
+            with st.expander("📤 Enviar estos PDF al expediente del Gestor de Comunidad", expanded=False):
+                st.caption("El archivo que subes al editor PDF no pasa automáticamente al Gestor. Usa este puente para archivarlo con su texto extraído y que después aparezca en Consulta libre y Auditoría integral.")
+                col_destino_1, col_destino_2 = st.columns(2)
+                with col_destino_1:
+                    comunidad_destino_pdf = st.text_input(
+                        "Nombre o referencia de la comunidad",
+                        value=str(st.session_state.get("consulta_comunidad_nombre", "") or ""),
+                        key="xav_pdf_destino_comunidad",
+                        placeholder="Ej.: Comunidad Edificio Norte",
+                    )
+                with col_destino_2:
+                    territorio_destino_pdf = st.text_input(
+                        "Municipio y comunidad autónoma",
+                        value=str(st.session_state.get("consulta_comunidad_territorio", "") or ""),
+                        key="xav_pdf_destino_territorio",
+                        placeholder="Ej.: Rincón de la Victoria, Andalucía",
+                    )
+                if st.button("📚 Archivar PDF en el Gestor para poder analizarlo", type="primary", key="xav_pdf_enviar_gestor"):
+                    if not str(comunidad_destino_pdf or "").strip():
+                        st.error("Indica un nombre o referencia de comunidad para crear el expediente.")
+                    else:
+                        guardados_pdf_gestor = 0
+                        fallos_pdf_gestor = []
+                        progreso_pdf_gestor = st.progress(0)
+                        estado_pdf_gestor = st.empty()
+                        for idx_pdf_gestor, archivo_pdf_gestor in enumerate(archivos[:8], 1):
+                            estado_pdf_gestor.text(f"Archivando {idx_pdf_gestor}/{min(len(archivos), 8)}: {archivo_pdf_gestor.name}...")
+                            texto_pdf_gestor = ""
+                            estado_lectura_pdf_gestor = "Recibido, pero sin texto legible"
+                            try:
+                                texto_pdf_gestor, _, aviso_pdf_gestor = _extraer_texto_paginas_pdf_editor(
+                                    archivo_pdf_gestor.getvalue(), "", contraseña
+                                )
+                                if texto_pdf_gestor and texto_pdf_gestor.strip():
+                                    estado_lectura_pdf_gestor = "Texto recuperado"
+                                if aviso_pdf_gestor:
+                                    fallos_pdf_gestor.append(f"{archivo_pdf_gestor.name}: {aviso_pdf_gestor}")
+                            except Exception as exc_pdf_gestor:
+                                fallos_pdf_gestor.append(f"{archivo_pdf_gestor.name}: {type(exc_pdf_gestor).__name__}: {exc_pdf_gestor}")
+                            try:
+                                guardar_documento_comunidad(
+                                    comunidad_destino_pdf.strip(), territorio_destino_pdf.strip(),
+                                    archivo_pdf_gestor.name, archivo_pdf_gestor.getvalue(),
+                                    texto_pdf_gestor if estado_lectura_pdf_gestor == "Texto recuperado" else "",
+                                    estado_lectura_pdf_gestor,
+                                )
+                                guardados_pdf_gestor += 1
+                            except Exception as exc_guardado_pdf_gestor:
+                                fallos_pdf_gestor.append(f"{archivo_pdf_gestor.name}: no se pudo archivar ({type(exc_guardado_pdf_gestor).__name__}: {exc_guardado_pdf_gestor})")
+                            progreso_pdf_gestor.progress(idx_pdf_gestor / max(1, min(len(archivos), 8)))
+                        progreso_pdf_gestor.empty()
+                        estado_pdf_gestor.empty()
+                        if guardados_pdf_gestor:
+                            # Al abrir el Gestor, obliga a recargar el expediente desde SQLite.
+                            st.session_state["consulta_comunidad_nombre"] = comunidad_destino_pdf.strip()
+                            st.session_state["consulta_comunidad_territorio"] = territorio_destino_pdf.strip()
+                            st.session_state["_consulta_comunidad_clave_activa"] = None
+                            st.success(f"{guardados_pdf_gestor} PDF archivado(s) en el expediente. Entra en Gestor de Comunidad → Consulta libre y usa esta misma comunidad y territorio.")
+                        for fallo_pdf_gestor in fallos_pdf_gestor:
+                            st.warning(fallo_pdf_gestor)
+
         if st.button("⚙️ Aplicar cambios al PDF", type="primary", key="xav_editor_pdf_run"):
             try:
                 if not archivos: raise ValueError("Selecciona un PDF.")
@@ -5562,6 +5625,11 @@ LECTURAS DOCUMENTALES POR ARCHIVO:
             key="aud_archivos_integral",
             help="Por ejemplo: citaciones, actas, estatutos, contratos de administración, proyectos, informes técnicos, presupuestos, facturas, extractos bancarios y liquidaciones.",
         )
+        if archivos_aud:
+            st.success(f"📎 Xavilu detecta {len(archivos_aud)} archivo(s) adjunto(s) para esta auditoría:")
+            for archivo_detectado_aud in archivos_aud:
+                st.write(f"• {archivo_detectado_aud.name} — {archivo_detectado_aud.size:,} bytes")
+            st.caption("La auditoría completa comienza al pulsar «Auditar y cruzar toda la documentación» más abajo.")
         pregunta_aud = st.text_area(
             "¿Qué te preocupa o qué quieres que compruebe? (opcional)",
             key="aud_pregunta_especifica",
@@ -5903,9 +5971,26 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
             "Adjunta uno o varios documentos",
             type=["pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg"],
             accept_multiple_files=True,
-            key="consulta_comunidad_archivos",
-            help="Puedes cargar varios documentos a la vez. Para comparar presupuestos, adjunta todas las ofertas y, si existen, el proyecto, acta de aprobación, contrato y facturas.",
+            key=f"consulta_comunidad_archivos_{clave_chat_actual[:12]}",
+            help="Puedes cargar varios documentos a la vez. Al seleccionarlos, Xavilu los detectará y leerá automáticamente para incorporarlos al expediente; después podrás preguntar sobre ellos.",
         )
+        # Streamlit solo entrega el archivo subido a este módulo; antes era obligatorio
+        # pulsar «Leer y añadir documentos». Ahora detectamos archivos nuevos por hash y
+        # los incorporamos automáticamente al expediente, evitando reprocesarlos en cada rerun.
+        archivos_consulta = list(archivos_consulta or [])
+        procesados_por_expediente = st.session_state.setdefault("_consulta_comunidad_hashes_procesados", {})
+        hashes_expediente = set(procesados_por_expediente.get(clave_chat_actual, []))
+        archivos_consulta_pendientes = []
+        for archivo_detectado in archivos_consulta:
+            try:
+                hash_detectado = hashlib.sha256(archivo_detectado.getvalue()).hexdigest()
+            except Exception:
+                hash_detectado = None
+            if hash_detectado and hash_detectado not in hashes_expediente:
+                archivos_consulta_pendientes.append((archivo_detectado, hash_detectado))
+        if archivos_consulta_pendientes:
+            st.info(f"📎 Xavilu ha detectado {len(archivos_consulta_pendientes)} documento(s) nuevo(s). Se leerán automáticamente y se añadirán al expediente de esta comunidad.")
+
         modo_carga_chat = st.radio(
             "Al cargar nuevos documentos (los originales archivados nunca se borran desde esta opción)",
             ["Añadir a los documentos ya cargados", "Reemplazar la vista de esta sesión (sin borrar el archivo histórico)"],
@@ -5934,7 +6019,11 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
             st.session_state["consulta_comunidad_contexto"] = ""
             st.success("Se ha vaciado el expediente documental de esta sesión. La conversación se conserva.")
 
-        if cargar_docs_chat and archivos_consulta:
+        if (cargar_docs_chat and archivos_consulta) or archivos_consulta_pendientes:
+            archivos_a_procesar_chat = (
+                [(a, hashlib.sha256(a.getvalue()).hexdigest()) for a in archivos_consulta]
+                if cargar_docs_chat and archivos_consulta else archivos_consulta_pendientes
+            )
             documentos_previos = list(st.session_state.get("consulta_comunidad_documentos", []))
             if modo_carga_chat == "Reemplazar la vista de esta sesión (sin borrar el archivo histórico)":
                 documentos_previos = []
@@ -5942,8 +6031,8 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
             estados_lectura = []
             barra_lectura = st.progress(0)
             estado_lectura = st.empty()
-            for indice_archivo, archivo_consulta in enumerate(archivos_consulta, 1):
-                estado_lectura.text(f"Leyendo {indice_archivo}/{len(archivos_consulta)}: {archivo_consulta.name}...")
+            for indice_archivo, (archivo_consulta, hash_archivo_consulta) in enumerate(archivos_a_procesar_chat, 1):
+                estado_lectura.text(f"Leyendo {indice_archivo}/{len(archivos_a_procesar_chat)}: {archivo_consulta.name}...")
                 extension_consulta = Path(archivo_consulta.name.lower()).suffix
                 texto_consulta = ""
                 try:
@@ -5976,8 +6065,11 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
                     )
                 except Exception as exc_archivo:
                     st.warning(f"{archivo_consulta.name}: se procesó, pero no pudo archivarse permanentemente ({type(exc_archivo).__name__}).")
-                barra_lectura.progress(indice_archivo / len(archivos_consulta))
+                barra_lectura.progress(indice_archivo / max(1, len(archivos_a_procesar_chat)))
+                hashes_expediente.add(hash_archivo_consulta)
 
+            procesados_por_expediente[clave_chat_actual] = list(hashes_expediente)
+            st.session_state["_consulta_comunidad_hashes_procesados"] = procesados_por_expediente
             documentos_finales = documentos_previos + nuevos_documentos
             st.session_state["consulta_comunidad_documentos"] = documentos_finales
             estados_previos = list(st.session_state.get("consulta_comunidad_estado_lectura", [])) if modo_carga_chat == "Añadir a los documentos ya cargados" else []
@@ -5992,7 +6084,7 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
             estado_lectura.empty()
             if nuevos_documentos:
                 st.success(f"Se han incorporado {len(nuevos_documentos)} documento(s) legible(s) al expediente y se ha intentado conservar el original y su texto en la memoria local permanente.")
-            if len(nuevos_documentos) < len(archivos_consulta):
+            if len(nuevos_documentos) < len(archivos_a_procesar_chat):
                 st.warning("Algún archivo se recibió, pero no pudo leerse. Consulta el inventario de lectura antes de sacar conclusiones.")
 
         documentos_cargados_chat = st.session_state.get("consulta_comunidad_documentos", [])
