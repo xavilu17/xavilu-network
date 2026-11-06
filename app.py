@@ -5596,64 +5596,79 @@ LECTURAS DOCUMENTALES POR ARCHIVO:
     elif sub_idx == 5:
         st.markdown("### 🔎 Auditoría integral de la administración de la comunidad")
         st.caption("Revisión independiente de citaciones, actas, estatutos, proyectos, presupuestos, contratos, facturas y cuentas. Cruza documentos para detectar contradicciones, gastos sin soporte, acuerdos no ejecutados y decisiones que requieren explicación.")
-        st.info("Xavilu funciona como asistente de auditoría jurídico-documental y administrativa: no es un abogado colegiado ni un perito, no determina por sí solo que exista fraude o apropiación y no sustituye la revisión profesional cuando haya que impugnar acuerdos, reclamar cantidades o iniciar acciones.")
-        st.warning("Antes de subir documentos, oculta DNI/NIE, firmas manuscritas, teléfonos, direcciones particulares, IBAN y datos personales que no sean necesarios. Los archivos pueden enviarse al proveedor de IA configurado en Xavilu para analizarlos; no subas información que no estés autorizado a tratar.")
+        with st.expander("ℹ️ Alcance, privacidad y ayuda", expanded=False):
+            st.info("Xavilu es un asistente de análisis jurídico-documental y administrativo. No es un abogado colegiado ni un perito y no sustituye la revisión profesional cuando haya plazos, dinero relevante o litigio.")
+            st.warning("Antes de subir documentos, oculta DNI/NIE, firmas manuscritas, teléfonos, direcciones particulares, IBAN y datos personales innecesarios. Los archivos y el contexto pueden enviarse al proveedor de IA configurado. La base de memoria local no está cifrada por Xavilu.")
 
-        col_aud_1, col_aud_2 = st.columns(2)
-        with col_aud_1:
-            comunidad_aud = st.text_input("Comunidad (nombre interno o referencia anonimizada)", key="aud_comunidad_nombre", placeholder="Ej.: Comunidad Edificio Norte")
-            territorio_aud = st.text_input("Municipio y comunidad autónoma", key="aud_comunidad_territorio", placeholder="Ej.: Rincón de la Victoria, Andalucía")
-        with col_aud_2:
-            periodo_aud = st.text_input("Periodo que quieres revisar", key="aud_periodo", placeholder="Ej.: ejercicios 2023–2026")
-            modalidad_aud = st.selectbox(
-                "Tipo de auditoría",
-                [
-                    "Auditoría integral de la gestión (recomendada)",
-                    "Revisar citación y preparar la junta",
-                    "Contrastar citaciones, actas y acuerdos",
-                    "Auditar proyecto, obra, presupuestos y contratos",
-                    "Auditar cuentas, cuotas, facturas y pagos",
-                    "Revisar actuaciones y obligaciones de la administradora",
-                ],
-                key="aud_modalidad",
+        with st.expander(
+            "⚙️ Datos y opciones del expediente",
+            expanded=not bool(st.session_state.get("aud_comunidad_nombre")) or not bool(st.session_state.get("aud_comunidad_territorio")),
+        ):
+            col_aud_1, col_aud_2 = st.columns(2)
+            with col_aud_1:
+                comunidad_aud = st.text_input("Comunidad (nombre interno o referencia anonimizada)", key="aud_comunidad_nombre", placeholder="Ej.: Comunidad Edificio Norte")
+                territorio_aud = st.text_input("Municipio y comunidad autónoma", key="aud_comunidad_territorio", placeholder="Ej.: Rincón de la Victoria, Andalucía")
+            with col_aud_2:
+                periodo_aud = st.text_input("Periodo que quieres revisar", key="aud_periodo", placeholder="Ej.: ejercicios 2023–2026")
+                modalidad_aud = st.selectbox(
+                    "Tipo de auditoría",
+                    [
+                        "Auditoría integral de la gestión (recomendada)",
+                        "Revisar citación y preparar la junta",
+                        "Contrastar citaciones, actas y acuerdos",
+                        "Auditar proyecto, obra, presupuestos y contratos",
+                        "Auditar cuentas, cuotas, facturas y pagos",
+                        "Revisar actuaciones y obligaciones de la administradora",
+                    ],
+                    key="aud_modalidad",
+                )
+            pregunta_aud = st.text_area(
+                "Instrucción adicional (opcional)",
+                key="aud_pregunta_especifica",
+                height=85,
+                placeholder="Ej.: Contrasta el presupuesto aprobado con las facturas y explica las diferencias.",
+            )
+            incluir_memoria_aud = st.checkbox(
+                "Incluir también los documentos ya archivados en la memoria de esta comunidad",
+                value=True,
+                key="aud_incluir_memoria",
             )
 
-        archivos_aud = st.file_uploader(
-            "Documentación para cruzar (puedes seleccionar varios archivos)",
-            type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "jpg", "jpeg", "png"],
-            accept_multiple_files=True,
-            key="aud_archivos_integral",
-            help="Por ejemplo: citaciones, actas, estatutos, contratos de administración, proyectos, informes técnicos, presupuestos, facturas, extractos bancarios y liquidaciones.",
-        )
-        if archivos_aud:
-            st.success(f"📎 Xavilu detecta {len(archivos_aud)} archivo(s) adjunto(s) para esta auditoría:")
-            for archivo_detectado_aud in archivos_aud:
-                st.write(f"• {archivo_detectado_aud.name} — {archivo_detectado_aud.size:,} bytes")
-            st.caption("La auditoría completa comienza al pulsar «Auditar y cruzar toda la documentación» más abajo.")
-        pregunta_aud = st.text_area(
-            "¿Qué te preocupa o qué quieres que compruebe? (opcional)",
-            key="aud_pregunta_especifica",
-            height=100,
-            placeholder="Ej.: Se aprobó una obra por 18.000 €, pero se facturaron 26.000 €. Comprueba qué autorizó la junta, qué se contrató y qué se pagó.",
-        )
-        st.caption("La auditoría integral lee cada archivo y lo divide en bloques para analizarlos individualmente antes de cruzar hallazgos. Los originales legibles y no legibles se archivan en la memoria local de la comunidad. Para una auditoría económica seria aporta, cuando los tengas, presupuesto aprobado, ofertas, contrato, facturas, justificantes de pago, extractos, liquidación y acta de autorización.")
-        incluir_memoria_aud = st.checkbox(
-            "Incluir también todos los documentos ya archivados en la memoria de esta comunidad (recomendado)",
-            value=True,
-            key="aud_incluir_memoria",
-        )
         try:
             documentos_memoria_aud = obtener_documentos_comunidad(comunidad_aud, territorio_aud) if incluir_memoria_aud else []
         except Exception as exc_memoria_aud:
             documentos_memoria_aud = []
-            st.warning(f"No se pudo leer la memoria documental de esta comunidad: {type(exc_memoria_aud).__name__}.")
+            st.error(f"No se pudo leer la memoria documental de esta comunidad: {type(exc_memoria_aud).__name__}.")
+
+        col_archivos_aud, col_ejecutar_aud = st.columns([4, 1])
+        with col_archivos_aud:
+            archivos_aud = st.file_uploader(
+                "📎 Adjuntar documentación (puedes seleccionar varios archivos)",
+                type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key="aud_archivos_integral",
+                help="Actas, citaciones, estatutos, contratos, proyectos, informes, presupuestos, facturas, extractos y liquidaciones.",
+            )
+        with col_ejecutar_aud:
+            st.markdown("**Análisis**")
+            total_fuentes_aud = len(archivos_aud or []) + len(documentos_memoria_aud)
+            st.caption(f"{total_fuentes_aud} documento(s) disponibles")
+            ejecutar_auditoria_integral = st.button(
+                "🧠 Analizar todo",
+                type="primary",
+                use_container_width=True,
+                key="btn_auditoria_integral",
+                disabled=(total_fuentes_aud == 0),
+            )
+
+        if archivos_aud:
+            st.caption("Adjuntos: " + " · ".join(a.name for a in archivos_aud))
         if documentos_memoria_aud:
-            st.caption(f"Se incorporarán {len(documentos_memoria_aud)} documento(s) ya archivado(s), además de los nuevos adjuntos; los duplicados por huella digital se evitarán.")
-
+            st.caption(f"Se añadirán {len(documentos_memoria_aud)} documento(s) del expediente guardado; se evitarán duplicados.")
         if not archivos_aud and not documentos_memoria_aud:
-            st.caption("Adjunta documentos aquí o archívalos primero en CONSULTA LIBRE para poder ejecutar la auditoría exhaustiva.")
+            st.caption("Adjunta documentos aquí o guárdalos antes en Consulta libre para analizarlos.")
 
-        if (archivos_aud or documentos_memoria_aud) and st.button("🧠 Auditar y cruzar toda la documentación", type="primary", use_container_width=True, key="btn_auditoria_integral"):
+        if ejecutar_auditoria_integral:
             st.session_state.pop("auditoria_integral_resultado", None)
             st.session_state.pop("auditoria_integral_fuentes", None)
             nombres_archivos_aud = [a.name for a in (archivos_aud or [])]
@@ -5927,23 +5942,28 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
     elif sub_idx == 6:
         st.markdown("### 💬 Consulta libre sobre tu comunidad")
         st.caption("Pregunta con tus propias palabras sobre cualquier asunto de la comunidad. Adjunta citaciones, actas, estatutos, presupuestos, derramas, facturas, extractos, contratos, proyectos, informes, fotografías y documentos Office. Xavilu conserva el expediente y el chat en la memoria local de esta comunidad para retomarlos en futuras sesiones.")
-        st.info("Esta consulta libre sirve para preguntas y seguimiento sobre el expediente. Para una revisión exhaustiva de todos los archivos, incluidos documentos largos, utiliza también «AUDITORÍA INTEGRAL»: Xavilu divide cada documento legible en bloques, los analiza uno por uno y después cruza sus hallazgos. Cualquier página o imagen no legible queda señalada como limitación.")
-        st.info("Xavilu es un asistente de análisis jurídico-documental y administrativo. No es un abogado colegiado, no sustituye una auditoría/pericial ni garantiza un resultado judicial. En asuntos con plazos, dinero relevante o posible litigio, pide revisión profesional antes de actuar.")
-        st.warning("Los originales y textos extraídos se guardan en el ordenador en documentos_comunidad y xavilu_memoria.db. Cuando preguntes, el contexto documental puede enviarse al proveedor de IA configurado. Oculta DNI/NIE, IBAN, teléfonos, firmas y domicilios particulares que no sean necesarios; la base local no está cifrada por Xavilu.")
+        with st.expander("ℹ️ Ayuda, alcance y privacidad", expanded=False):
+            st.info("Puedes preguntar cualquier asunto y adjuntar documentos. Para una revisión exhaustiva de expedientes largos, utiliza también Auditoría integral: divide los documentos en bloques y cruza hallazgos.")
+            st.info("Xavilu es un asistente de análisis jurídico-documental, no un abogado colegiado ni un perito. En asuntos con plazos o consecuencias económicas relevantes, conviene una revisión profesional.")
+            st.warning("Los originales y textos extraídos se guardan localmente en documentos_comunidad y xavilu_memoria.db. El contexto de la consulta puede enviarse al proveedor de IA configurado. Oculta datos personales innecesarios; la base local no está cifrada por Xavilu.")
 
-        col_comunidad_chat, col_territorio_chat = st.columns(2)
-        with col_comunidad_chat:
-            comunidad_chat = st.text_input(
-                "Nombre o referencia de la comunidad",
-                key="consulta_comunidad_nombre",
-                placeholder="Ej.: Comunidad Edificio Norte",
-            )
-        with col_territorio_chat:
-            territorio_chat = st.text_input(
-                "Municipio y comunidad autónoma",
-                key="consulta_comunidad_territorio",
-                placeholder="Ej.: Rincón de la Victoria, Andalucía",
-            )
+        with st.expander(
+            "⚙️ Identificación de la comunidad",
+            expanded=not bool(st.session_state.get("consulta_comunidad_nombre")) or not bool(st.session_state.get("consulta_comunidad_territorio")),
+        ):
+            col_comunidad_chat, col_territorio_chat = st.columns(2)
+            with col_comunidad_chat:
+                comunidad_chat = st.text_input(
+                    "Nombre o referencia de la comunidad",
+                    key="consulta_comunidad_nombre",
+                    placeholder="Ej.: Comunidad Edificio Norte",
+                )
+            with col_territorio_chat:
+                territorio_chat = st.text_input(
+                    "Municipio y comunidad autónoma",
+                    key="consulta_comunidad_territorio",
+                    placeholder="Ej.: Rincón de la Victoria, Andalucía",
+                )
 
         clave_chat_actual = clave_expediente_comunidad(comunidad_chat, territorio_chat)
         if st.session_state.get("_consulta_comunidad_clave_activa") != clave_chat_actual:
@@ -5966,14 +5986,25 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
                     st.write(f"**#{doc_id_mem} · {nombre_mem}** — {fecha_mem} · {mb_mem:.2f} MB · {estado_mem}")
                 st.caption("Los documentos se guardan localmente en la carpeta documentos_comunidad y en xavilu_memoria.db. La base local no está cifrada por Xavilu: protege el ordenador y limita el acceso a la carpeta.")
 
-        st.markdown("#### 1. Añadir documentación al expediente")
-        archivos_consulta = st.file_uploader(
-            "Adjunta uno o varios documentos",
-            type=["pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg"],
-            accept_multiple_files=True,
-            key=f"consulta_comunidad_archivos_{clave_chat_actual[:12]}",
-            help="Puedes cargar varios documentos a la vez. Al seleccionarlos, Xavilu los detectará y leerá automáticamente para incorporarlos al expediente; después podrás preguntar sobre ellos.",
-        )
+        st.markdown("#### 📎 Documentos y consulta")
+        col_adjuntos_chat, col_accion_adjuntos_chat = st.columns([4, 1])
+        with col_adjuntos_chat:
+            archivos_consulta = st.file_uploader(
+                "Adjunta actas, citaciones, presupuestos, facturas, proyectos o cualquier documento",
+                type=["pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg"],
+                accept_multiple_files=True,
+                key=f"consulta_comunidad_archivos_{clave_chat_actual[:12]}",
+                help="Al seleccionar archivos nuevos, Xavilu los leerá e incorporará automáticamente al expediente.",
+            )
+        with col_accion_adjuntos_chat:
+            st.markdown("**Expediente**")
+            cargar_docs_chat = st.button(
+                "📥 Leer ahora",
+                type="primary",
+                use_container_width=True,
+                key="consulta_comunidad_cargar_docs",
+                disabled=not bool(archivos_consulta),
+            )
         # Streamlit solo entrega el archivo subido a este módulo; antes era obligatorio
         # pulsar «Leer y añadir documentos». Ahora detectamos archivos nuevos por hash y
         # los incorporamos automáticamente al expediente, evitando reprocesarlos en cada rerun.
@@ -5989,27 +6020,19 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
             if hash_detectado and hash_detectado not in hashes_expediente:
                 archivos_consulta_pendientes.append((archivo_detectado, hash_detectado))
         if archivos_consulta_pendientes:
-            st.info(f"📎 Xavilu ha detectado {len(archivos_consulta_pendientes)} documento(s) nuevo(s). Se leerán automáticamente y se añadirán al expediente de esta comunidad.")
+            st.caption(f"Xavilu ha detectado {len(archivos_consulta_pendientes)} documento(s) nuevo(s) y los incorporará automáticamente.")
 
-        modo_carga_chat = st.radio(
-            "Al cargar nuevos documentos (los originales archivados nunca se borran desde esta opción)",
-            ["Añadir a los documentos ya cargados", "Reemplazar la vista de esta sesión (sin borrar el archivo histórico)"],
-            horizontal=True,
-            key="consulta_comunidad_modo_carga",
-        )
-        col_cargar_chat, col_limpiar_chat_docs = st.columns(2)
-        with col_cargar_chat:
-            cargar_docs_chat = st.button(
-                "📥 Leer y añadir documentos",
-                type="primary",
-                use_container_width=True,
-                key="consulta_comunidad_cargar_docs",
-                disabled=not bool(archivos_consulta),
+        modo_carga_chat = "Añadir a los documentos ya cargados"
+        limpiar_docs_chat = False
+        with st.expander("⚙️ Opciones avanzadas del expediente", expanded=False):
+            modo_carga_chat = st.radio(
+                "Al cargar nuevos documentos",
+                ["Añadir a los documentos ya cargados", "Reemplazar la vista de esta sesión (sin borrar el archivo histórico)"],
+                horizontal=True,
+                key="consulta_comunidad_modo_carga",
             )
-        with col_limpiar_chat_docs:
             limpiar_docs_chat = st.button(
-                "🗑️ Vaciar documentos cargados",
-                use_container_width=True,
+                "🗑️ Vaciar documentos cargados de esta sesión",
                 key="consulta_comunidad_vaciar_docs",
             )
 
@@ -6099,34 +6122,33 @@ Redacta en español claro, firme, técnico y comprensible para propietarios sin 
         else:
             st.caption("Todavía no hay documentos cargados en este expediente. Puedes hacer preguntas generales; al añadir archivos se guardarán en la memoria local de esta comunidad.")
 
-        st.markdown("#### 2. Pregunta lo que necesites")
-        st.caption("Ejemplos: «¿Pueden aprobar esta derrama con esta convocatoria?», «Compara estos tres presupuestos partida por partida», «¿Qué documentación puedo exigir a la administradora?», «¿El acta refleja lo que realmente se votó?», «¿Qué riesgos tiene este contrato?».")
-        verificar_boe_chat = st.checkbox(
-            "Contrastar las cuestiones jurídicas con la legislación consolidada del BOE en cada pregunta",
-            value=True,
-            key="consulta_comunidad_verificar_boe",
-        )
-
+        st.markdown("#### 💬 Pregunta lo que necesites")
         historial_comunidad_chat = st.session_state.setdefault("consulta_comunidad_historial", [])
-        col_historial_chat, col_borrar_historial_chat = st.columns([3, 1])
-        with col_historial_chat:
-            st.caption(f"Conversación de esta sesión: {len(historial_comunidad_chat)} mensajes. Puedes preguntar varias veces y hacer preguntas de seguimiento.")
-        with col_borrar_historial_chat:
-            if st.button("Limpiar chat", key="consulta_comunidad_limpiar_chat", use_container_width=True):
-                borrar_chat_comunidad(comunidad_chat, territorio_chat)
-                st.session_state["consulta_comunidad_historial"] = []
-                st.rerun()
+        with st.expander("⚖️ Opciones de respuesta", expanded=False):
+            verificar_boe_chat = st.checkbox(
+                "Contrastar las cuestiones jurídicas con la legislación consolidada del BOE en cada pregunta",
+                value=True,
+                key="consulta_comunidad_verificar_boe",
+            )
 
-        for mensaje_comunidad in historial_comunidad_chat:
-            with st.chat_message(mensaje_comunidad["role"]):
-                st.markdown(mensaje_comunidad["content"])
-                if mensaje_comunidad.get("fuentes"):
-                    with st.expander("Fuentes oficiales utilizadas"):
-                        for fuente_chat in mensaje_comunidad["fuentes"]:
-                            st.markdown(f"- [{fuente_chat.get('titulo', 'Fuente BOE')}]({fuente_chat.get('url', '')}) — actualización: {fuente_chat.get('actualizado') or 'no indicada'}")
+        with st.form("consulta_comunidad_form_pregunta", clear_on_submit=True):
+            col_pregunta_chat, col_enviar_chat = st.columns([5, 1])
+            with col_pregunta_chat:
+                pregunta_libre_comunidad = st.text_area(
+                    "Escribe tu pregunta o instrucción para Xavilu",
+                    key="consulta_comunidad_pregunta_texto",
+                    height=95,
+                    placeholder="Ej.: Analiza estos presupuestos partida por partida y compáralos con lo aprobado en el acta. Indica qué podemos exigir a la administradora.",
+                )
+            with col_enviar_chat:
+                st.markdown("**Consultar**")
+                enviar_consulta_comunidad = st.form_submit_button(
+                    "🚀 Enviar a Xavilu",
+                    type="primary",
+                    use_container_width=True,
+                )
 
-        pregunta_libre_comunidad = st.chat_input("Pregunta cualquier cosa sobre tu comunidad...")
-        if pregunta_libre_comunidad and pregunta_libre_comunidad.strip():
+        if enviar_consulta_comunidad and pregunta_libre_comunidad and pregunta_libre_comunidad.strip():
             pregunta_libre_comunidad = pregunta_libre_comunidad.strip()
             historial_previo_chat = list(historial_comunidad_chat)
             st.session_state["consulta_comunidad_historial"].append({"role": "user", "content": pregunta_libre_comunidad})
@@ -6253,10 +6275,59 @@ Responde con rigor, sin ocultar dudas ni inventar datos."""
                     st.warning(f"La respuesta está visible, pero no pudo guardarse en memoria: {type(exc_chat).__name__}.")
                 st.rerun()
 
-        if st.session_state.get("consulta_comunidad_historial"):
-            conversacion_exportar_chat = "\n\n".join(
-                ("PROPIETARIO" if m["role"] == "user" else "XAVILU") + ":\n" + m["content"]
-                for m in st.session_state["consulta_comunidad_historial"]
+        historial_comunidad_chat = st.session_state.get("consulta_comunidad_historial", [])
+        if historial_comunidad_chat:
+            # Mantener la memoria completa en SQLite, pero no llenar la pantalla
+            # con conversaciones antiguas. Solo se muestra la respuesta más reciente;
+            # el historial queda oculto tras un expander cerrado por defecto.
+            ultima_respuesta_chat = next(
+                (m for m in reversed(historial_comunidad_chat) if m.get("role") == "assistant"),
+                None,
             )
-            botones_descarga(conversacion_exportar_chat, "Consulta_Libre_Comunidad", formatos_extra=True)
+            if ultima_respuesta_chat:
+                with st.chat_message("assistant"):
+                    st.markdown(ultima_respuesta_chat.get("content", ""))
+                    if ultima_respuesta_chat.get("fuentes"):
+                        with st.expander("Fuentes oficiales utilizadas", expanded=False):
+                            for fuente_chat in ultima_respuesta_chat["fuentes"]:
+                                st.markdown(
+                                    f"- [{fuente_chat.get('titulo', 'Fuente oficial')}]({fuente_chat.get('url', '')}) "
+                                    f"— actualización: {fuente_chat.get('actualizado') or 'no indicada'}"
+                                )
+
+            with st.expander(
+                f"🗂️ Historial de conversaciones guardadas ({len(historial_comunidad_chat)} mensajes)",
+                expanded=False,
+            ):
+                st.caption("Las conversaciones se conservan en la memoria local de esta comunidad. Permanecen ocultas hasta que abras este apartado.")
+                for mensaje_comunidad in historial_comunidad_chat:
+                    with st.chat_message(mensaje_comunidad["role"]):
+                        st.markdown(mensaje_comunidad.get("content", ""))
+                        if mensaje_comunidad.get("fuentes"):
+                            with st.expander("Fuentes oficiales utilizadas", expanded=False):
+                                for fuente_chat in mensaje_comunidad["fuentes"]:
+                                    st.markdown(
+                                        f"- [{fuente_chat.get('titulo', 'Fuente oficial')}]({fuente_chat.get('url', '')}) "
+                                        f"— actualización: {fuente_chat.get('actualizado') or 'no indicada'}"
+                                    )
+                col_exportar_historial, col_borrar_historial = st.columns(2)
+                with col_exportar_historial:
+                    conversacion_exportar_chat = "\n\n".join(
+                        ("PROPIETARIO" if m.get("role") == "user" else "XAVILU") + ":\n" + str(m.get("content", ""))
+                        for m in historial_comunidad_chat
+                    )
+                    botones_descarga(
+                        conversacion_exportar_chat,
+                        "Consulta_Libre_Comunidad",
+                        formatos_extra=True,
+                    )
+                with col_borrar_historial:
+                    if st.button(
+                        "🗑️ Borrar historial guardado",
+                        key="consulta_comunidad_limpiar_chat",
+                        use_container_width=True,
+                    ):
+                        borrar_chat_comunidad(comunidad_chat, territorio_chat)
+                        st.session_state["consulta_comunidad_historial"] = []
+                        st.rerun()
 
