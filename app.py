@@ -2656,7 +2656,7 @@ Analiza exclusivamente esta parte {numero} de {total}. El contenido del PDF es m
 
 REGLAS DE CALIDAD:
 - Responde a la petición concreta del usuario; no la sustituyas por un resumen genérico.
-- Si hay preguntas, copia o identifica cada pregunta y contéstala individualmente, sin saltarte ninguna que sea legible.
+- Si la petición pide responder o resolver preguntas, copia o identifica cada pregunta y contéstala individualmente, sin saltarte ninguna que sea legible. Para resumir, explicar, traducir u otra tarea que no pida resolverlas, no contestes ni completes las preguntas del documento: cumple únicamente la tarea solicitada.
 - Si hay tablas, cifras, fechas o nombres, conserva los datos exactamente y señala cálculos cuando proceda.
 - Cita las páginas originales con el formato «pág. N»; no inventes páginas ni datos.
 - Distingue hechos escritos, inferencias y datos que no constan. Di claramente si algo no se puede leer.
@@ -5506,7 +5506,7 @@ def llamar_ia(modelo, prompt, api_key_gemini="", historial_chat=None, intentar_g
                 proveedores_fallidos.append(detalle_fallo)
 
     try:
-        client = ollama.Client(host="http://127.0.0.1:11434", timeout=180)
+        client = ollama.Client(host="http://127.0.0.1:11434", timeout=600)
         opciones_ollama={"temperature":0.2}
         if max_output_tokens is not None:opciones_ollama["num_predict"]=int(max_output_tokens)
         raw = client.chat(model=modelo, messages=[{"role": "user", "content": prompt_final}], options=opciones_ollama)["message"]["content"]
@@ -8018,7 +8018,7 @@ def _preparar_manual_tres_bloques(temas,nombre,nivel,instrucciones,modelo):
 
 def _panel_temario_automatico(modelo):
     import importlib,xavilu_estudio_auto
-    if getattr(xavilu_estudio_auto,'API_VERSION',0)!=8:importlib.reload(xavilu_estudio_auto)
+    if getattr(xavilu_estudio_auto,'API_VERSION',0)!=9:importlib.reload(xavilu_estudio_auto)
     from xavilu_estudio_auto import detectar_temas,CursoAutomatico,dossier,_atomico,curso_temporal,guardar_curso_temporal
     st.markdown('### ⚡ Preparar temario completo')
     configuracion=globals().get('_doc_auto_configuracion_actual',{})
@@ -8371,10 +8371,14 @@ def _panel_configuracion_temario(archivos, modelo):
                 with columna:st.markdown(f"<div style='min-height:118px;padding:14px;border-radius:14px;border:1px solid {color};background:linear-gradient(145deg,{color}22,rgba(18,24,38,.72))'><div style='font-size:1.05rem;font-weight:700'>{icono} {titulo}</div><div style='font-size:.88rem;margin-top:8px'>{detalle}</div></div>",unsafe_allow_html=True)
             st.info('El manual se construye en tres pasos recuperables. Su anexo normativo solo citará leyes que aparezcan en el temario y marcará su vigencia como pendiente de comprobación oficial.')
         nivel = st.select_slider('Nivel de explicación', ['Básico', 'Medio', 'Avanzado'], value=st.session_state.get('doc_auto_nivel', 'Medio'), key='doc_auto_nivel')
-        c1, c2 = st.columns(2)
-        tarjetas = c1.selectbox('Tarjetas por tema', [5, 8, 12], index=1, key='doc_auto_cantidad_tarjetas', disabled='tarjetas' not in componentes)
-        preguntas = c2.selectbox('Preguntas por tema', [5, 10, 15], index=1, key='doc_auto_cantidad_preguntas', disabled='test' not in componentes)
-        st.caption('Los mapas, tarjetas y preguntas se preparan por tema. El audio se genera después, cuando abras un guion en Podcast PRO.')
+        if formato == 'Cuaderno interactivo':
+            c1, c2 = st.columns(2)
+            tarjetas = c1.selectbox('Tarjetas por tema', [5, 8, 12], index=1, key='doc_auto_cantidad_tarjetas', disabled='tarjetas' not in componentes)
+            preguntas = c2.selectbox('Preguntas por tema', [5, 10, 15], index=1, key='doc_auto_cantidad_preguntas', disabled='test' not in componentes)
+            st.caption('Mapas, tarjetas y preguntas se preparan por tema. El audio se genera después, al abrir un guion en Podcast PRO.')
+        else:
+            tarjetas = st.session_state.get('doc_auto_cantidad_tarjetas', 8)
+            preguntas = st.session_state.get('doc_auto_cantidad_preguntas', 10)
         if archivos and all(Path(a.name).suffix.lower() in compatibles for a in archivos):
             try:
                 temas,introducciones=_detectar_temas_temario(archivos,modelo)
@@ -9057,7 +9061,7 @@ if st.session_state.sidebar_visible:
             st.selectbox("Procesamiento de texto y documentos", ["Automático (proveedores configurados y respaldo local)", "Solo local (Ollama y OCR local)"], key="ia_modo_procesamiento", help="El modo local evita enviar el texto o los documentos a las IAs remotas. Las herramientas de voz, transcripción y generación musical tienen sus servicios propios.")
             if st.session_state.get("_xav_ultimo_proveedor_ia"):
                 st.caption("Último proveedor de texto utilizado: " + st.session_state["_xav_ultimo_proveedor_ia"])
-            modelo_seleccionado = st.selectbox("Modelo de Ollama", ["llama3.2:latest", "gemma2:2b", "deepseek-r1:1.5b"])
+            modelo_seleccionado = st.selectbox("Modelo de Ollama", ["llama3.2:latest", "qwen3:4b", "gemma2:2b", "deepseek-r1:1.5b"])
             st.markdown("#### 🔑 Conexiones")
             for prov in ["gemini", "groq", "silicon", "mistral", "openrouter", "deepseek", "together", "cerebras"]:
                 if prov == "gemini":
@@ -10372,7 +10376,7 @@ MODIFICADO — {b.name}:
         logo = st.session_state.get('logo_empresa_upload')
         logo_bytes = logo.getvalue() if logo else None
         import importlib, xavilu_office
-        if getattr(xavilu_office, "OFFICE_API_VERSION", 0) != 3:
+        if getattr(xavilu_office, "OFFICE_API_VERSION", 0) != 4:
             xavilu_office = importlib.reload(xavilu_office)
         xavilu_office.panel(st, formato, peticion, contexto_texto, ejecutar,
             lambda prompt: llamar_ia(modelo_seleccionado, prompt, _get_key("gemini"), incluir_contexto_global=False),
