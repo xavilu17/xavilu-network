@@ -27,7 +27,7 @@ export default function(component){
   iframe.srcdoc=data.html;
 }
 '''
-_VISOR=st.components.v2.component('xavilu_visormapa_pdf',html='<iframe title="Mapa interactivo con exportación PDF" style="width:100%;height:730px;border:0" sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>',js=_JS)
+_VISOR=st.components.v2.component('xavilu_visormapa_pdf',html='<iframe title="Mapa interactivo con exportación PDF" style="width:100%;height:730px;border:0" sandbox="allow-scripts allow-downloads"></iframe>',js=_JS)
 
 def visor_pdf(codigo,direccion,clave):
     import importlib,xavilu_mapas
@@ -140,4 +140,3 @@ def generar_pdf_mapa(svg,titulo='Mapa',orientacion='A4 horizontal'):
                 c.saveState();p=c.beginPath();p.rect(margen,30,w,h);c.clipPath(p,stroke=0)
                 c.translate(margen-columna*pasox,30+h-dibujo.height*escala_detalle+fila*pasoy);c.scale(escala_detalle,escala_detalle);renderPDF.draw(dibujo,c,0,0);c.restoreState();c.showPage();numero+=1
     c.save();return out.getvalue()
-

@@ -3768,7 +3768,7 @@ def _render_tutor_ia(modelo_seleccionado, archivos_seleccionados=None):
                         cols_cal = st.columns(3)
                         for columna_cal, etiqueta_cal, calidad_cal in zip(cols_cal, ("Otra vez", "Difícil", "Recordada"), (1, 3, 5)):
                             if columna_cal.button(etiqueta_cal, key=f"xav_tutor_tarjeta_{calidad_cal}"):
-                                xavilu_aprendizaje.calificar_tarjeta(CARPETA_PROYECTO / "xavilu_memoria.db", tarjeta_rep["id"], calidad_cal)
+                                xavilu_aprendizaje.calificar_tarjeta(CARPETA_PROYECTO / "xavilu_memoria.db", perfil_rep, tarjeta_rep["id"], calidad_cal)
                                 st.session_state["xav_tutor_tarjeta_indice"] = (idx_rep + 1) % len(tarjetas_rep)
                                 st.session_state.pop("xav_tutor_tarjeta_revelada", None)
                                 st.rerun()
@@ -6274,7 +6274,7 @@ def _original_mesa_estudio(archivos,modelo):
 
 def _ejecutar_paso_estudio(modelo,accion,material,notas,cantidad,dificultad,modo,audio_modo,editado):
     import importlib,xavilu_estudio_flujo
-    if getattr(xavilu_estudio_flujo,'API_VERSION',0)!=3:importlib.reload(xavilu_estudio_flujo)
+    if getattr(xavilu_estudio_flujo,'API_VERSION',0)!=4:importlib.reload(xavilu_estudio_flujo)
     from xavilu_estudio_flujo import prompt_estudio,validar_test,texto_test
     global _continuacion_mapa_activa
     if accion=='editar':return {'texto':editado,'titulo':'Texto editado','tipo':'texto'}
@@ -6361,7 +6361,7 @@ def _guardar_desde_mesa(resultado,clave):
 @st.fragment
 def _mesa_estudio_fragmento(registro,archivos,modelo):
     import importlib,xavilu_estudio_flujo
-    if getattr(xavilu_estudio_flujo,'API_VERSION',0)!=3:importlib.reload(xavilu_estudio_flujo)
+    if getattr(xavilu_estudio_flujo,'API_VERSION',0)!=4:importlib.reload(xavilu_estudio_flujo)
     from xavilu_estudio_flujo import iniciar,dibujar
     firma=hashlib.sha256(repr((registro['clave'],registro['texto'],[(a.name,hashlib.sha256(a.getvalue()).hexdigest()) for a in archivos])).encode()).hexdigest()
     memoria=st.session_state.get('_mesa_de_estudio')
@@ -8022,7 +8022,7 @@ def _preparar_manual_tres_bloques(temas,nombre,nivel,instrucciones,modelo):
 
 def _panel_temario_automatico(modelo):
     import importlib,xavilu_estudio_auto
-    if getattr(xavilu_estudio_auto,'API_VERSION',0)!=9:importlib.reload(xavilu_estudio_auto)
+    if getattr(xavilu_estudio_auto,'API_VERSION',0)!=10:importlib.reload(xavilu_estudio_auto)
     from xavilu_estudio_auto import detectar_temas,CursoAutomatico,dossier,_atomico,curso_temporal,guardar_curso_temporal
     st.markdown('### ⚡ Preparar temario completo')
     configuracion=globals().get('_doc_auto_configuracion_actual',{})
@@ -8063,6 +8063,7 @@ def _panel_temario_automatico(modelo):
         return
     curso=curso_temporal(st.session_state,ARCHIVO_XAVILU_ROOT,nombre,temas,instrucciones,st.session_state.get('rol','admin'),componentes,nivel,cantidad_tarjetas,cantidad_preguntas)
     st.caption(f"📘 {len(temas)} tema(s) · {len(componentes)} material(es) por tema · nivel {nivel}")
+    st.caption('El progreso y los kits se guardan en ARCHIVO_XAVILU como archivos locales sin cifrar.')
     hechos=curso.completados();st.progress(len(hechos)/len(temas),text=f'{len(hechos)} de {len(temas)} temas preparados')
     uno=st.button('Probar primero con un tema',key='doc_auto_preparar_uno',disabled=len(hechos)==len(temas),width='stretch')
     todos=bool(globals().get('_ejecutar_tarea_material',False))
@@ -8483,7 +8484,7 @@ def _abrir_seleccion_archivo_en_documentos(rutas=None, convertir_texto=False):
 
 def _abrir_resultado_busqueda(ruta, accion):
     try:
-        archivo = ArchivoLocal(CARPETA_PROYECTO)._ruta(ruta)
+        archivo = ArchivoLocal(CARPETA_PROYECTO).resolver_archivo(ruta)
         if not archivo.is_file():
             raise FileNotFoundError("El archivo ya no está en la biblioteca.")
         _abrir_seleccion_archivo_en_documentos([str(archivo)], convertir_texto=True)
@@ -8600,6 +8601,8 @@ def _panel_archivos_generados():
             return
 
         archivos = biblioteca.listar()
+        if biblioteca.listado_limitado:
+            st.warning(f'Se muestran como máximo {biblioteca.MAX_ARCHIVOS_LISTADO:,} archivos. Reduce el contenido de la biblioteca para ver el resto.')
         busqueda = st.text_input("Buscar por nombre, carpeta o categoría", key="mi_archivo_salidas_buscar").strip().casefold()
         col_origen, col_categoria = st.columns(2)
         origenes = ["Todos los orígenes"] + sorted({a["origen"] for a in archivos})
@@ -8631,7 +8634,7 @@ def _panel_archivos_generados():
         if not elegido:
             return
         ficha = next(a for a in filtrados if a["ruta"] == elegido)
-        ruta = biblioteca._ruta(elegido)
+        ruta = biblioteca.resolver_archivo(elegido)
         st.caption(f"{ficha['origen']} · {ficha['bytes'] / 1024:.1f} KB · Modificado: {datetime.datetime.fromtimestamp(ficha['modificado']).strftime('%d/%m/%Y %H:%M')}")
         clave = hashlib.sha256(elegido.encode()).hexdigest()[:16]
         with st.form("archivo_organizar_" + clave):
@@ -9788,7 +9791,7 @@ def _panel_aprendizaje_inicio():
                 for col,(etiqueta,calidad) in zip(columnas,[("Otra vez",0),("Difícil",3),("Bien",4),("Fácil",5)]):
                     with col:
                         if st.button(etiqueta,key=f"xav_repaso_{calidad}_"+ident[:12],width="stretch"):
-                            calificar_tarjeta(_aprendizaje_path(),ident,calidad)
+                            calificar_tarjeta(_aprendizaje_path(),st.session_state.get("rol","admin"),ident,calidad)
                             st.session_state.pop("_xav_repaso_revelado",None);st.rerun()
             st.caption(f"Quedan {len(pendientes)} tarjeta(s) vencida(s) en esta sesión de repaso.")
         elif datos["total_tarjetas"]:

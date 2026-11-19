@@ -1,6 +1,6 @@
 """Repaso espaciado, simulacros y cuaderno de errores para Xavilu."""
 from __future__ import annotations
-import hashlib, sqlite3
+import hashlib
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 
@@ -9,9 +9,8 @@ INTERVALOS_DIAS = (1, 3, 7, 15, 30)
 
 @contextmanager
 def _db(path):
-    db=sqlite3.connect(str(path),timeout=15)
-    try:
-        db.execute('PRAGMA busy_timeout=15000')
+    from xavilu_mantenimiento import conexion_sqlite
+    with conexion_sqlite(str(path), timeout=15) as db:
         db.executescript('''
         CREATE TABLE IF NOT EXISTS aprendizaje_tarjetas (
             id TEXT PRIMARY KEY, perfil TEXT NOT NULL, curso TEXT NOT NULL, tema TEXT NOT NULL,
@@ -39,12 +38,6 @@ def _db(path):
         CREATE TABLE IF NOT EXISTS aprendizaje_objetivos (perfil TEXT PRIMARY KEY, tarjetas_dia INTEGER NOT NULL DEFAULT 10, minutos_dia INTEGER NOT NULL DEFAULT 30, actualizada TEXT NOT NULL);
         ''')
         yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
 
 
 def _now(): return datetime.now().replace(microsecond=0)
@@ -83,7 +76,7 @@ def registrar_intento(path, perfil, curso, tema, preguntas, respuestas, examen=F
         db.execute('INSERT INTO aprendizaje_intentos(perfil,curso,tema,total,aciertos,fallos,puntuacion,aprobado,examen,fecha) VALUES(?,?,?,?,?,?,?,?,?,?)',
                    (str(perfil),str(curso),str(tema),total,correctas,fallos,puntuacion,int(aprobado),int(examen),_iso(fecha)))
         db.execute('INSERT INTO aprendizaje_eventos(perfil,tipo,fecha) VALUES(?,?,?)',(str(perfil),'examen' if examen else 'test',_iso(fecha)))
-        for i,p,elegida,correcta,micro in errores:
+        for i,p,elegida,correcta,micro in errores[:10]:
             ident=hashlib.sha256((str(perfil)+'\0'+str(curso)+'\0'+str(tema)+'\0'+str(p.get('pregunta',p.get('enunciado','')))).encode()).hexdigest()
             db.execute('''INSERT INTO aprendizaje_errores(id,perfil,curso,tema,pregunta,elegida,correcta,microexplicacion,referencia,fecha,repasado)
                          VALUES(?,?,?,?,?,?,?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET
@@ -106,20 +99,28 @@ def tarjetas_pendientes(path, perfil, limite=20):
     return [dict(zip(keys,r)) for r in rows]
 
 
-def calificar_tarjeta(path, ident, calidad):
-    calidad=max(0,min(5,int(calidad)));ahora=_now()
+def calificar_tarjeta(path, perfil, ident, calidad):
+    if isinstance(calidad, bool) or not str(calidad).strip().lstrip('-').isdigit():
+        raise ValueError('La calidad debe ser un número entero entre 0 y 5.')
+    calidad=int(calidad)
+    if not 0 <= calidad <= 5:
+        raise ValueError('La calidad debe estar entre 0 y 5.')
+    perfil=str(perfil)
+    ahora=_now()
     with _db(path) as db:
-        fila=db.execute('SELECT paso,facilidad,repeticiones,fallos,origen,perfil FROM aprendizaje_tarjetas WHERE id=?',(str(ident),)).fetchone()
+        fila=db.execute('SELECT paso,facilidad,repeticiones,fallos,origen FROM aprendizaje_tarjetas WHERE id=? AND perfil=?',(str(ident),perfil)).fetchone()
         if not fila:return False
-        paso,facilidad,repeticiones,fallos,origen,perfil=fila
+        paso,facilidad,repeticiones,fallos,origen=fila
         if calidad<3:
             paso=0;repeticiones=0;fallos+=1;facilidad=max(1.3,facilidad-.2);dias=1
         else:
             paso=0 if repeticiones==0 else min(len(INTERVALOS_DIAS)-1,paso+(2 if calidad>=5 else 1))
             repeticiones+=1;facilidad=max(1.3,facilidad+(0.1 if calidad>=5 else 0.0));dias=INTERVALOS_DIAS[paso]
-        db.execute('UPDATE aprendizaje_tarjetas SET paso=?,facilidad=?,repeticiones=?,fallos=?,fecha_revision=?,actualizada=? WHERE id=?',
-                   (paso,facilidad,repeticiones,fallos,_iso(ahora+timedelta(days=dias)),_iso(ahora),str(ident)))
-        if origen=='error':db.execute('UPDATE aprendizaje_errores SET repasado=1 WHERE id=?',(str(ident).removeprefix('error_'),))
+        db.execute('UPDATE aprendizaje_tarjetas SET paso=?,facilidad=?,repeticiones=?,fallos=?,fecha_revision=?,actualizada=? WHERE id=? AND perfil=?',
+                   (paso,facilidad,repeticiones,fallos,_iso(ahora+timedelta(days=dias)),_iso(ahora),str(ident),perfil))
+        if origen=='error' and calidad>=3:
+            db.execute('UPDATE aprendizaje_errores SET repasado=1 WHERE id=? AND perfil=?',(str(ident).removeprefix('error_'),perfil))
+            db.execute('DELETE FROM aprendizaje_tarjetas WHERE id=? AND perfil=?',(str(ident),perfil))
         db.execute('INSERT INTO aprendizaje_eventos(perfil,tipo,fecha) VALUES(?,?,?)',(perfil,'repaso',_iso(ahora)))
     return True
 
@@ -163,4 +164,3 @@ def errores_pendientes(path, perfil, limite=10):
         rows=db.execute('SELECT curso,tema,pregunta,elegida,correcta,microexplicacion,referencia,fecha FROM aprendizaje_errores WHERE perfil=? AND repasado=0 ORDER BY fecha DESC LIMIT ?',
                         (str(perfil),max(1,min(int(limite),100)))).fetchall()
     return [{'curso':r[0],'tema':r[1],'pregunta':r[2],'elegida':r[3],'correcta':r[4],'explicacion':r[5],'referencia':r[6],'fecha':r[7]} for r in rows]
-

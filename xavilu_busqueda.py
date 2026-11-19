@@ -152,11 +152,14 @@ class IndiceArchivo:
 
     def _actuales(self):
         actuales = {}
-        for ficha in self.archivo.listar():
+        fichas = self.archivo.listar()
+        if self.archivo.listado_limitado:
+            raise RuntimeError(f'La biblioteca supera {self.archivo.MAX_ARCHIVOS_LISTADO:,} archivos; reduce o separa el contenido antes de indexarla.')
+        for ficha in fichas:
             if Path(ficha['ruta']).suffix.lower() not in EXTENSIONES:
                 continue
             try:
-                ruta = self.archivo._ruta(ficha['ruta'])
+                ruta = self.archivo.resolver_archivo(ficha['ruta'])
                 stat = ruta.stat()
             except (FileNotFoundError, ValueError):
                 continue
@@ -185,7 +188,7 @@ class IndiceArchivo:
         pendientes = [(r,f) for r,f in actuales.items() if r not in previos or previos[r][:3] != (*f,VERSION) or previos[r][3] == 'error']
         leidos = 0
         for numero, (clave, firma) in enumerate(pendientes, 1):
-            ruta = self.archivo._ruta(clave)
+            ruta = self.archivo.resolver_archivo(clave)
             bloques = [];detalle = [];caracteres = 0;estado = 'ok'
             try:
                 if firma[0] > MAX_ARCHIVO:

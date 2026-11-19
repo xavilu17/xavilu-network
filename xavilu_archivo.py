@@ -7,10 +7,12 @@ import uuid
 
 
 class ArchivoLocal:
+    MAX_ARCHIVOS_LISTADO = 20000
     BASES = ('Descargas', 'ARCHIVO_XAVILU')
 
     def __init__(self, raiz):
         self.raiz = Path(raiz).resolve()
+        self.listado_limitado = False
         with self._db() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS archivo_organizacion (
@@ -64,6 +66,7 @@ class ArchivoLocal:
             meta = {r[0]: {'categoria': r[1], 'favorito': bool(r[2])}
                     for r in db.execute('SELECT ruta,categoria,favorito FROM archivo_organizacion')}
         archivos = []
+        self.listado_limitado = False
         for nombre in self.BASES:
             base = self.raiz / nombre
             if not base.exists():
@@ -72,6 +75,9 @@ class ArchivoLocal:
             for p in base.rglob('*'):
                 if not p.is_file():
                     continue
+                if len(archivos) >= self.MAX_ARCHIVOS_LISTADO:
+                    self.listado_limitado = True
+                    break
                 try:
                     p = self._ruta(p)
                     stat = p.stat()
@@ -83,7 +89,13 @@ class ArchivoLocal:
                     'bytes': stat.st_size, 'modificado': stat.st_mtime,
                     'categoria': meta.get(relativo, {}).get('categoria', ''),
                     'favorito': meta.get(relativo, {}).get('favorito', False)})
+            if self.listado_limitado:
+                break
         return sorted(archivos, key=lambda x: x['modificado'], reverse=True)
+
+    def resolver_archivo(self, ruta):
+        """Return a verified file path inside the Xavilu library."""
+        return self._ruta(ruta)
 
     def organizar(self, ruta, categoria, favorito):
         ruta = self._clave(ruta)

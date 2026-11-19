@@ -82,7 +82,7 @@ def crear_respaldo(raiz, forzar=False):
                     if destino.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
                         raise RuntimeError('La verificación de la copia SQLite ha fallado.')
             archivos = [(snapshot, 'xavilu_memoria.db')] if snapshot.exists() else []
-            for nombre in ('app.py', 'requirements.txt', 'requirements.lock.txt', 'xavilu_mantenimiento.py', 'xavilu_normativa_prl.py', 'xavilu_pdf_editorial.py', 'xavilu_archivo.py', 'xavilu_busqueda.py', 'xavilu_trabajos.py', 'xavilu_estado.py', 'xavilu_imagenes.py', 'xavimusic_historial.json', 'db.py'):
+            for nombre in ('app.py', 'iniciar_xavilu.py', 'requirements.txt', 'requirements.lock.txt', 'xavilu_mantenimiento.py', 'xavilu_agentes_estudio.py', 'xavilu_aprendizaje.py', 'xavilu_archivo.py', 'xavilu_busqueda.py', 'xavilu_estado.py', 'xavilu_estudio_auto.py', 'xavilu_estudio_flujo.py', 'xavilu_imagenes.py', 'xavilu_mapa_pdf.py', 'xavilu_mapas.py', 'xavilu_material.py', 'xavilu_normativa_prl.py', 'xavilu_office.py', 'xavilu_pdf_editorial.py', 'xavilu_temporales.py', 'xavilu_trabajos.py', 'xavilu_video.py', 'xavimusic_historial.json'):
                 p = raiz / nombre
                 if p.is_file() and not p.is_symlink():
                     archivos.append((p, nombre))

@@ -94,7 +94,9 @@ def recortar(datos,nombre,modo,**op):
         return {'data':(f'Fuente: {nombre}\nSelección: {modo}\n\n'+parte).encode('utf-8'),'name':base+' [fragmento].txt','type':'text/plain','detalle':f'Fragmento verificado · {len(parte)} caracteres'}
     if modo=='Zona de la imagen':
         from PIL import Image,ImageOps
+        if len(datos)>25*1024*1024:raise ValueError('La imagen supera el límite de 25 MB.')
         with Image.open(BytesIO(datos)) as im:
+            if im.width*im.height>40_000_000:raise ValueError('La imagen tiene más de 40 megapíxeles; reduce su tamaño antes de recortarla.')
             im=ImageOps.exif_transpose(im);x,y,w,h=[int(op[k]) for k in ('x','y','ancho','alto')]
             if min(x,y)<0 or min(w,h)<=0 or x+w>im.width or y+h>im.height:raise ValueError('El recuadro debe quedar dentro de la imagen.')
             out=BytesIO();im.crop((x,y,x+w,y+h)).save(out,format='PNG')
@@ -109,7 +111,13 @@ def recortar(datos,nombre,modo,**op):
                 info=subprocess.run([shutil.which('ffprobe'),'-v','error','-show_entries','format=duration','-of','json',str(entrada)],check=True,capture_output=True,text=True,timeout=20)
                 duracion=float(json.loads(info.stdout)['format']['duration'])
                 if inicio>=duracion or fin>duracion+0.05:raise ValueError(f'El archivo dura {duracion:.1f} segundos. Elige un tramo dentro de esa duración.')
-            cmd=[str(op['ffmpeg']),'-nostdin','-y','-i',str(entrada),'-ss',str(inicio),'-t',str(fin-inicio)]
+            ffmpeg=str(op.get('ffmpeg') or '')
+            ejecutable=Path(ffmpeg)
+            if not ejecutable.is_file():
+                localizado=shutil.which(ffmpeg)
+                if not localizado:raise ValueError('No se encontró FFmpeg. Comprueba la ruta en la configuración local.')
+                ejecutable=Path(localizado)
+            cmd=[str(ejecutable),'-nostdin','-y','-i',str(entrada),'-ss',str(inicio),'-t',str(fin-inicio)]
             cmd+=['-map','0:v:0','-map','0:a:0?','-c:v','libx264','-crf','23','-c:a','aac'] if video else ['-vn','-c:a','libmp3lame','-b:a','192k']
             try:subprocess.run(cmd+[str(salida)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=300)
             except subprocess.TimeoutExpired:raise ValueError('Preparar el tramo ha superado cinco minutos. Elige uno más corto.') from None
@@ -118,4 +126,3 @@ def recortar(datos,nombre,modo,**op):
             resultado=salida.read_bytes()
         return {'data':resultado,'name':f'{base} [segundos {inicio:g}-{fin:g}]'+sufijo,'type':'video/mp4' if video else 'audio/mpeg','detalle':f'Tramo {inicio:g}–{fin:g} segundos'}
     raise ValueError('Selección de material no válida.')
-
