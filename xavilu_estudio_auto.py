@@ -1,11 +1,11 @@
 """Preparación de temarios por temas con resultados persistentes y reanudables."""
 from pathlib import Path
 from datetime import datetime
-import hashlib,json,re,os
+import hashlib,json,re,os,shutil
 from contextlib import contextmanager
 
 VERSION=2
-API_VERSION=10
+API_VERSION=11
 COMPONENTES_VALIDOS={'resumen','mapa','tarjetas','test','guion'}
 
 def _normalizar_componentes(componentes):
@@ -317,6 +317,14 @@ def curso_temporal(session_state,raiz,nombre,temas,indicaciones='',perfil='admin
     else:
         temporal=__import__('tempfile').TemporaryDirectory(prefix='xavilu_temario_')
     curso=CursoAutomatico(temporal.name,nombre,temas,indicaciones,perfil,componentes,nivel,cantidad_tarjetas,cantidad_preguntas)
+    # Reopen a manually saved course into this session's temporary working copy.
+    persistido=Path(raiz).resolve()/curso.carpeta.relative_to(Path(temporal.name).resolve())
+    if persistido.is_dir() and (persistido/'progreso.json').is_file():
+        firma_curso=curso.estado.get('firma')
+        shutil.copytree(persistido,curso.carpeta,dirs_exist_ok=True)
+        curso.estado=_leer_progreso(curso.path)
+        if curso.estado.get('firma')!=firma_curso or curso.estado.get('perfil')!=perfil:
+            raise ValueError('El progreso guardado no coincide con este temario o perfil; el original se conserva.')
     curso._temporal=temporal;curso._firma_sesion=firma;curso._raiz_temporal=Path(temporal.name)
     cursos[firma]=curso
     session_state['_estudio_temporal']=curso

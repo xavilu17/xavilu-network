@@ -7,7 +7,7 @@ textColor="#FAFAFA"
 font="sans serif"
 
 [server]
-maxUploadSize = 500
-maxMessageSize = 500
-enableCORS = false
-enableXsrfProtection = false
+maxUploadSize = 200
+maxMessageSize = 200
+enableCORS = true
+enableXsrfProtection = true
